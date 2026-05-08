@@ -1,0 +1,21 @@
+<!--
+  Fixture : excessive-br-input.html
+  Test    : tests/Unit/Rules/ExcessiveBrRuleTest.php (préset P5 isolé, seuil défaut 2)
+  Auteur  : agent
+
+  Cas couverts :
+    1. 2 <br /> consécutifs en fin de <p> (cas réel post 374)
+    2. 3 <br> consécutifs (forme HTML5 sans slash)
+    3. 4 <br/> consécutifs (forme XHTML self-closed)
+    4. 1 seul <br> isolé (sous seuil → conservé)
+    5. <br /><br /> séparés par espaces/newlines (collapse)
+    6. <br> non consécutifs (préservés tels quels)
+-->
+<p>Texte 1.<br /><br /></p>
+<p>Texte 2.<br><br><br>Suite.</p>
+<p>Texte 3.<br/><br/><br/><br/>Suite.</p>
+<p>Texte 4 avec un seul <br> isolé.</p>
+<p>Texte 5.<br />
+<br />
+Suite après whitespace.</p>
+<p>Texte 6 avec <br> un puis ligne <br> et <br> trois espacés.</p>

@@ -1,0 +1,12 @@
+<!--
+  Fixture : excessive-br-expected.html
+  Sortie attendue après P5 SEUL (seuil 2) sur excessive-br-input.html.
+  N+ <br> consécutifs (séparés ou non par du blanc) → </p><p>.
+  P1 ramasserait les <p> vides en pipeline complète, mais P5 isolé les laisse.
+-->
+<p>Texte 1.</p><p></p>
+<p>Texte 2.</p><p>Suite.</p>
+<p>Texte 3.</p><p>Suite.</p>
+<p>Texte 4 avec un seul <br> isolé.</p>
+<p>Texte 5.</p><p>Suite après whitespace.</p>
+<p>Texte 6 avec <br> un puis ligne <br> et <br> trois espacés.</p>
