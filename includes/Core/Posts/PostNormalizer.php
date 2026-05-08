@@ -18,6 +18,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
 use Cent_Son\Html_Normalizer\Core\Logs\Logger;
+use Cent_Son\Html_Normalizer\Core\Metrics\HtmlMetrics;
 
 /**
  * Service de normalisation au niveau article WP.
@@ -71,13 +72,23 @@ final class PostNormalizer {
 		$html_after  = $this->normalizer->normalize( $html_before, [ 'source' => 'admin-f8', 'post_id' => $post_id ] );
 		$status      = $html_before === $html_after ? self::STATUS_UNCHANGED : self::STATUS_MODIFIED;
 
-		$this->logger?->log_preview( $post_id, (string) $post->post_title, $status );
+		$metrics_before = HtmlMetrics::compute( $html_before );
+		$metrics_after  = HtmlMetrics::compute( $html_after );
+		$metrics_diff   = HtmlMetrics::compare( $metrics_before, $metrics_after );
+		$metrics        = [
+			'before' => $metrics_before,
+			'after'  => $metrics_after,
+			'diff'   => $metrics_diff,
+		];
+
+		$this->logger?->log_preview( $post_id, (string) $post->post_title, $status, $metrics );
 
 		return [
 			'status'          => $status,
 			'html_before'     => $html_before,
 			'html_after'      => $html_after,
 			'has_panels_data' => $has_so,
+			'metrics'         => $metrics,
 		];
 	}
 
@@ -119,13 +130,22 @@ final class PostNormalizer {
 		$html_before = (string) $post->post_content;
 		$html_after  = $this->normalizer->normalize( $html_before, [ 'source' => 'admin-f8', 'post_id' => $post_id ] );
 
+		$metrics_before = HtmlMetrics::compute( $html_before );
+		$metrics_after  = HtmlMetrics::compute( $html_after );
+		$metrics        = [
+			'before' => $metrics_before,
+			'after'  => $metrics_after,
+			'diff'   => HtmlMetrics::compare( $metrics_before, $metrics_after ),
+		];
+
 		if ( $html_before === $html_after ) {
 			$unchanged_msg = __( "Aucune modification : le HTML est déjà conforme.", '100son-html-normalizer' );
-			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_UNCHANGED, $unchanged_msg );
+			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_UNCHANGED, $unchanged_msg, 0, $metrics );
 			return [
 				'status'          => self::STATUS_UNCHANGED,
 				'message'         => $unchanged_msg,
 				'has_panels_data' => $has_so,
+				'metrics'         => $metrics,
 			];
 		}
 
@@ -156,11 +176,12 @@ final class PostNormalizer {
 			];
 		}
 
-		$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_MODIFIED, '', $revision_id );
+		$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_MODIFIED, '', $revision_id, $metrics );
 		return [
 			'status'          => self::STATUS_MODIFIED,
 			'revision_id'     => $revision_id,
 			'has_panels_data' => $has_so,
+			'metrics'         => $metrics,
 		];
 	}
 

@@ -30,27 +30,33 @@ final class Logger {
 	/**
 	 * Logue une normalisation d'article.
 	 *
-	 * @param int    $post_id     ID de l'article.
-	 * @param string $post_title  Titre snapshotte au moment de l'evenement.
-	 * @param string $status      Statut renvoye par PostNormalizer.
-	 * @param string $message     Message complementaire (optionnel).
-	 * @param int    $revision_id ID de la revision creee (0 si aucune).
+	 * @param int                       $post_id     ID de l'article.
+	 * @param string                    $post_title  Titre snapshotte au moment de l'evenement.
+	 * @param string                    $status      Statut renvoye par PostNormalizer.
+	 * @param string                    $message     Message complementaire (optionnel).
+	 * @param int                       $revision_id ID de la revision creee (0 si aucune).
+	 * @param array<string, mixed>|null $metrics     Metriques avant/apres + delta (optionnel).
 	 * @return void
 	 */
-	public function log_normalize( int $post_id, string $post_title, string $status, string $message = '', int $revision_id = 0 ): void {
-		$this->repo->add( $this->build_entry( 'normalize', $status, $post_id, $post_title, $message, $revision_id ) );
+	public function log_normalize( int $post_id, string $post_title, string $status, string $message = '', int $revision_id = 0, ?array $metrics = null ): void {
+		$entry            = $this->build_entry( 'normalize', $status, $post_id, $post_title, $message, $revision_id );
+		$entry['metrics'] = $metrics;
+		$this->repo->add( $entry );
 	}
 
 	/**
 	 * Logue un apercu (sans ecriture).
 	 *
-	 * @param int    $post_id    ID.
-	 * @param string $post_title Titre.
-	 * @param string $status     Statut (modified/unchanged/error_*).
+	 * @param int                       $post_id    ID.
+	 * @param string                    $post_title Titre.
+	 * @param string                    $status     Statut (modified/unchanged/error_*).
+	 * @param array<string, mixed>|null $metrics    Metriques avant/apres + delta (optionnel).
 	 * @return void
 	 */
-	public function log_preview( int $post_id, string $post_title, string $status ): void {
-		$this->repo->add( $this->build_entry( 'preview', $status, $post_id, $post_title, '', 0 ) );
+	public function log_preview( int $post_id, string $post_title, string $status, ?array $metrics = null ): void {
+		$entry            = $this->build_entry( 'preview', $status, $post_id, $post_title, '', 0 );
+		$entry['metrics'] = $metrics;
+		$this->repo->add( $entry );
 	}
 
 	/**

@@ -13,7 +13,9 @@ namespace Cent_Son\Html_Normalizer\Admin\Pages;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
+use Cent_Son\Html_Normalizer\Core\Metrics\HtmlMetrics;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 
 /**
@@ -123,6 +125,8 @@ final class LogsPage {
 			$user_id     = (int) ( $e['user_id'] ?? 0 );
 			$message     = (string) ( $e['message'] ?? '' );
 			$revision_id = (int) ( $e['revision_id'] ?? 0 );
+			$metrics     = isset( $e['metrics'] ) && is_array( $e['metrics'] ) ? $e['metrics'] : null;
+			$metrics_str = self::format_metrics_summary( $metrics );
 
 			$date_str = $timestamp > 0
 				? wp_date( 'Y-m-d H:i:s', $timestamp )
@@ -145,7 +149,7 @@ final class LogsPage {
 					);
 				}
 				printf(
-					'<td><strong>%s</strong>%s%s</td>',
+					'<td><strong>%s</strong>%s%s%s</td>',
 					'' === $edit_url
 						? esc_html( '' === trim( $post_title ) ? __( '(sans titre)', '100son-html-normalizer' ) : $post_title )
 						: sprintf(
@@ -156,7 +160,8 @@ final class LogsPage {
 					'' !== $message
 						? '<br><span class="description" style="font-size:12px;">' . esc_html( $message ) . '</span>'
 						: '',
-					$rev_link // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — déjà esc_url + sprintf typé
+					$rev_link, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — déjà esc_url + sprintf typé
+					$metrics_str // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper
 				);
 			} else {
 				echo '<td>—</td>';
@@ -237,6 +242,55 @@ final class LogsPage {
 			'settings'  => __( 'Configuration', '100son-html-normalizer' ),
 			default     => $event,
 		};
+	}
+
+	/**
+	 * Construit un résumé HTML court des métriques avant/après pour la cellule détail.
+	 *
+	 * @param array<string, mixed>|null $metrics ['before','after','diff'] ou null.
+	 * @return string HTML déjà échappé (vide si rien).
+	 */
+	private static function format_metrics_summary( ?array $metrics ): string {
+		if ( ! is_array( $metrics ) || empty( $metrics['diff'] ) ) {
+			return '';
+		}
+		$diff = $metrics['diff'];
+		if ( ! is_array( $diff ) ) {
+			return '';
+		}
+		$word_delta  = (int) ( $diff['word_delta'] ?? 0 );
+		$word_pct    = (float) ( $diff['word_pct'] ?? 0.0 );
+		$image_delta = (int) ( $diff['image_delta'] ?? 0 );
+		$severity    = (string) ( $diff['severity'] ?? HtmlMetrics::SEVERITY_OK );
+
+		// Aucun delta -> rien à afficher.
+		if ( 0 === $word_delta && 0 === $image_delta ) {
+			return '';
+		}
+
+		$bits = [];
+		if ( 0 !== $word_delta ) {
+			$bits[] = sprintf(
+				'%s%d mots (%s%.1f%%)',
+				$word_delta > 0 ? '+' : '',
+				$word_delta,
+				$word_pct > 0 ? '+' : '',
+				$word_pct
+			);
+		}
+		if ( 0 !== $image_delta ) {
+			$bits[] = sprintf( '%s%d image(s)', $image_delta > 0 ? '+' : '', $image_delta );
+		}
+
+		$badge = HtmlMetrics::SEVERITY_OK !== $severity
+			? ' ' . PostsPage::severity_badge( $severity )
+			: '';
+
+		return sprintf(
+			'<br><span class="description" style="font-size:11px;">%s%s</span>',
+			esc_html( implode( ' · ', $bits ) ),
+			$badge // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper
+		);
 	}
 
 	private static function badge_status( string $status ): string {

@@ -18,6 +18,7 @@ namespace Cent_Son\Html_Normalizer\Admin\Pages;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Metrics\HtmlMetrics;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 use Cent_Son\Html_Normalizer\Core\Posts\SiteOriginDetector;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
@@ -526,7 +527,8 @@ final class PostsPage {
 		echo self::sortable_th( 'title', __( 'Titre', '100son-html-normalizer' ), $orderby, $order ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo self::sortable_th( 'date', __( 'Date', '100son-html-normalizer' ), $orderby, $order, 'width:120px;' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<th class="manage-column" style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
-		echo '<th class="manage-column" style="width:220px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
+		echo '<th class="manage-column" style="width:200px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
+		echo '<th class="manage-column" style="width:70px;text-align:right;">' . esc_html__( 'Mots', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:60px;">SO</th>';
 		echo '<th class="manage-column" style="width:100px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
 		echo '</tr></thead><tbody>';
@@ -566,6 +568,8 @@ final class PostsPage {
 			printf( '<td style="white-space:nowrap;">%s</td>', esc_html( $date_str ) );
 			printf( '<td>%s</td>', esc_html( $post_type ) );
 			printf( '<td>%s</td>', $cats_html ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
+			$word_count = HtmlMetrics::compute( (string) get_post_field( 'post_content', $post_id ) )['word_count'];
+			printf( '<td style="text-align:right;font-variant-numeric:tabular-nums;">%s</td>', esc_html( number_format_i18n( $word_count ) ) );
 			echo '<td>' . ( $has_so
 				? '<span style="display:inline-block;padding:2px 8px;background:#d63638;color:#fff;border-radius:3px;font-size:11px;font-weight:600;">SO</span>'
 				: '—'
@@ -847,6 +851,11 @@ final class PostsPage {
 			echo '<div class="notice notice-info"><p>' . esc_html__( "Aucune modification : le HTML est déjà conforme aux préréglages actifs.", '100son-html-normalizer' ) . '</p></div>';
 		}
 
+		// Encart métriques avant/après.
+		if ( isset( $preview['metrics'] ) && is_array( $preview['metrics'] ) ) {
+			$this->render_metrics_box( $preview['metrics'] );
+		}
+
 		echo '<div style="display:flex;gap:16px;margin-top:16px;">';
 
 		echo '<div style="flex:1;min-width:0;">';
@@ -977,6 +986,97 @@ final class PostsPage {
 				echo '<div class="notice notice-error"><p>' . esc_html( $msg ) . '</p></div>';
 				break;
 		}
+	}
+
+	/**
+	 * Render de l'encart métriques avant/après dans la vue Aperçu.
+	 *
+	 * @param array<string, mixed> $metrics ['before' => [...], 'after' => [...], 'diff' => [...]].
+	 * @return void
+	 */
+	private function render_metrics_box( array $metrics ): void {
+		$before = $metrics['before'] ?? [];
+		$after  = $metrics['after']  ?? [];
+		$diff   = $metrics['diff']   ?? [];
+		if ( ! is_array( $before ) || ! is_array( $after ) || ! is_array( $diff ) ) {
+			return;
+		}
+		$severity = (string) ( $diff['severity'] ?? HtmlMetrics::SEVERITY_OK );
+		$badge    = self::severity_badge( $severity );
+
+		echo '<div style="margin:16px 0;padding:12px;background:#fff;border:1px solid #c3c4c7;">';
+		echo '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+		echo '<strong>' . esc_html__( 'Garde-fou perte de contenu', '100son-html-normalizer' ) . '</strong>';
+		echo $badge; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '</div>';
+
+		echo '<table class="widefat" style="max-width:640px;">';
+		echo '<thead><tr>';
+		echo '<th></th>';
+		echo '<th style="text-align:right;">' . esc_html__( 'Avant', '100son-html-normalizer' ) . '</th>';
+		echo '<th style="text-align:right;">' . esc_html__( 'Après', '100son-html-normalizer' ) . '</th>';
+		echo '<th style="text-align:right;">' . esc_html__( 'Δ', '100son-html-normalizer' ) . '</th>';
+		echo '<th style="text-align:right;">%</th>';
+		echo '</tr></thead><tbody>';
+
+		$rows = [
+			[ __( 'Mots', '100son-html-normalizer' ), 'word_count', 'word_delta', 'word_pct' ],
+			[ __( 'Caractères', '100son-html-normalizer' ), 'char_count', 'char_delta', 'char_pct' ],
+			[ __( 'Images', '100son-html-normalizer' ), 'image_count', 'image_delta', null ],
+		];
+		foreach ( $rows as $row ) {
+			[ $label, $count_key, $delta_key, $pct_key ] = $row;
+			$b   = (int) ( $before[ $count_key ] ?? 0 );
+			$a   = (int) ( $after[ $count_key ] ?? 0 );
+			$d   = (int) ( $diff[ $delta_key ] ?? 0 );
+			$pct = null !== $pct_key ? (float) ( $diff[ $pct_key ] ?? 0.0 ) : null;
+			$color = 0 === $d ? '' : ( $d < 0 ? 'color:#d63638;font-weight:600;' : 'color:#00a32a;font-weight:600;' );
+
+			echo '<tr>';
+			printf( '<td><strong>%s</strong></td>', esc_html( $label ) );
+			printf( '<td style="text-align:right;font-variant-numeric:tabular-nums;">%s</td>', esc_html( number_format_i18n( $b ) ) );
+			printf( '<td style="text-align:right;font-variant-numeric:tabular-nums;">%s</td>', esc_html( number_format_i18n( $a ) ) );
+			printf(
+				'<td style="text-align:right;font-variant-numeric:tabular-nums;%s">%s%s</td>',
+				esc_attr( $color ),
+				$d > 0 ? '+' : '',
+				esc_html( number_format_i18n( $d ) )
+			);
+			if ( null === $pct ) {
+				echo '<td style="text-align:right;color:#646970;">—</td>';
+			} else {
+				printf(
+					'<td style="text-align:right;font-variant-numeric:tabular-nums;%s">%s%s%%</td>',
+					esc_attr( $color ),
+					$pct > 0 ? '+' : '',
+					esc_html( number_format_i18n( $pct, 1 ) )
+				);
+			}
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+		echo '</div>';
+	}
+
+	/**
+	 * Badge HTML colore selon le niveau de severite.
+	 *
+	 * @param string $severity HtmlMetrics::SEVERITY_*.
+	 * @return string HTML déjà échappé.
+	 */
+	public static function severity_badge( string $severity ): string {
+		$presets = [
+			HtmlMetrics::SEVERITY_OK       => [ 'bg' => '#00a32a', 'fg' => '#fff', 'label' => __( 'OK', '100son-html-normalizer' ) ],
+			HtmlMetrics::SEVERITY_WARNING  => [ 'bg' => '#f0b849', 'fg' => '#1d2327', 'label' => __( 'Attention', '100son-html-normalizer' ) ],
+			HtmlMetrics::SEVERITY_CRITICAL => [ 'bg' => '#d63638', 'fg' => '#fff', 'label' => __( 'Perte significative', '100son-html-normalizer' ) ],
+		];
+		$p = $presets[ $severity ] ?? $presets[ HtmlMetrics::SEVERITY_OK ];
+		return sprintf(
+			'<span style="display:inline-block;padding:2px 8px;background:%s;color:%s;border-radius:3px;font-size:11px;font-weight:600;">%s</span>',
+			esc_attr( $p['bg'] ),
+			esc_attr( $p['fg'] ),
+			esc_html( $p['label'] )
+		);
 	}
 
 	// ===================================================================
