@@ -1,0 +1,53 @@
+{
+    "name": "cent-son/100son-html-normalizer",
+    "description": "Moteur de normalisation HTML configurable pour WordPress — 8 présets + règles custom + API publique htmln/normalize.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Cyrille",
+            "email": "cyrille@100son.net",
+            "homepage": "https://100son.net"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "ext-dom": "*",
+        "ext-pcre": "*",
+        "ext-mbstring": "*",
+        "composer/installers": "^2.2",
+        "symfony/css-selector": "^6.4 || ^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "wp-coding-standards/wpcs": "^3.1",
+        "phpstan/phpstan": "^1.11",
+        "szepeviktor/phpstan-wordpress": "^1.3",
+        "phpcompatibility/phpcompatibility-wp": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cent_Son\\Html_Normalizer\\": "includes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Cent_Son\\Html_Normalizer\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "composer/installers": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpcs": "phpcs",
+        "phpcbf": "phpcbf",
+        "phpstan": "phpstan analyse"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -1,0 +1,21 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - 100son-html-normalizer.php
+        - uninstall.php
+        - includes
+    excludePaths:
+        - vendor/*
+        - node_modules/*
+        - assets/build/*
+        - tests/*
+    bootstrapFiles:
+        - vendor/autoload.php
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # Constantes définies dans le fichier principal — connues à l'analyse mais opaques aux stubs.
+        - '#Constant SON100_HTMLN_(VERSION|FILE|PATH|URL|MIN_PHP|MIN_WP) not found#'

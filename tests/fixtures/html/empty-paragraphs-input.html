@@ -1,0 +1,26 @@
+<!--
+  Fixture : empty-paragraphs-input.html
+  Test    : tests/Unit/Rules/EmptyParagraphsRuleTest.php (préset P1 isolé)
+  Auteur  : agent (cas isolés focalisés, fixtures non sensibles au bias)
+
+  Cas couverts (cf. cahier §3.1 F2.P1, §8 F2.P1) :
+    1. <p></p> strictement vide
+    2. <p>&nbsp;</p>
+    3. <p> </p> (espace simple)
+    4. <p>   </p> (espaces multiples)
+    5. <p>texte</p> (paragraphe non vide → conservé)
+    6. <p><img src="..."/></p> (paragraphe contenant un élément structurel → conservé)
+    7. <p><strong></strong></p> (paragraphe avec balise inline vide → traité comme vide)
+    8. <p>\n   \n&nbsp;\n</p> (mix blancs et nbsp → traité comme vide)
+-->
+<p></p>
+<p>&nbsp;</p>
+<p> </p>
+<p>   </p>
+<p>texte significatif</p>
+<p><img src="https://example.test/image.jpg" alt="image"></p>
+<p><strong></strong></p>
+<p>
+
+&nbsp;
+</p>

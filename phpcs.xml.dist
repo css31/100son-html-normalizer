@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<ruleset name="100son-html-normalizer">
+    <description>WPCS + PSR-12 ruleset pour 100son-html-normalizer.</description>
+
+    <file>./100son-html-normalizer.php</file>
+    <file>./uninstall.php</file>
+    <file>./includes</file>
+    <file>./tests</file>
+
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/assets/build/*</exclude-pattern>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="ps"/>
+    <arg name="parallel" value="4"/>
+
+    <config name="minimum_supported_wp_version" value="6.8"/>
+    <config name="testVersion" value="8.3-"/>
+
+    <rule ref="WordPress">
+        <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+        <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+        <exclude name="Universal.Operators.DisallowShortTernary.Found"/>
+        <exclude name="Squiz.Commenting.FunctionComment.MissingParamComment"/>
+    </rule>
+
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="100son-html-normalizer"/>
+            </property>
+        </properties>
+    </rule>
+
+    <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+        <properties>
+            <property name="prefixes" type="array">
+                <element value="son100_htmln"/>
+                <element value="SON100_HTMLN"/>
+                <element value="Cent_Son\Html_Normalizer"/>
+            </property>
+        </properties>
+    </rule>
+
+    <rule ref="PHPCompatibilityWP"/>
+</ruleset>
