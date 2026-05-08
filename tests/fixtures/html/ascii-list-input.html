@@ -1,0 +1,51 @@
+<!--
+  Fixture : ascii-list-input.html
+  Test    : tests/Unit/Rules/AsciiListRuleTest.php (préset P7 isolé)
+  Auteur  : agent (option C — à valider par Cyrille avant écriture du code)
+
+  Configuration testée : présets activés par défaut
+    - marqueurs `- `, `– ` (cadratin), `* `, `• `, numéros `N. `
+    - pas de marqueurs custom
+    - seuil = 2
+
+  Cas couverts (cf. cahier §3.1 F2.P7, §4.4, §14 hyp. 12) :
+    1. `<p>` mixte (texte + bullets `•` séparées par `<br />`) — extrait post 6150
+    2. Bullets `•` hors-`<p>` (chaque item dans `<p>` distinct) — extrait post 2500
+    3. Tirets `- ` traversant `<span>` inline — extrait post 6690 (avec attribut style à dropper)
+    4. Cadratin `– ` hors-`<p>` (synthétique)
+    5. Astérisque `* ` intra-`<p>` (synthétique)
+    6. Numéros `N.` hors-`<p>` (synthétique)
+    7. Sous-seuil : 1 seul tiret isolé (seuil défaut 2) — ne doit PAS être converti
+    8. `<p>` mixte sans détection (1 seul bullet en milieu, sous seuil) — pas d'action P7
+-->
+
+<!-- 1. <p> mixte avec bullets `•` (post 6150) — split + conversion -->
+<p><strong>Horaires</strong> : <a href="https://ma-maison-mag-2.local/wp-content/uploads/2020/01/2020-01-art3f-toulouse-09.jpg"><img class="wp-image-6064 alignright" src="https://ma-maison-mag-2.local/wp-content/uploads/2020/01/2020-01-art3f-toulouse-09.jpg" alt="art3f salon" width="528" height="352" /></a><br />• Vendredi : 16h à 23h (vernissage officiel à partir de 18h)<br />• Samedi : 10h à 20h<br />• Dimanche : 10h à 19h</p>
+
+<!-- 2. Bullets `•` hors-<p> (post 2500) — chaque item dans son propre <p> -->
+<p>• Bien moins chère que l'alu, le bois et le mixte.</p>
+<p>• Très bonne étanchéité.</p>
+<p>• Ouvrant caché, comme l'alu, et protégé contre l'effraction.</p>
+<p>• 100% recyclable.</p>
+
+<!-- 3. Tirets `- ` traversant <span style> (post 6690) — préservation inline + drop attributs -->
+<p><span style="color: #000000;">- offre des <strong>performances techniques inégalables</strong> pour créer un plancher porteur.</span><br /><span style="color: #000000;">- combine des procédés techniques qui lui assurent <strong>une parfaite rigidité</strong>.</span><br /><span style="color: #000000;">- permet de <strong>réaliser l'ensemble des travaux par l'extérieur</strong>.</span></p>
+
+<!-- 4. Cadratin `– ` hors-<p> (synthétique) -->
+<p>– Élément alpha</p>
+<p>– Élément beta</p>
+<p>– Élément gamma</p>
+
+<!-- 5. Astérisque `* ` intra-<p> avec <br /> (synthétique) -->
+<p>* Note de bas de page un<br />* Note de bas de page deux<br />* Note de bas de page trois</p>
+
+<!-- 6. Numéros `N.` hors-<p> (synthétique) — produit <ol> -->
+<p>1. Première étape de la procédure</p>
+<p>2. Deuxième étape de la procédure</p>
+<p>3. Troisième étape de la procédure</p>
+
+<!-- 7. Sous-seuil (1 tiret isolé, seuil = 2) — ne doit PAS être converti -->
+<p>- Tiret isolé qui doit rester en paragraphe.</p>
+
+<!-- 8. <p> mixte sans détection (1 bullet seul au milieu, sous seuil) — P7 inactif -->
+<p>Texte d'introduction normal sans liste.<br />• Une seule bullet isolée ici.<br />Conclusion sur une autre ligne.</p>

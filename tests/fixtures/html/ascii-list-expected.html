@@ -1,0 +1,42 @@
+<!--
+  Fixture : ascii-list-expected.html
+  Test    : tests/Unit/Rules/AsciiListRuleTest.php (préset P7 isolé)
+  Auteur  : agent (option C — à valider par Cyrille avant écriture du code)
+
+  Sortie attendue après application de P7 SEUL (pas P6, pas P5, pas P1 etc.)
+  sur ascii-list-input.html, en config par défaut (marqueurs `- – * • N.`, seuil 2).
+
+  Format : HTML brut (pas de blocs Gutenberg, cf. cahier §3.2 ligne 82).
+
+  Règles appliquées (cf. cahier §3.1 F2.P7, §14 hyp. 12) :
+    - Pour chaque <p>, compter les fragments séparés par <br /> qui commencent par un marqueur.
+    - Si nb < seuil → <p> inchangé.
+    - Si nb >= seuil → split sur <br />, fragments non-bullet en <p> séparés, fragments bullets consécutifs regroupés en <ul>/<ol>.
+    - Dans chaque <li>, marqueur retiré, balises inline (span/strong/em/a) préservées MAIS attributs style/class/id supprimés ; autres attributs (href, alt…) conservés.
+    - Numéros `N.` produisent <ol>, autres marqueurs produisent <ul>.
+-->
+
+<!-- 1. <p> mixte avec bullets `•` (post 6150) — split + conversion. Non-bullet shard préservé verbatim -->
+<p><strong>Horaires</strong> : <a href="https://ma-maison-mag-2.local/wp-content/uploads/2020/01/2020-01-art3f-toulouse-09.jpg"><img class="wp-image-6064 alignright" src="https://ma-maison-mag-2.local/wp-content/uploads/2020/01/2020-01-art3f-toulouse-09.jpg" alt="art3f salon" width="528" height="352" /></a></p>
+<ul><li>Vendredi : 16h à 23h (vernissage officiel à partir de 18h)</li><li>Samedi : 10h à 20h</li><li>Dimanche : 10h à 19h</li></ul>
+
+<!-- 2. Bullets `•` hors-<p> (post 2500) -->
+<ul><li>Bien moins chère que l'alu, le bois et le mixte.</li><li>Très bonne étanchéité.</li><li>Ouvrant caché, comme l'alu, et protégé contre l'effraction.</li><li>100% recyclable.</li></ul>
+
+<!-- 3. Tirets `- ` traversant <span style> (post 6690) — <span> désenrobé (conteneur sans attribut sémantique), <strong> préservé -->
+<ul><li>offre des <strong>performances techniques inégalables</strong> pour créer un plancher porteur.</li><li>combine des procédés techniques qui lui assurent <strong>une parfaite rigidité</strong>.</li><li>permet de <strong>réaliser l'ensemble des travaux par l'extérieur</strong>.</li></ul>
+
+<!-- 4. Cadratin `– ` hors-<p> -->
+<ul><li>Élément alpha</li><li>Élément beta</li><li>Élément gamma</li></ul>
+
+<!-- 5. Astérisque `* ` intra-<p> avec <br /> -->
+<ul><li>Note de bas de page un</li><li>Note de bas de page deux</li><li>Note de bas de page trois</li></ul>
+
+<!-- 6. Numéros `N.` hors-<p> — produit <ol> -->
+<ol><li>Première étape de la procédure</li><li>Deuxième étape de la procédure</li><li>Troisième étape de la procédure</li></ol>
+
+<!-- 7. Sous-seuil (1 tiret isolé, seuil = 2) — inchangé -->
+<p>- Tiret isolé qui doit rester en paragraphe.</p>
+
+<!-- 8. <p> mixte sans détection (1 bullet seul, sous seuil) — inchangé -->
+<p>Texte d'introduction normal sans liste.<br />• Une seule bullet isolée ici.<br />Conclusion sur une autre ligne.</p>

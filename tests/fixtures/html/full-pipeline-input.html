@@ -1,0 +1,76 @@
+<!--
+  Fixture : full-pipeline-input.html
+  Test    : tests/Integration/HtmlNormalizerTest.php (pipeline complète)
+  Auteur  : agent + Cyrille (option C — à valider par Cyrille avant écriture du code)
+
+  Configuration testée : tous présets activés par défaut
+    P3, P4, P6 (keep_text_align=true), P7 (marqueurs défaut, seuil 2), P5, P1, P2
+
+  Pipeline (cf. cahier §4.4) : P3 → P4 → P6 → P7 → P5 → P1 → P2
+
+  Cas couverts :
+    A. P7 hors-<p> bullets `•` (post 2500)            — chaque item dans son propre <p>
+    B. P3 Shareaholic shortcode (post 2500)            — `[shareaholic …]`
+    C. P4 Pinterest officiel `data-pin-do` (synth.)    — vrai bouton Pinterest
+    D. P6 + cas Pinterest "Enregistrer" forme B (2500) — span sans data-pin-*, capturé seulement par P6
+    E. P6 keep_text_align=true (synth.)                — text-align préservé, color retiré
+    F. P7 + P6 imbriqué — tirets dans <span style> (post 6690)
+    K. P8 RecoverSemanticStyles                       — bold → <strong>, italic → <em>, combinés, chirurgical avec text-align
+    G. P5 ExcessiveBr (synth.)                         — 4 <br> consécutifs
+    H. P2 EmptyHeadings (synth.)                       — <h2></h2>
+    I. P1 EmptyParagraphs                              — <p>&nbsp;</p>, <p></p>
+    J. Interaction P5 → P1 (synth.)                    — 5 <br> en fin de <p> → P5 splitte → P1 ramasse
+-->
+
+<!-- A. Bullets `•` hors-<p> (post 2500) -->
+<p>• Meilleure performance thermique du marché. <br />Uw jusqu'à 0,8 W/(m².K)<br />NB : Le coefficient Uw mesure la performance de l'isolation de la fenêtre.</p>
+<p>• Bien moins chère que l'alu, le bois et le mixte.</p>
+<p>• Très bonne étanchéité.<br />3 joints au lieu de 2 habituellement.</p>
+<p>• Ouvrant caché, comme l'alu, et protégé contre l'effraction.</p>
+<p>• 100% recyclable.</p>
+<p>• Très belles finitions au niveau des soudures d'angle. Pas d'ébavurage.</p>
+<p>• Vitrage de 28 mm d'épaisseur (4/20/4, isolation thermique renforcée, gaz argon).</p>
+<p>• Gain de surface vitrée jusqu'à +10%.</p>
+
+<!-- B. P3 Shareaholic shortcode (post 2500) -->
+<p>[shareaholic app="share_buttons" id="25022196"]</p>
+
+<!--
+  D. Pinterest "Enregistrer" forme B — span sans data-pin-* (post 2500).
+  Variantes observées dans le corpus (toutes équivalentes côté pipeline V1) : opacity 0.85/1, avec/sans top/left.
+  Toutes deviennent `<p><span>Enregistrer</span></p>` après P6 (P4 ne les capture pas).
+  Si P4 est élargi en V2 (cf. PLUGIN_CONTEXT.md §6.7), enrichir cette fixture.
+-->
+<p><span style="border-radius: 2px; text-indent: 20px; width: auto; padding: 0px 4px 0px 0px; text-align: center; font: bold 11px/20px 'Helvetica Neue',Helvetica,sans-serif; color: #ffffff; background: #bd081c no-repeat scroll 3px 50% / 14px 14px; position: absolute; opacity: 0.85; z-index: 8675309; display: none; cursor: pointer; top: 168px; left: 328px;">Enregistrer</span></p>
+
+<!-- C. P4 Pinterest officiel — vrai bouton avec data-pin-do (synthétique) -->
+<p><span data-pin-do="buttonPin" data-pin-config="above" data-pin-color="red">Pin it</span></p>
+
+<!-- E. P6 keep_text_align (synthétique) — text-align doit rester, color doit partir -->
+<p style="text-align: center; color: red;">Texte centré rouge.</p>
+
+<!-- K. P8 RecoverSemanticStyles (synthétique) -->
+<p style="font-weight: bold;">Texte gras seul.</p>
+<p style="font-style: italic;">Texte italique seul.</p>
+<p style="font-weight: 700;">Valeur numérique 700, équivalent bold.</p>
+<p style="text-align: center; font-weight: bold;">Centré et gras combinés.</p>
+<p><span style="font-weight: bold; font-style: italic;">Inline gras italique combiné.</span></p>
+
+<!-- F. P7 + P6 imbriqué — tirets dans <span style> (post 6690) -->
+<p><span style="color: #000000;">- offre des <strong>performances inégalables</strong>.</span><br /><span style="color: #000000;">- combine des procédés techniques.</span><br /><span style="color: #000000;">- permet de réaliser les travaux.</span></p>
+
+<!-- G. P5 ExcessiveBr (post 374) — 2 <br> en fin de <p> avec seuil défaut 2 → collapse en </p><p>, P1 ramasse le <p> vide -->
+<p>Puis la charpente traditionnelle avec poutre faîtière et solives qui garantira une hauteur sous plafond de 1,80 m au plus bas et de 3 m au plus haut.<br /><br /></p>
+
+<!-- H. P2 EmptyHeadings (synthétique) -->
+<h2></h2>
+<h3>Vrai titre conservé.</h3>
+<h4></h4>
+
+<!-- I. P1 EmptyParagraphs (synthétique + post 2500) -->
+<p>&nbsp;</p>
+<p></p>
+<p> </p>
+
+<!-- J. Interaction P5 → P1 — 5 <br> en fin de <p> : P5 collapse, le <p> résultant peut être vide -->
+<p>Texte court avant.<br /><br /><br /><br /><br /></p>
