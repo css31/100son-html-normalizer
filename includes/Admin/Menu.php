@@ -15,6 +15,7 @@ namespace Cent_Son\Html_Normalizer\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Admin\Pages\LogsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
@@ -30,11 +31,13 @@ final class Menu {
 	private PresetsPage $presets_page;
 	private TesterPage  $tester_page;
 	private PostsPage   $posts_page;
+	private LogsPage    $logs_page;
 
-	public function __construct( PresetsPage $presets_page, TesterPage $tester_page, PostsPage $posts_page ) {
+	public function __construct( PresetsPage $presets_page, TesterPage $tester_page, PostsPage $posts_page, LogsPage $logs_page ) {
 		$this->presets_page = $presets_page;
 		$this->tester_page  = $tester_page;
 		$this->posts_page   = $posts_page;
+		$this->logs_page    = $logs_page;
 	}
 
 	/**
@@ -93,6 +96,16 @@ final class Menu {
 			self::CAPABILITY,
 			self::SLUG . '-posts',
 			[ $this->posts_page, 'render' ]
+		);
+
+		// Sous-page "Journal".
+		add_submenu_page(
+			self::SLUG,
+			__( 'Journal', '100son-html-normalizer' ),
+			__( 'Journal', '100son-html-normalizer' ),
+			self::CAPABILITY,
+			self::SLUG . '-logs',
+			[ $this->logs_page, 'render' ]
 		);
 	}
 }

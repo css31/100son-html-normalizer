@@ -14,6 +14,7 @@ namespace Cent_Son\Html_Normalizer\Admin\Pages;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Logs\Logger;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
@@ -27,10 +28,12 @@ final class PresetsPage {
 
 	private SettingsRepository $settings;
 	private PresetRegistry     $registry;
+	private ?Logger            $logger;
 
-	public function __construct( SettingsRepository $settings, PresetRegistry $registry ) {
+	public function __construct( SettingsRepository $settings, PresetRegistry $registry, ?Logger $logger = null ) {
 		$this->settings = $settings;
 		$this->registry = $registry;
+		$this->logger   = $logger;
 	}
 
 	/**
@@ -75,7 +78,9 @@ final class PresetsPage {
 
 		check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
 
-		$presets   = $this->settings->get_all_presets();
+		// Snapshot AVANT save pour générer un diff dans le journal.
+		$before    = $this->settings->get_all_presets();
+		$presets   = $before;
 		$post_data = isset( $_POST['preset'] ) && is_array( $_POST['preset'] )
 			? wp_unslash( $_POST['preset'] )
 			: [];
@@ -123,7 +128,43 @@ final class PresetsPage {
 			$this->settings->set_preset_config( $preset_id, $config );
 		}
 
+		// Log de la sauvegarde avec un résumé du diff.
+		if ( null !== $this->logger ) {
+			$after = $this->settings->get_all_presets();
+			$this->logger->log_settings_change( self::summarize_presets_diff( $before, $after ) );
+		}
+
 		return true;
+	}
+
+	/**
+	 * Construit un résumé textuel du diff entre deux configurations de préréglages.
+	 *
+	 * @param array<string, array<string, mixed>> $before Avant.
+	 * @param array<string, array<string, mixed>> $after  Après.
+	 * @return string
+	 */
+	private static function summarize_presets_diff( array $before, array $after ): string {
+		$changes = [];
+		$keys    = array_unique( array_merge( array_keys( $before ), array_keys( $after ) ) );
+		foreach ( $keys as $preset_id ) {
+			$b = $before[ $preset_id ] ?? [];
+			$a = $after[ $preset_id ] ?? [];
+			if ( $a === $b ) {
+				continue;
+			}
+			$b_enabled = ! empty( $b['enabled'] );
+			$a_enabled = ! empty( $a['enabled'] );
+			if ( $b_enabled !== $a_enabled ) {
+				$changes[] = $preset_id . ( $a_enabled ? ' activé' : ' désactivé' );
+			} else {
+				$changes[] = $preset_id . ' (paramètres modifiés)';
+			}
+		}
+		if ( [] === $changes ) {
+			return 'Aucun changement effectif';
+		}
+		return implode( ', ', $changes );
 	}
 
 	/**

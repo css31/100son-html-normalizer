@@ -134,3 +134,40 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 		return $post_id;
 	}
 }
+
+if ( ! function_exists( 'wp_get_current_user' ) ) {
+	function wp_get_current_user(): object {
+		return (object) [ 'ID' => 0, 'user_login' => '' ];
+	}
+}
+
+if ( ! function_exists( 'wp_date' ) ) {
+	function wp_date( string $format, int $timestamp ): string {
+		return date( $format, $timestamp );
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	$GLOBALS['son100_htmln_options'] = $GLOBALS['son100_htmln_options'] ?? [];
+	function get_option( string $name, mixed $default = false ): mixed {
+		return $GLOBALS['son100_htmln_options'][ $name ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	$GLOBALS['son100_htmln_options'] = $GLOBALS['son100_htmln_options'] ?? [];
+	function update_option( string $name, mixed $value, string|bool $autoload = false ): bool {
+		$GLOBALS['son100_htmln_options'][ $name ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $name, mixed $value, string $deprecated = '', string|bool $autoload = false ): bool {
+		if ( ! isset( $GLOBALS['son100_htmln_options'][ $name ] ) ) {
+			$GLOBALS['son100_htmln_options'][ $name ] = $value;
+			return true;
+		}
+		return false;
+	}
+}

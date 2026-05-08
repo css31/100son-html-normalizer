@@ -17,6 +17,7 @@ namespace Cent_Son\Html_Normalizer\Core\Posts;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
+use Cent_Son\Html_Normalizer\Core\Logs\Logger;
 
 /**
  * Service de normalisation au niveau article WP.
@@ -32,10 +33,12 @@ final class PostNormalizer {
 
 	private HtmlNormalizer    $normalizer;
 	private SiteOriginDetector $so_detector;
+	private ?Logger            $logger;
 
-	public function __construct( HtmlNormalizer $normalizer, SiteOriginDetector $so_detector ) {
+	public function __construct( HtmlNormalizer $normalizer, SiteOriginDetector $so_detector, ?Logger $logger = null ) {
 		$this->normalizer  = $normalizer;
 		$this->so_detector = $so_detector;
+		$this->logger      = $logger;
 	}
 
 	/**
@@ -53,6 +56,7 @@ final class PostNormalizer {
 	public function preview( int $post_id ): array {
 		$post = $this->fetch_post( $post_id );
 		if ( null === $post ) {
+			$this->logger?->log_preview( $post_id, '', self::STATUS_ERROR_NOT_FOUND );
 			return [
 				'status'          => self::STATUS_ERROR_NOT_FOUND,
 				'html_before'     => '',
@@ -65,9 +69,12 @@ final class PostNormalizer {
 		$has_so      = $this->so_detector->has_panels_data( $post_id );
 		$html_before = (string) $post->post_content;
 		$html_after  = $this->normalizer->normalize( $html_before, [ 'source' => 'admin-f8', 'post_id' => $post_id ] );
+		$status      = $html_before === $html_after ? self::STATUS_UNCHANGED : self::STATUS_MODIFIED;
+
+		$this->logger?->log_preview( $post_id, (string) $post->post_title, $status );
 
 		return [
-			'status'          => $html_before === $html_after ? self::STATUS_UNCHANGED : self::STATUS_MODIFIED,
+			'status'          => $status,
 			'html_before'     => $html_before,
 			'html_after'      => $html_after,
 			'has_panels_data' => $has_so,
@@ -89,6 +96,7 @@ final class PostNormalizer {
 	public function normalize_post( int $post_id, bool $force_siteorigin = false ): array {
 		$post = $this->fetch_post( $post_id );
 		if ( null === $post ) {
+			$this->logger?->log_normalize( $post_id, '', self::STATUS_ERROR_NOT_FOUND, __( "Article introuvable.", '100son-html-normalizer' ) );
 			return [
 				'status'          => self::STATUS_ERROR_NOT_FOUND,
 				'message'         => __( "Article introuvable.", '100son-html-normalizer' ),
@@ -96,11 +104,14 @@ final class PostNormalizer {
 			];
 		}
 
-		$has_so = $this->so_detector->has_panels_data( $post_id );
+		$post_title = (string) $post->post_title;
+		$has_so     = $this->so_detector->has_panels_data( $post_id );
 		if ( $has_so && ! $force_siteorigin ) {
+			$skip_msg = __( "Article SiteOrigin détecté. Cocher « Continuer quand même » pour outrepasser, ou utiliser SO to Blocks pour la migration.", '100son-html-normalizer' );
+			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_SKIPPED_SO, $skip_msg );
 			return [
 				'status'          => self::STATUS_SKIPPED_SO,
-				'message'         => __( "Article SiteOrigin détecté. Cocher « Continuer quand même » pour outrepasser, ou utiliser SO to Blocks pour la migration.", '100son-html-normalizer' ),
+				'message'         => $skip_msg,
 				'has_panels_data' => true,
 			];
 		}
@@ -109,9 +120,11 @@ final class PostNormalizer {
 		$html_after  = $this->normalizer->normalize( $html_before, [ 'source' => 'admin-f8', 'post_id' => $post_id ] );
 
 		if ( $html_before === $html_after ) {
+			$unchanged_msg = __( "Aucune modification : le HTML est déjà conforme.", '100son-html-normalizer' );
+			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_UNCHANGED, $unchanged_msg );
 			return [
 				'status'          => self::STATUS_UNCHANGED,
-				'message'         => __( "Aucune modification : le HTML est déjà conforme.", '100son-html-normalizer' ),
+				'message'         => $unchanged_msg,
 				'has_panels_data' => $has_so,
 			];
 		}
@@ -135,6 +148,7 @@ final class PostNormalizer {
 
 		if ( is_wp_error( $update_result ) || 0 === $update_result ) {
 			$msg = is_wp_error( $update_result ) ? $update_result->get_error_message() : __( 'Échec de la mise à jour.', '100son-html-normalizer' );
+			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_ERROR_WRITE, (string) $msg );
 			return [
 				'status'          => self::STATUS_ERROR_WRITE,
 				'message'         => (string) $msg,
@@ -142,6 +156,7 @@ final class PostNormalizer {
 			];
 		}
 
+		$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_MODIFIED, '', $revision_id );
 		return [
 			'status'          => self::STATUS_MODIFIED,
 			'revision_id'     => $revision_id,

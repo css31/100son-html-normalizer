@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Posts;
 
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
+use Cent_Son\Html_Normalizer\Core\Logs\Logger;
+use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
 use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 use Cent_Son\Html_Normalizer\Core\Posts\SiteOriginDetector;
@@ -25,9 +27,11 @@ final class PostNormalizerTest extends TestCase {
 	use HtmlAssertions;
 
 	private PostNormalizer $service;
+	private LogRepository  $log_repo;
 
 	protected function setUp(): void {
 		Son100_Htmln_Test_Posts_Registry::reset();
+		$GLOBALS['son100_htmln_options'] = [];
 
 		$settings = new class extends SettingsRepository {
 			public function is_preset_enabled( string $preset_id ): bool { return true; }
@@ -45,8 +49,10 @@ final class PostNormalizerTest extends TestCase {
 				};
 			}
 		};
-		$normalizer  = new HtmlNormalizer( new PresetRegistry( $settings ), new Pipeline() );
-		$this->service = new PostNormalizer( $normalizer, new SiteOriginDetector() );
+		$normalizer    = new HtmlNormalizer( new PresetRegistry( $settings ), new Pipeline() );
+		$this->log_repo = new LogRepository();
+		$logger        = new Logger( $this->log_repo );
+		$this->service = new PostNormalizer( $normalizer, new SiteOriginDetector(), $logger );
 	}
 
 	private function set_post( int $id, string $content, ?array $panels_data = null ): void {
@@ -130,5 +136,37 @@ final class PostNormalizerTest extends TestCase {
 	public function test_normalize_404_for_missing_post(): void {
 		$result = $this->service->normalize_post( 99999, false );
 		$this->assertSame( PostNormalizer::STATUS_ERROR_NOT_FOUND, $result['status'] );
+	}
+
+	// ====== Logging ====== //
+
+	public function test_normalize_logs_entry_on_success(): void {
+		$this->set_post( 10, '<p style="color:red"></p><p>OK</p>' );
+		$this->service->normalize_post( 10, false );
+
+		$entries = $this->log_repo->all();
+		$this->assertCount( 1, $entries );
+		$this->assertSame( 'normalize', $entries[0]['event'] );
+		$this->assertSame( PostNormalizer::STATUS_MODIFIED, $entries[0]['status'] );
+		$this->assertSame( 10, $entries[0]['post_id'] );
+	}
+
+	public function test_normalize_logs_entry_on_so_skip(): void {
+		$this->set_post( 11, '<p>x</p>', [ 'widgets' => [ [ 'a' => 1 ] ] ] );
+		$this->service->normalize_post( 11, false );
+
+		$entries = $this->log_repo->all();
+		$this->assertCount( 1, $entries );
+		$this->assertSame( PostNormalizer::STATUS_SKIPPED_SO, $entries[0]['status'] );
+	}
+
+	public function test_preview_logs_entry(): void {
+		$this->set_post( 12, '<p style="color:red"></p><p>OK</p>' );
+		$this->service->preview( 12 );
+
+		$entries = $this->log_repo->all();
+		$this->assertCount( 1, $entries );
+		$this->assertSame( 'preview', $entries[0]['event'] );
+		$this->assertSame( PostNormalizer::STATUS_MODIFIED, $entries[0]['status'] );
 	}
 }
