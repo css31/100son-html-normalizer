@@ -60,6 +60,32 @@ class SettingsRepository {
 	}
 
 	/**
+	 * Nombre d'articles par page sur la liste F8.
+	 *
+	 * @return int Validé contre la liste des choix autorisés (10, 25, 50, 100, 200), défaut 25.
+	 */
+	public function get_f8_per_page(): int {
+		$settings = $this->get_settings();
+		$value    = (int) ( $settings['f8_per_page'] ?? 25 );
+		$allowed  = [ 10, 25, 50, 100, 200 ];
+		return in_array( $value, $allowed, true ) ? $value : 25;
+	}
+
+	/**
+	 * Met à jour le nombre d'articles par page (F8).
+	 *
+	 * @param int $per_page Valeur candidate.
+	 * @return void
+	 */
+	public function set_f8_per_page( int $per_page ): void {
+		$allowed                  = [ 10, 25, 50, 100, 200 ];
+		$valid                    = in_array( $per_page, $allowed, true ) ? $per_page : 25;
+		$settings                 = $this->get_settings();
+		$settings['f8_per_page']  = $valid;
+		update_option( self::OPT_SETTINGS, $settings, false );
+	}
+
+	/**
 	 * Récupère les réglages globaux bruts.
 	 *
 	 * @return array<string, mixed>

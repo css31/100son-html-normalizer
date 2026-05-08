@@ -31,7 +31,7 @@ final class PostsPage {
 	private const NONCE_NORMALIZE  = 'son100_htmln_posts_normalize';
 	private const NONCE_NAME       = '_son100_htmln_nonce';
 	private const PAGE_SLUG        = '100son-html-normalizer-posts';
-	private const PER_PAGE         = 25;
+	private const PER_PAGE_CHOICES = [ 10, 25, 50, 100, 200 ];
 
 	private SettingsRepository $settings;
 	private SiteOriginDetector $so_detector;
@@ -109,6 +109,11 @@ final class PostsPage {
 			: [];
 
 		$this->settings->set_f8_post_types_selection( $selected );
+
+		// Sauvegarde du nombre d'articles par page si présent.
+		if ( isset( $_POST['per_page'] ) ) {
+			$this->settings->set_f8_per_page( (int) $_POST['per_page'] );
+		}
 	}
 
 	/**
@@ -149,15 +154,20 @@ final class PostsPage {
 	 * @return void
 	 */
 	private function render_filters_form(): void {
-		$selected      = $this->settings->get_f8_post_types_selection();
-		$available     = $this->get_available_post_types();
-		$page_url      = self::page_url();
+		$selected     = $this->settings->get_f8_post_types_selection();
+		$available    = $this->get_available_post_types();
+		$current_pp   = $this->settings->get_f8_per_page();
+		$page_url     = self::page_url();
 
 		echo '<form method="post" action="' . esc_url( $page_url ) . '" style="margin:16px 0;padding:12px;background:#fff;border:1px solid #c3c4c7;">';
 		echo '<input type="hidden" name="son100_htmln_action" value="save_filters">';
 		wp_nonce_field( self::NONCE_FILTERS, self::NONCE_NAME );
 
-		echo '<strong>' . esc_html__( 'Types de contenu à afficher :', '100son-html-normalizer' ) . '</strong> ';
+		echo '<div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;">';
+
+		// Filtres post_type.
+		echo '<div>';
+		echo '<strong>' . esc_html__( 'Types de contenu :', '100son-html-normalizer' ) . '</strong> ';
 		foreach ( $available as $slug => $label ) {
 			$checked = in_array( $slug, $selected, true );
 			printf(
@@ -167,7 +177,28 @@ final class PostsPage {
 				esc_html( $label )
 			);
 		}
-		submit_button( __( 'Filtrer', '100son-html-normalizer' ), 'secondary', '', false );
+		echo '</div>';
+
+		// Sélecteur per_page.
+		echo '<div>';
+		echo '<label><strong>' . esc_html__( 'Articles / page :', '100son-html-normalizer' ) . '</strong> ';
+		echo '<select name="per_page">';
+		foreach ( self::PER_PAGE_CHOICES as $choice ) {
+			printf(
+				'<option value="%1$d" %2$s>%1$d</option>',
+				$choice,
+				selected( $choice === $current_pp, true, false )
+			);
+		}
+		echo '</select></label>';
+		echo '</div>';
+
+		// Bouton.
+		echo '<div>';
+		submit_button( __( 'Appliquer', '100son-html-normalizer' ), 'secondary', '', false );
+		echo '</div>';
+
+		echo '</div>';
 		echo '</form>';
 	}
 
@@ -183,15 +214,16 @@ final class PostsPage {
 			return;
 		}
 
-		$paged = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
+		$paged    = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$per_page = $this->settings->get_f8_per_page();
 
 		$query = new \WP_Query(
 			[
 				'post_type'      => $selected,
 				'post_status'    => [ 'publish', 'draft', 'private' ],
-				'posts_per_page' => self::PER_PAGE,
+				'posts_per_page' => $per_page,
 				'paged'          => $paged,
-				'orderby'        => 'ID',
+				'orderby'        => 'date',
 				'order'          => 'DESC',
 				'no_found_rows'  => false,
 			]
@@ -213,19 +245,23 @@ final class PostsPage {
 
 		echo '<table class="wp-list-table widefat fixed striped">';
 		echo '<thead><tr>';
-		echo '<th style="width:80px;">ID</th>';
+		echo '<th style="width:60px;">ID</th>';
 		echo '<th>' . esc_html__( 'Titre', '100son-html-normalizer' ) . '</th>';
+		echo '<th style="width:120px;">' . esc_html__( 'Date', '100son-html-normalizer' ) . '</th>';
 		echo '<th style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
-		echo '<th style="width:80px;">SO</th>';
-		echo '<th style="width:200px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
+		echo '<th style="width:220px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
+		echo '<th style="width:60px;">SO</th>';
+		echo '<th style="width:100px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
 		while ( $query->have_posts() ) {
 			$query->the_post();
 			$post_id   = (int) get_the_ID();
 			$title     = get_the_title( $post_id );
-			$post_type = get_post_type( $post_id );
+			$post_type = (string) get_post_type( $post_id );
 			$has_so    = $this->so_detector->has_panels_data( $post_id );
+			$date_str  = (string) get_the_date( 'Y-m-d', $post_id );
+			$cats_html = self::format_terms( $post_id, $post_type );
 
 			$preview_url = add_query_arg(
 				[
@@ -246,7 +282,9 @@ final class PostsPage {
 					? sprintf( ' <a href="%s" target="_blank" style="text-decoration:none;color:#646970;">↗</a>', esc_url( $edit_url ) )
 					: ''
 			);
-			printf( '<td>%s</td>', esc_html( (string) $post_type ) );
+			printf( '<td style="white-space:nowrap;">%s</td>', esc_html( $date_str ) );
+			printf( '<td>%s</td>', esc_html( $post_type ) );
+			printf( '<td>%s</td>', $cats_html ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
 			echo '<td>' . ( $has_so
 				? '<span style="display:inline-block;padding:2px 8px;background:#d63638;color:#fff;border-radius:3px;font-size:11px;font-weight:600;">SO</span>'
 				: '—'
@@ -263,6 +301,43 @@ final class PostsPage {
 		echo '</tbody></table>';
 
 		$this->render_pagination( $query, $paged );
+	}
+
+	/**
+	 * Liste les termes hiérarchiques d'un post (catégories pour les `post`,
+	 * autres taxonomies hiérarchiques pour les CPT). Output déjà échappé.
+	 *
+	 * @param int    $post_id   ID.
+	 * @param string $post_type Type de contenu.
+	 * @return string HTML déjà échappé (liste de termes séparés par virgule, ou « — »).
+	 */
+	private static function format_terms( int $post_id, string $post_type ): string {
+		// Récupère les taxonomies hiérarchiques attachées au post_type.
+		$taxonomies = get_object_taxonomies( $post_type, 'objects' );
+		$names      = [];
+		foreach ( $taxonomies as $tax ) {
+			if ( ! is_object( $tax ) ) {
+				continue;
+			}
+			$slug         = (string) ( $tax->name ?? '' );
+			$is_hierarchic = (bool) ( $tax->hierarchical ?? false );
+			if ( '' === $slug || ! $is_hierarchic ) {
+				continue;
+			}
+			$terms = get_the_terms( $post_id, $slug );
+			if ( ! is_array( $terms ) ) {
+				continue;
+			}
+			foreach ( $terms as $term ) {
+				if ( is_object( $term ) && isset( $term->name ) ) {
+					$names[] = (string) $term->name;
+				}
+			}
+		}
+		if ( [] === $names ) {
+			return '<span style="color:#646970;">—</span>';
+		}
+		return esc_html( implode( ', ', $names ) );
 	}
 
 	/**
