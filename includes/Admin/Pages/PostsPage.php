@@ -301,10 +301,11 @@ final class PostsPage {
 	 */
 	private function render_search_form(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- form GET en lecture, sans nonce.
-		$search = isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : '';
-		$cat    = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
-		$year   = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
-		$month  = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
+		$search    = isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : '';
+		$cat       = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
+		$year      = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
+		$month     = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
+		$so_filter = isset( $_GET['so'] ) ? sanitize_key( (string) $_GET['so'] ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$months = [
@@ -398,6 +399,28 @@ final class PostsPage {
 		echo '</select></label>';
 		echo '</div>';
 
+		// Filtre SiteOrigin.
+		echo '<div>';
+		echo '<label><strong>' . esc_html__( 'SiteOrigin :', '100son-html-normalizer' ) . '</strong><br>';
+		echo '<select name="so">';
+		printf(
+			'<option value="" %s>%s</option>',
+			selected( '' === $so_filter, true, false ),
+			esc_html__( 'Tous', '100son-html-normalizer' )
+		);
+		printf(
+			'<option value="only" %s>%s</option>',
+			selected( 'only' === $so_filter, true, false ),
+			esc_html__( 'SO uniquement', '100son-html-normalizer' )
+		);
+		printf(
+			'<option value="none" %s>%s</option>',
+			selected( 'none' === $so_filter, true, false ),
+			esc_html__( 'Non-SO uniquement', '100son-html-normalizer' )
+		);
+		echo '</select></label>';
+		echo '</div>';
+
 		// Boutons.
 		echo '<div>';
 		submit_button( __( 'Filtrer', '100son-html-normalizer' ), 'primary', '', false );
@@ -448,13 +471,14 @@ final class PostsPage {
 		}
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- params GET de navigation.
-		$paged    = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
-		$search   = isset( $_GET['s'] ) ? trim( (string) wp_unslash( $_GET['s'] ) ) : '';
-		$cat      = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
-		$year     = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
-		$month    = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
-		$orderby  = isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : 'date';
-		$order    = isset( $_GET['order'] ) && 'asc' === strtolower( (string) $_GET['order'] ) ? 'ASC' : 'DESC';
+		$paged     = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
+		$search    = isset( $_GET['s'] ) ? trim( (string) wp_unslash( $_GET['s'] ) ) : '';
+		$cat       = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
+		$year      = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
+		$month     = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
+		$so_filter = isset( $_GET['so'] ) ? sanitize_key( (string) $_GET['so'] ) : '';
+		$orderby   = isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : 'date';
+		$order     = isset( $_GET['order'] ) && 'asc' === strtolower( (string) $_GET['order'] ) ? 'ASC' : 'DESC';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		// Validation du tri.
@@ -484,6 +508,17 @@ final class PostsPage {
 				$date_q['month'] = $month;
 			}
 			$query_args['date_query'] = [ $date_q ];
+		}
+
+		// Filtre SiteOrigin via meta_query sur `panels_data`.
+		if ( 'only' === $so_filter ) {
+			$query_args['meta_query'] = [
+				[ 'key' => 'panels_data', 'compare' => 'EXISTS' ],
+			];
+		} elseif ( 'none' === $so_filter ) {
+			$query_args['meta_query'] = [
+				[ 'key' => 'panels_data', 'compare' => 'NOT EXISTS' ],
+			];
 		}
 
 		// Restriction de `s` au seul post_title (pas content / excerpt).
@@ -659,6 +694,7 @@ final class PostsPage {
 					'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
 					'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
 					'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
+					'so'      => isset( $_GET['so'] ) && '' !== (string) $_GET['so'] ? sanitize_key( (string) $_GET['so'] ) : null,
 				],
 				static fn( $v ): bool => null !== $v
 			),
@@ -789,6 +825,7 @@ final class PostsPage {
 				'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
 				'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
 				'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
+				'so'      => isset( $_GET['so'] ) && '' !== (string) $_GET['so'] ? sanitize_key( (string) $_GET['so'] ) : null,
 				'orderby' => isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : null,
 				'order'   => isset( $_GET['order'] ) ? sanitize_key( (string) $_GET['order'] ) : null,
 			],
