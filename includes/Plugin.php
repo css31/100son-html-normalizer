@@ -14,6 +14,9 @@ namespace Cent_Son\Html_Normalizer;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Admin\Menu;
+use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
+use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 use Cent_Son\Html_Normalizer\Api\PublicApi;
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
 use Cent_Son\Html_Normalizer\Core\Pipeline;
@@ -82,8 +85,17 @@ final class Plugin {
 		$public_api = new PublicApi( $normalizer );
 		$public_api->register();
 
+		// UI admin minimale V0.1 (PHP classique, pas SPA — phase 15 §11 ultérieure).
+		if ( is_admin() ) {
+			$presets_page = new PresetsPage( $settings, $preset_registry );
+			$tester_page  = new TesterPage( $normalizer );
+			$menu         = new Menu( $presets_page, $tester_page );
+			$menu->register();
+		}
+
 		// (Phases ultérieures cf. cahier §11 :
-		//  - étapes 8+ : REST, CLI, Admin SPA, F4 (UserRules + Validator + Preview),
-		//                F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController).)
+		//  - étapes 8+ : REST, CLI, F4 (UserRules + Validator + Preview),
+		//                F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController),
+		//                15 (SPA React).)
 	}
 }
