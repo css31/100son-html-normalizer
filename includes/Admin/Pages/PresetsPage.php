@@ -179,6 +179,15 @@ final class PresetsPage {
 		echo '<form method="post" action="">';
 		wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
 
+		// Case maître "Tout activer/désactiver".
+		echo '<p style="margin-top:16px;">';
+		echo '<label style="font-weight:600;">';
+		echo '<input type="checkbox" id="son100-htmln-toggle-all-presets"> ';
+		echo esc_html__( 'Tout activer / désactiver', '100son-html-normalizer' );
+		echo '</label>';
+		echo ' <span class="description">' . esc_html__( "Synchronise toutes les cases d'activation. N'oublie pas de cliquer sur Enregistrer.", '100son-html-normalizer' ) . '</span>';
+		echo '</p>';
+
 		echo '<table class="widefat striped" style="margin-top:16px;max-width:1100px;">';
 		echo '<tbody>';
 
@@ -233,6 +242,27 @@ final class PresetsPage {
 		echo '</table>';
 
 		submit_button( __( 'Enregistrer', '100son-html-normalizer' ) );
+
+		// JS minimal : case maître <-> cases individuelles (vanilla, sans dépendance).
+		echo "<script>(function(){"
+			. "var master=document.getElementById('son100-htmln-toggle-all-presets');"
+			. "if(!master)return;"
+			. "var rows=document.querySelectorAll('input[type=\"checkbox\"][name^=\"preset[\"][name$=\"[enabled]\"]');"
+			. "function refreshMaster(){"
+			. "var arr=Array.prototype.slice.call(rows);"
+			. "var allOn=arr.every(function(r){return r.checked;});"
+			. "var allOff=arr.every(function(r){return !r.checked;});"
+			. "master.checked=allOn;"
+			. "master.indeterminate=!allOn&&!allOff;"
+			. "}"
+			. "refreshMaster();"
+			. "master.addEventListener('change',function(){"
+			. "rows.forEach(function(r){r.checked=master.checked;});"
+			. "master.indeterminate=false;"
+			. "});"
+			. "rows.forEach(function(r){r.addEventListener('change',refreshMaster);});"
+			. "})();</script>";
+
 		echo '</form>';
 	}
 
