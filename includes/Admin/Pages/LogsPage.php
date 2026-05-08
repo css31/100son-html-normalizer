@@ -315,7 +315,7 @@ final class LogsPage {
 		// Save à gauche.
 		printf(
 			'<button type="submit" form="son100-htmln-save-notes-form" class="button button-primary">%s</button>',
-			esc_html__( 'Enregistrer la note', '100son-html-normalizer' )
+			esc_html__( 'Enregistrer', '100son-html-normalizer' )
 		);
 
 		// Clear à droite, avec confirm() JS bloquant. N'apparaît que si une note existe.
@@ -324,7 +324,7 @@ final class LogsPage {
 			printf(
 				'<button type="submit" form="son100-htmln-clear-notes-form" class="button button-link-delete" onclick="return window.confirm(\'%s\');">%s</button>',
 				esc_js( $confirm ),
-				esc_html__( 'Effacer la note', '100son-html-normalizer' )
+				esc_html__( 'Effacer', '100son-html-normalizer' )
 			);
 		} else {
 			// Aucune note : placeholder vide pour préserver le justify-content:space-between.
