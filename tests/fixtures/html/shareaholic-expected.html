@@ -1,0 +1,14 @@
+<!--
+  Fixture : shareaholic-expected.html
+  Sortie attendue après P3 SEUL.
+  Tous les [shareaholic ...] self-closed sont supprimés. Les autres shortcodes
+  et le texte sont préservés.
+  Note : les <p> qui deviennent vides après suppression seront ramassés par P1
+  en pipeline complète, mais P3 isolé les laisse vides.
+-->
+<p></p>
+<p></p>
+<p></p>
+<p>[gallery ids="1,2,3"]</p>
+<p>[my_other_shortcode foo="bar"]</p>
+<p>Texte normal préservé.</p>

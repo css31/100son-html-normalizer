@@ -1,0 +1,18 @@
+<!--
+  Fixture : shareaholic-input.html
+  Test    : tests/Unit/Rules/ShareaholicShortcodeRuleTest.php (préset P3 isolé)
+  Auteur  : agent
+
+  Cas couverts (uniquement forme self-closed, la forme bloc n'existe pas sur le corpus) :
+    1. [shareaholic id="..."] (forme classique post 2500)
+    2. [shareaholic app="share_buttons" id="25022196"] (attributs multiples)
+    3. [SHAREAHOLIC ...] (case-insensitive)
+    4. Shortcode WP natif (préservé)
+    5. Shortcode tiers (préservé)
+-->
+<p>[shareaholic id="25022196"]</p>
+<p>[shareaholic app="share_buttons" id="abc-123" class="custom"]</p>
+<p>[SHAREAHOLIC id="UPPER"]</p>
+<p>[gallery ids="1,2,3"]</p>
+<p>[my_other_shortcode foo="bar"]</p>
+<p>Texte normal préservé.</p>
