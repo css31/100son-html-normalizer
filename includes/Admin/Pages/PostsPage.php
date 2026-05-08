@@ -1,6 +1,6 @@
 <?php
 /**
- * Page admin "Normaliser des articles" (F8).
+ * Page admin "Normaliser" (F8).
  *
  * UI PHP classique V0.1 — workflow article par article :
  *  - Liste paginée des articles, filtrable par post_type
@@ -24,7 +24,7 @@ use Cent_Son\Html_Normalizer\Core\Posts\SiteOriginDetector;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
- * Vue F8 — Normaliser des articles.
+ * Vue F8 — Normaliser.
  */
 final class PostsPage {
 
@@ -85,7 +85,7 @@ final class PostsPage {
 		$post_id = isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0;
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'HTML Normalizer — Normaliser des articles', '100son-html-normalizer' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'HTML Normalizer — Normaliser', '100son-html-normalizer' ) . '</h1>';
 
 		if ( null !== $normalize_result ) {
 			$this->render_normalize_notice( $normalize_result );

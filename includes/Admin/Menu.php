@@ -88,11 +88,11 @@ final class Menu {
 			[ $this->tester_page, 'render' ]
 		);
 
-		// Sous-page "Normaliser des articles" (F8).
+		// Sous-page "Normaliser" (F8).
 		add_submenu_page(
 			self::SLUG,
-			__( 'Normaliser des articles', '100son-html-normalizer' ),
-			__( 'Normaliser des articles', '100son-html-normalizer' ),
+			__( 'Normaliser', '100son-html-normalizer' ),
+			__( 'Normaliser', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-posts',
 			[ $this->posts_page, 'render' ]
