@@ -179,14 +179,15 @@ final class PresetsPage {
 		echo '<form method="post" action="">';
 		wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
 
-		// Case maître "Tout activer/désactiver".
-		echo '<p style="margin-top:16px;">';
+		// Bandeau d'actions du haut : case maître + bouton Enregistrer.
+		echo '<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;">';
 		echo '<label style="font-weight:600;">';
 		echo '<input type="checkbox" id="son100-htmln-toggle-all-presets"> ';
 		echo esc_html__( 'Tout activer / désactiver', '100son-html-normalizer' );
 		echo '</label>';
-		echo ' <span class="description">' . esc_html__( "Synchronise toutes les cases d'activation. N'oublie pas de cliquer sur Enregistrer.", '100son-html-normalizer' ) . '</span>';
-		echo '</p>';
+		echo '<span class="description" style="flex:1;">' . esc_html__( "Synchronise toutes les cases. N'oublie pas de cliquer sur Enregistrer.", '100son-html-normalizer' ) . '</span>';
+		submit_button( __( 'Enregistrer', '100son-html-normalizer' ), 'primary', 'submit_top', false );
+		echo '</div>';
 
 		echo '<table class="widefat striped" style="margin-top:16px;max-width:1100px;">';
 		echo '<tbody>';
