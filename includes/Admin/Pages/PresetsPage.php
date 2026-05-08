@@ -141,12 +141,32 @@ final class PresetsPage {
 		echo '<table class="form-table" role="presentation">';
 		echo '<tbody>';
 
+		// Whitelist limitée pour wp_kses sur les descriptions (HTML autorisé : code, strong, em, br).
+		$allowed_html = [
+			'code'   => [],
+			'strong' => [],
+			'em'     => [],
+			'br'     => [],
+		];
+
 		foreach ( $metadata as $preset_id => $meta ) {
 			$config  = $presets[ $preset_id ] ?? [];
 			$enabled = ! empty( $config['enabled'] );
 
 			echo '<tr>';
-			echo '<th scope="row">' . esc_html( $preset_id ) . ' — ' . esc_html( $meta['label'] ) . '</th>';
+			echo '<th scope="row" style="vertical-align:top;">';
+			printf(
+				'<strong>%s — %s</strong>',
+				esc_html( $preset_id ),
+				wp_kses( (string) ( $meta['label'] ?? '' ), $allowed_html )
+			);
+			if ( ! empty( $meta['description'] ) ) {
+				printf(
+					'<p class="description" style="font-weight:normal;margin-top:4px;max-width:520px;">%s</p>',
+					wp_kses( (string) $meta['description'], $allowed_html )
+				);
+			}
+			echo '</th>';
 			echo '<td>';
 
 			printf(

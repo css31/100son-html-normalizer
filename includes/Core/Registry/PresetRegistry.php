@@ -76,18 +76,50 @@ final class PresetRegistry {
 	 * Liste tous les presets connus (independamment de leur etat).
 	 * Utilise pour l'UI Presets.
 	 *
-	 * @return array<string, array{label: string, has_options: bool}>
+	 * @return array<string, array{label: string, description: string, has_options: bool}>
 	 */
 	public function get_all_presets_metadata(): array {
 		return [
-			'P1' => [ 'label' => __( 'Paragraphes vides', '100son-html-normalizer' ), 'has_options' => false ],
-			'P2' => [ 'label' => __( 'Titres vides', '100son-html-normalizer' ), 'has_options' => false ],
-			'P3' => [ 'label' => __( 'Shortcodes Shareaholic', '100son-html-normalizer' ), 'has_options' => false ],
-			'P4' => [ 'label' => __( 'Artefacts Pinterest', '100son-html-normalizer' ), 'has_options' => false ],
-			'P5' => [ 'label' => __( '<br> excessifs', '100son-html-normalizer' ), 'has_options' => true ],
-			'P6' => [ 'label' => __( 'Styles inline', '100son-html-normalizer' ), 'has_options' => true ],
-			'P7' => [ 'label' => __( 'Listes ASCII', '100son-html-normalizer' ), 'has_options' => true ],
-			'P8' => [ 'label' => __( 'Recuperation semantique des styles', '100son-html-normalizer' ), 'has_options' => true ],
+			'P1' => [
+				'label'       => __( 'Paragraphes vides', '100son-html-normalizer' ),
+				'description' => __( 'Supprime les <code>&lt;p&gt;&lt;/p&gt;</code>, <code>&lt;p&gt;&amp;nbsp;&lt;/p&gt;</code> et <code>&lt;p&gt; &lt;/p&gt;</code>. Les <code>&lt;p&gt;</code> contenant un élément structurel (image, vidéo, iframe…) sont préservés.', '100son-html-normalizer' ),
+				'has_options' => false,
+			],
+			'P2' => [
+				'label'       => __( 'Titres vides', '100son-html-normalizer' ),
+				'description' => __( 'Supprime les <code>&lt;h1&gt;</code> à <code>&lt;h6&gt;</code> vides ou ne contenant que du blanc / <code>&amp;nbsp;</code>.', '100son-html-normalizer' ),
+				'has_options' => false,
+			],
+			'P3' => [
+				'label'       => __( 'Shortcodes Shareaholic', '100son-html-normalizer' ),
+				'description' => __( 'Supprime tout shortcode <code>[shareaholic ...]</code> (forme self-closed). Les autres shortcodes WordPress sont préservés.', '100son-html-normalizer' ),
+				'has_options' => false,
+			],
+			'P4' => [
+				'label'       => __( 'Artefacts Pinterest', '100son-html-normalizer' ),
+				'description' => __( "Supprime les vestiges du bouton Pinterest « Save » : forme A (<code>&lt;span data-pin-do&gt;</code>, attributs <code>data-pin-*</code>) et forme B (signature <code>z-index: 8675309</code> dans l'attribut <code>style</code>). 0 faux positif vérifié sur le corpus MMM.", '100son-html-normalizer' ),
+				'has_options' => false,
+			],
+			'P5' => [
+				'label'       => __( '<code>&lt;br&gt;</code> excessifs', '100son-html-normalizer' ),
+				'description' => __( "Réduit les <code>&lt;br&gt;</code> consécutifs (≥ seuil) en séparation <code>&lt;/p&gt;&lt;p&gt;</code>. Les <code>&lt;p&gt;</code> éventuellement vides produits sont ramassés par P1 en fin de pipeline.", '100son-html-normalizer' ),
+				'has_options' => true,
+			],
+			'P6' => [
+				'label'       => __( 'Styles inline', '100son-html-normalizer' ),
+				'description' => __( 'Supprime les attributs <code>style="..."</code> de tous les éléments. Avec l\'option « Conserver text-align » activée, seule la déclaration <code>text-align: …</code> est conservée, les autres (<code>color</code>, <code>font-size</code>, <code>margin</code>…) sont retirées.', '100son-html-normalizer' ),
+				'has_options' => true,
+			],
+			'P7' => [
+				'label'       => __( 'Listes ASCII', '100son-html-normalizer' ),
+				'description' => __( "Détecte les listes ASCII (lignes commençant par <code>-</code>, <code>–</code>, <code>*</code>, <code>•</code> ou un numéro <code>N.</code>) et les convertit en <code>&lt;ul&gt;</code>/<code>&lt;ol&gt;</code>. Fonctionne intra-<code>&lt;p&gt;</code> (séparées par <code>&lt;br&gt;</code>) et hors-<code>&lt;p&gt;</code> (chaque item dans son propre <code>&lt;p&gt;</code>). Marqueurs activables individuellement, seuil configurable, marqueurs custom possibles.", '100son-html-normalizer' ),
+				'has_options' => true,
+			],
+			'P8' => [
+				'label'       => __( 'Récupération sémantique des styles', '100son-html-normalizer' ),
+				'description' => __( "Convertit les déclarations de présentation en balises HTML sémantiques AVANT que P6 ne strippe le style : <code>font-weight: bold</code> (ou ≥ 700) → <code>&lt;strong&gt;</code>, <code>font-style: italic</code> → <code>&lt;em&gt;</code>. Comportement chirurgical : seules ces déclarations sont retirées du <code>style</code>, les autres (<code>text-align</code>, <code>color</code>…) restent intactes pour P6.", '100son-html-normalizer' ),
+				'has_options' => true,
+			],
 		];
 	}
 
