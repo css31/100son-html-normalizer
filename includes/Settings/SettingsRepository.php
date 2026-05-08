@@ -16,8 +16,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Repository des réglages plugin et de la config des présets.
+ *
+ * Volontairement non-final pour permettre l'extension/stub en tests
+ * d'intégration (HtmlNormalizerTest, PublicApiTest…). Ne pas la rendre
+ * final sans extraire au préalable une interface dediee.
  */
-final class SettingsRepository {
+class SettingsRepository {
 
 	private const OPT_SETTINGS = 'son100_htmln_settings';
 	private const OPT_PRESETS  = 'son100_htmln_presets';

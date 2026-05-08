@@ -14,6 +14,12 @@ namespace Cent_Son\Html_Normalizer;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Api\PublicApi;
+use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
+use Cent_Son\Html_Normalizer\Core\Pipeline;
+use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
+
 /**
  * Plugin singleton.
  */
@@ -66,9 +72,18 @@ final class Plugin {
 		}
 		$this->booted = true;
 
-		// Sous-systèmes — chargés conditionnellement selon le contexte.
-		// (Phases ultérieures : REST, CLI, Admin, PublicApi.)
-		// En l'état (étapes 1-4 du §11), seul le PublicApi est attendu mais
-		// arrive dans une étape suivante. Bootstrap minimal pour l'instant.
+		// Composition root : assemblage des dépendances Core.
+		$settings        = new SettingsRepository();
+		$preset_registry = new PresetRegistry( $settings );
+		$pipeline        = new Pipeline();
+		$normalizer      = new HtmlNormalizer( $preset_registry, $pipeline );
+
+		// API publique : branche le filtre `htmln/normalize`.
+		$public_api = new PublicApi( $normalizer );
+		$public_api->register();
+
+		// (Phases ultérieures cf. cahier §11 :
+		//  - étapes 8+ : REST, CLI, Admin SPA, F4 (UserRules + Validator + Preview),
+		//                F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController).)
 	}
 }
