@@ -1,0 +1,21 @@
+<!--
+  Fixture : pinterest-spans-input.html
+  Test    : tests/Unit/Rules/PinterestArtifactsRuleTest.php (preset P4 isole)
+  Auteur  : agent
+
+  Cas couverts (cf. cahier §3.1 F2.P4, §8 F2.P4 ; PLUGIN_CONTEXT.md §6.7) :
+    1. Forme A — span avec data-pin-do (vrai bouton Pinterest officiel)
+    2. Forme A — span avec data-pin-id seul
+    3. Forme A — span avec data-pin-config et autres attributs
+    4. Forme B — span avec style contenant z-index: 8675309 (post 2500)
+    5. Forme B — variantes opacity (toutes equivalentes côté pipeline)
+    6. Span ordinaire sans signature (préservé)
+    7. Texte sans aucun span (préservé)
+-->
+<p><span data-pin-do="buttonPin" data-pin-config="above">Pin it</span></p>
+<p><span data-pin-id="abc-123">contenu A</span></p>
+<p><span data-pin-do="buttonBookmark" data-pin-config="below" data-pin-color="red">Save</span></p>
+<p><span style="border-radius: 2px; text-indent: 20px; width: auto; padding: 0px 4px 0px 0px; text-align: center; font: bold 11px/20px 'Helvetica Neue',Helvetica,sans-serif; color: #ffffff; background: #bd081c no-repeat scroll 3px 50% / 14px 14px; position: absolute; opacity: 0.85; z-index: 8675309; display: none; cursor: pointer; top: 168px; left: 328px;">Enregistrer</span></p>
+<p><span style="border-radius: 2px; opacity: 1; z-index: 8675309; cursor: pointer;">Enregistrer</span></p>
+<p><span class="legitime" style="color: red;">Texte rouge ordinaire</span></p>
+<p>Texte sans span.</p>
