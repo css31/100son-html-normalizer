@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
+use Cent_Son\Html_Normalizer\Core\Logs\NotesRepository;
 use Cent_Son\Html_Normalizer\Core\Metrics\HtmlMetrics;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 
@@ -23,15 +24,19 @@ use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
  */
 final class LogsPage {
 
-	private const NONCE_CLEAR = 'son100_htmln_logs_clear';
-	private const NONCE_NAME  = '_son100_htmln_nonce';
-	private const PAGE_SLUG   = '100son-html-normalizer-logs';
-	private const PER_PAGE    = 50;
+	private const NONCE_CLEAR       = 'son100_htmln_logs_clear';
+	private const NONCE_NOTES_SAVE  = 'son100_htmln_notes_save';
+	private const NONCE_NOTES_CLEAR = 'son100_htmln_notes_clear';
+	private const NONCE_NAME        = '_son100_htmln_nonce';
+	private const PAGE_SLUG         = '100son-html-normalizer-logs';
+	private const PER_PAGE          = 50;
 
-	private LogRepository $repo;
+	private LogRepository   $repo;
+	private NotesRepository $notes;
 
-	public function __construct( LogRepository $repo ) {
-		$this->repo = $repo;
+	public function __construct( LogRepository $repo, NotesRepository $notes ) {
+		$this->repo  = $repo;
+		$this->notes = $notes;
 	}
 
 	/**
@@ -44,26 +49,40 @@ final class LogsPage {
 			wp_die( esc_html__( 'Permission refusée.', '100son-html-normalizer' ) );
 		}
 
-		$cleared = $this->maybe_handle_clear();
+		$cleared       = $this->maybe_handle_clear();
+		$notes_saved   = $this->maybe_handle_notes_save();
+		$notes_cleared = $this->maybe_handle_notes_clear();
 
-		$paged   = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$page    = $this->repo->paginate( $paged, self::PER_PAGE );
-		$total   = $page['total'];
+		$paged = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page  = $this->repo->paginate( $paged, self::PER_PAGE );
+		$total = $page['total'];
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'HTML Normalizer — Journal', '100son-html-normalizer' ) . '</h1>';
+
+		// Notices empilées en haut.
+		if ( $notes_saved ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Note enregistrée.', '100son-html-normalizer' ) . '</p></div>';
+		}
+		if ( $notes_cleared ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Note effacée.', '100son-html-normalizer' ) . '</p></div>';
+		}
+		if ( $cleared ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Journal vidé.', '100son-html-normalizer' ) . '</p></div>';
+		}
+
+		// Zone de saisie libre — au-dessus du journal, indépendante.
+		$this->render_notes_form();
+
+		echo '<h2 style="margin-top:32px;">' . esc_html__( 'Historique des actions', '100son-html-normalizer' ) . '</h2>';
 		echo '<p>' . esc_html(
 			sprintf(
 				/* translators: %1$d nombre d'entrees, %2$d capacité max */
-				__( 'Historique des actions (normalisations, aperçus, changements de configuration). %1$d entrée(s) sur %2$d max — les plus anciennes sont automatiquement évincées.', '100son-html-normalizer' ),
+				__( 'Normalisations, aperçus, changements de configuration. %1$d entrée(s) sur %2$d max — les plus anciennes sont automatiquement évincées.', '100son-html-normalizer' ),
 				(int) $total,
 				LogRepository::MAX_ENTRIES
 			)
 		) . '</p>';
-
-		if ( $cleared ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Journal vidé.', '100son-html-normalizer' ) . '</p></div>';
-		}
 
 		if ( 0 === $total ) {
 			echo '<p><em>' . esc_html__( 'Aucune entrée enregistrée pour l\'instant.', '100son-html-normalizer' ) . '</em></p>';
@@ -95,6 +114,52 @@ final class LogsPage {
 		check_admin_referer( self::NONCE_CLEAR, self::NONCE_NAME );
 
 		$this->repo->clear();
+		return true;
+	}
+
+	/**
+	 * Traite la sauvegarde de la note libre (POST).
+	 *
+	 * @return bool True si une sauvegarde a eu lieu.
+	 */
+	private function maybe_handle_notes_save(): bool {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+			return false;
+		}
+		if ( ! isset( $_POST['son100_htmln_action'] ) || 'save_notes' !== $_POST['son100_htmln_action'] ) {
+			return false;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		check_admin_referer( self::NONCE_NOTES_SAVE, self::NONCE_NAME );
+
+		$raw = isset( $_POST['son100_htmln_notes'] )
+			? sanitize_textarea_field( (string) wp_unslash( $_POST['son100_htmln_notes'] ) )
+			: '';
+
+		$this->notes->set( $raw );
+		return true;
+	}
+
+	/**
+	 * Traite l'effacement de la note libre (POST), independant du journal.
+	 *
+	 * @return bool True si l'effacement a eu lieu.
+	 */
+	private function maybe_handle_notes_clear(): bool {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+			return false;
+		}
+		if ( ! isset( $_POST['son100_htmln_action'] ) || 'clear_notes' !== $_POST['son100_htmln_action'] ) {
+			return false;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		check_admin_referer( self::NONCE_NOTES_CLEAR, self::NONCE_NAME );
+
+		$this->notes->clear();
 		return true;
 	}
 
@@ -207,6 +272,54 @@ final class LogsPage {
 		if ( ! empty( $links ) ) {
 			echo '<div class="tablenav"><div class="tablenav-pages">' . $links . '</div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		}
+	}
+
+	/**
+	 * Render de la zone de saisie libre (notes admin) au-dessus du journal.
+	 *
+	 * Possède 2 actions independantes du journal :
+	 *  - Enregistrer (sauvegarde le texte saisi)
+	 *  - Effacer (vide la note, sans toucher au journal)
+	 *
+	 * @return void
+	 */
+	private function render_notes_form(): void {
+		$current = $this->notes->get();
+
+		echo '<div style="margin-top:16px;padding:12px;background:#fff;border:1px solid #c3c4c7;max-width:900px;">';
+		echo '<h2 style="margin-top:0;">' . esc_html__( 'Note libre', '100son-html-normalizer' ) . '</h2>';
+		echo '<p class="description" style="margin-top:0;">' . esc_html__( "Espace de notes contextuelles persistantes. Indépendant du journal des actions.", '100son-html-normalizer' ) . '</p>';
+
+		// Form principal : sauvegarde.
+		echo '<form method="post" action="" style="margin-bottom:8px;">';
+		echo '<input type="hidden" name="son100_htmln_action" value="save_notes">';
+		wp_nonce_field( self::NONCE_NOTES_SAVE, self::NONCE_NAME );
+		printf(
+			'<textarea name="son100_htmln_notes" rows="6" style="width:100%%;font-family:monospace;" placeholder="%s">%s</textarea>',
+			esc_attr__( "Tape ici les notes que tu veux garder à portée de main…", '100son-html-normalizer' ),
+			esc_textarea( $current )
+		);
+		echo '<p style="margin:8px 0 0 0;">';
+		submit_button( __( 'Enregistrer la note', '100son-html-normalizer' ), 'primary', 'save_notes_btn', false );
+		echo '</p>';
+		echo '</form>';
+
+		// Form secondaire : effacement (indépendant du journal et du Save).
+		if ( '' !== $current ) {
+			$confirm = esc_attr__( "Confirmer l'effacement de la note ? Le journal n'est pas affecté.", '100son-html-normalizer' );
+			echo '<form method="post" action="" style="display:inline;">';
+			echo '<input type="hidden" name="son100_htmln_action" value="clear_notes">';
+			wp_nonce_field( self::NONCE_NOTES_CLEAR, self::NONCE_NAME );
+			printf(
+				'<button type="submit" class="button" onclick="return confirm(\'%s\');">%s</button>',
+				esc_js( $confirm ),
+				esc_html__( 'Effacer la note', '100son-html-normalizer' )
+			);
+			echo '</form>';
+			echo ' <span class="description">' . esc_html__( "N'efface QUE la note, pas les entrées du journal.", '100son-html-normalizer' ) . '</span>';
+		}
+
+		echo '</div>';
 	}
 
 	/**

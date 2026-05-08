@@ -16,6 +16,8 @@ $son100_htmln_options = [
 	'son100_htmln_settings',
 	'son100_htmln_presets',
 	'son100_htmln_rules_user',
+	'son100_htmln_logs',
+	'son100_htmln_logs_notes',
 	'son100_htmln_db_version',
 ];
 

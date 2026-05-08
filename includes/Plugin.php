@@ -23,6 +23,7 @@ use Cent_Son\Html_Normalizer\Api\PublicApi;
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
 use Cent_Son\Html_Normalizer\Core\Logs\Logger;
 use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
+use Cent_Son\Html_Normalizer\Core\Logs\NotesRepository;
 use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 use Cent_Son\Html_Normalizer\Core\Posts\SiteOriginDetector;
@@ -94,6 +95,7 @@ final class Plugin {
 		// UI admin minimale V0.1 (PHP classique, pas SPA — phase 15 §11 ultérieure).
 		if ( is_admin() ) {
 			$log_repo        = new LogRepository();
+			$notes_repo      = new NotesRepository();
 			$logger          = new Logger( $log_repo );
 			$so_detector     = new SiteOriginDetector();
 			$post_normalizer = new PostNormalizer( $normalizer, $so_detector, $logger );
@@ -101,7 +103,7 @@ final class Plugin {
 			$presets_page = new PresetsPage( $settings, $preset_registry, $logger );
 			$tester_page  = new TesterPage( $normalizer );
 			$posts_page   = new PostsPage( $settings, $so_detector, $post_normalizer );
-			$logs_page    = new LogsPage( $log_repo );
+			$logs_page    = new LogsPage( $log_repo, $notes_repo );
 
 			$menu = new Menu( $presets_page, $tester_page, $posts_page, $logs_page );
 			$menu->register();
