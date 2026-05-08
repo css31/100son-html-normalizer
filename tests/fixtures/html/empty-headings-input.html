@@ -1,0 +1,22 @@
+<!--
+  Fixture : empty-headings-input.html
+  Test    : tests/Unit/Rules/EmptyHeadingsRuleTest.php (préset P2 isolé)
+  Auteur  : agent
+
+  Cas couverts (cf. cahier §3.1 F2.P2, §8 F2.P2) :
+    1. <h1></h1> à <h6></h6> strictement vides
+    2. <h2>&nbsp;</h2> (uniquement nbsp)
+    3. <h3> </h3> (uniquement espaces)
+    4. <h2>Titre</h2> (non vide → conservé)
+    5. <h3><strong></strong></h3> (inline vide → traité comme vide)
+    6. <h4><img/></h4> (élément structurel → conservé)
+-->
+<h1></h1>
+<h2>&nbsp;</h2>
+<h3> </h3>
+<h4></h4>
+<h5></h5>
+<h6></h6>
+<h2>Titre conservé</h2>
+<h3><strong></strong></h3>
+<h4><img src="x.jpg" alt="x"></h4>
