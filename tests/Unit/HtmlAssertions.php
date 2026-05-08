@@ -50,8 +50,14 @@ trait HtmlAssertions {
 		$html = (string) preg_replace( '/>\s+</', '><', $html );
 		// Normalise les éléments void (XHTML `<img/>` <-> HTML5 `<img>`) — on garde la forme HTML5 canonique.
 		$html = (string) preg_replace(
-			'#<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)((?:\s[^>]*?)?)\s*/>#i',
+			'#<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)([^>]*?)\s*/>#i',
 			'<$1$2>',
+			$html
+		);
+		// Et tasse les espaces résiduels avant `>` sur ces mêmes balises (`<br >` -> `<br>`).
+		$html = (string) preg_replace(
+			'#<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)\s+>#i',
+			'<$1>',
 			$html
 		);
 		return trim( $html );
