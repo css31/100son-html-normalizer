@@ -15,6 +15,7 @@ namespace Cent_Son\Html_Normalizer\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 
@@ -28,10 +29,12 @@ final class Menu {
 
 	private PresetsPage $presets_page;
 	private TesterPage  $tester_page;
+	private PostsPage   $posts_page;
 
-	public function __construct( PresetsPage $presets_page, TesterPage $tester_page ) {
+	public function __construct( PresetsPage $presets_page, TesterPage $tester_page, PostsPage $posts_page ) {
 		$this->presets_page = $presets_page;
 		$this->tester_page  = $tester_page;
+		$this->posts_page   = $posts_page;
 	}
 
 	/**
@@ -80,6 +83,16 @@ final class Menu {
 			self::CAPABILITY,
 			self::SLUG . '-tester',
 			[ $this->tester_page, 'render' ]
+		);
+
+		// Sous-page "Normaliser des articles" (F8).
+		add_submenu_page(
+			self::SLUG,
+			__( 'Normaliser des articles', '100son-html-normalizer' ),
+			__( 'Normaliser des articles', '100son-html-normalizer' ),
+			self::CAPABILITY,
+			self::SLUG . '-posts',
+			[ $this->posts_page, 'render' ]
 		);
 	}
 }
