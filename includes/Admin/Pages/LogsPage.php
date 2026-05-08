@@ -290,8 +290,8 @@ final class LogsPage {
 		echo '<h2 style="margin-top:0;">' . esc_html__( 'Note libre', '100son-html-normalizer' ) . '</h2>';
 		echo '<p class="description" style="margin-top:0;">' . esc_html__( "Espace de notes contextuelles persistantes. Indépendant du journal des actions.", '100son-html-normalizer' ) . '</p>';
 
-		// Form principal : sauvegarde.
-		echo '<form method="post" action="" style="margin-bottom:8px;">';
+		// Form 1 : sauvegarde de la note (form principal qui contient la textarea).
+		echo '<form id="son100-htmln-save-notes-form" method="post" action="">';
 		echo '<input type="hidden" name="son100_htmln_action" value="save_notes">';
 		wp_nonce_field( self::NONCE_NOTES_SAVE, self::NONCE_NAME );
 		printf(
@@ -299,26 +299,39 @@ final class LogsPage {
 			esc_attr__( "Tape ici les notes que tu veux garder à portée de main…", '100son-html-normalizer' ),
 			esc_textarea( $current )
 		);
-		echo '<p style="margin:8px 0 0 0;">';
-		submit_button( __( 'Enregistrer la note', '100son-html-normalizer' ), 'primary', 'save_notes_btn', false );
-		echo '</p>';
 		echo '</form>';
 
-		// Form secondaire : effacement (indépendant du journal et du Save).
+		// Form 2 : effacement (frère du form 1, à part pour pouvoir aligner ses boutons).
+		echo '<form id="son100-htmln-clear-notes-form" method="post" action="" style="display:none;">';
+		echo '<input type="hidden" name="son100_htmln_action" value="clear_notes">';
+		wp_nonce_field( self::NONCE_NOTES_CLEAR, self::NONCE_NAME );
+		echo '</form>';
+
+		// Barre d'actions : 2 boutons sur la même ligne, Save à gauche, Clear à droite.
+		// Les boutons utilisent l'attribut HTML5 `form="..."` pour cibler leur form respectif
+		// même s'ils sont rendus en dehors.
+		echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">';
+
+		// Save à gauche.
+		printf(
+			'<button type="submit" form="son100-htmln-save-notes-form" class="button button-primary">%s</button>',
+			esc_html__( 'Enregistrer la note', '100son-html-normalizer' )
+		);
+
+		// Clear à droite, avec confirm() JS bloquant. N'apparaît que si une note existe.
 		if ( '' !== $current ) {
-			$confirm = esc_attr__( "Confirmer l'effacement de la note ? Le journal n'est pas affecté.", '100son-html-normalizer' );
-			echo '<form method="post" action="" style="display:inline;">';
-			echo '<input type="hidden" name="son100_htmln_action" value="clear_notes">';
-			wp_nonce_field( self::NONCE_NOTES_CLEAR, self::NONCE_NAME );
+			$confirm = esc_attr__( "Confirmer l'effacement de la note ?\n\nLe journal des actions n'est PAS affecté.", '100son-html-normalizer' );
 			printf(
-				'<button type="submit" class="button" onclick="return confirm(\'%s\');">%s</button>',
+				'<button type="submit" form="son100-htmln-clear-notes-form" class="button button-link-delete" onclick="return window.confirm(\'%s\');">%s</button>',
 				esc_js( $confirm ),
 				esc_html__( 'Effacer la note', '100son-html-normalizer' )
 			);
-			echo '</form>';
-			echo ' <span class="description">' . esc_html__( "N'efface QUE la note, pas les entrées du journal.", '100son-html-normalizer' ) . '</span>';
+		} else {
+			// Aucune note : placeholder vide pour préserver le justify-content:space-between.
+			echo '<span></span>';
 		}
 
+		echo '</div>';
 		echo '</div>';
 	}
 
