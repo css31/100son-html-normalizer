@@ -17,7 +17,7 @@ namespace Cent_Son\Html_Normalizer\Core\Rules;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Préset P3 : suppression du shortcode Shareaholic.
+ * Préréglage P3 : suppression du shortcode Shareaholic.
  */
 final class ShareaholicShortcodeRule implements RuleInterface {
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Page admin "Présets" — cocher/décocher et configurer les présets.
+ * Page admin "Préréglages" — cocher/décocher et configurer les préréglages.
  *
  * V0.1 minimale : formulaire PHP classique avec POST handler. Sera remplacée
  * par la SPA React en phase 15 du §11.
@@ -18,7 +18,7 @@ use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
- * Vue Présets.
+ * Vue Préréglages.
  */
 final class PresetsPage {
 
@@ -46,7 +46,7 @@ final class PresetsPage {
 		$saved = $this->maybe_handle_save();
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'HTML Normalizer — Présets', '100son-html-normalizer' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'HTML Normalizer — Préréglages', '100son-html-normalizer' ) . '</h1>';
 		echo '<p>' . esc_html__( "Activez les règles de nettoyage à appliquer dans la pipeline. L'ordre d'exécution est : P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2.", '100son-html-normalizer' ) . '</p>';
 
 		if ( $saved ) {
@@ -127,7 +127,7 @@ final class PresetsPage {
 	}
 
 	/**
-	 * Render du formulaire des présets.
+	 * Render du formulaire des préréglages.
 	 *
 	 * @return void
 	 */
@@ -196,7 +196,7 @@ final class PresetsPage {
 	}
 
 	/**
-	 * Render des sous-paramètres d'un préset.
+	 * Render des sous-paramètres d'un préréglage.
 	 *
 	 * @param string               $preset_id Identifiant.
 	 * @param array<string, mixed> $config    Configuration courante.

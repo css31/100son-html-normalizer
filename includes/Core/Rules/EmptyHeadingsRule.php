@@ -20,7 +20,7 @@ use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use DOMElement;
 
 /**
- * Préset P2 : suppression des titres vides.
+ * Préréglage P2 : suppression des titres vides.
  */
 final class EmptyHeadingsRule implements RuleInterface {
 

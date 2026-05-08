@@ -3,7 +3,7 @@
  * Menu admin — enregistre le top-level et les sous-pages.
  *
  * V0.1 : UI minimale en PHP classique (pas de SPA React, ce sera la phase 15
- * du §11). 2 sous-pages : Présets (cocher/décocher + paramètres) et Tester
+ * du §11). 2 sous-pages : Préréglages (cocher/décocher + paramètres) et Tester
  * (normalisation interactive d'un fragment).
  *
  * @package Cent_Son\Html_Normalizer
@@ -65,11 +65,11 @@ final class Menu {
 			80
 		);
 
-		// Sous-page "Présets" (alias de la top-level — point d'entrée naturel V0.1).
+		// Sous-page "Préréglages" (alias de la top-level — point d'entrée naturel V0.1).
 		add_submenu_page(
 			self::SLUG,
-			__( 'Présets', '100son-html-normalizer' ),
-			__( 'Présets', '100son-html-normalizer' ),
+			__( 'Préréglages', '100son-html-normalizer' ),
+			__( 'Préréglages', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG,
 			[ $this->presets_page, 'render' ]

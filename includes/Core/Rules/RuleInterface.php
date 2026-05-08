@@ -1,6 +1,6 @@
 <?php
 /**
- * RuleInterface — contrat commun à toutes les règles (présets + custom).
+ * RuleInterface — contrat commun à toutes les règles (préréglages + custom).
  *
  * @package Cent_Son\Html_Normalizer
  */

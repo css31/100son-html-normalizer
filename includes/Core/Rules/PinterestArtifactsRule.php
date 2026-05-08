@@ -23,7 +23,7 @@ use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use DOMElement;
 
 /**
- * Préset P4 : suppression des artefacts Pinterest (formes A et B).
+ * Préréglage P4 : suppression des artefacts Pinterest (formes A et B).
  */
 final class PinterestArtifactsRule implements RuleInterface {
 

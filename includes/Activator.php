@@ -51,9 +51,9 @@ final class Activator {
 	}
 
 	/**
-	 * Initialise la configuration des présets si l'option est absente.
+	 * Initialise la configuration des préréglages si l'option est absente.
 	 *
-	 * Tous les présets sont activés par défaut, avec leurs paramètres au
+	 * Tous les préréglages sont activés par défaut, avec leurs paramètres au
 	 * défaut documenté en §3.1 et §14.
 	 *
 	 * @return void

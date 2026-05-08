@@ -19,7 +19,7 @@ use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use DOMElement;
 
 /**
- * Préset P1 : suppression des paragraphes vides.
+ * Préréglage P1 : suppression des paragraphes vides.
  */
 final class EmptyParagraphsRule implements RuleInterface {
 

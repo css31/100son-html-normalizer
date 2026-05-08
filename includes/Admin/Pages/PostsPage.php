@@ -337,7 +337,7 @@ final class PostsPage {
 		}
 
 		if ( PostNormalizer::STATUS_UNCHANGED === $preview['status'] ) {
-			echo '<div class="notice notice-info"><p>' . esc_html__( "Aucune modification : le HTML est déjà conforme aux présets actifs.", '100son-html-normalizer' ) . '</p></div>';
+			echo '<div class="notice notice-info"><p>' . esc_html__( "Aucune modification : le HTML est déjà conforme aux préréglages actifs.", '100son-html-normalizer' ) . '</p></div>';
 		}
 
 		echo '<div style="display:flex;gap:16px;margin-top:16px;">';
