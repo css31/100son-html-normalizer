@@ -517,14 +517,14 @@ final class PostsPage {
 
 		echo '<table class="wp-list-table widefat fixed striped">';
 		echo '<thead><tr>';
-		echo '<td style="width:30px;"><input type="checkbox" id="son100-htmln-select-all"></td>';
-		echo '<th style="width:60px;">' . self::sortable_th_link( 'ID', 'ID', $orderby, $order ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		echo '<th>' . self::sortable_th_link( 'title', __( 'Titre', '100son-html-normalizer' ), $orderby, $order ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		echo '<th style="width:120px;">' . self::sortable_th_link( 'date', __( 'Date', '100son-html-normalizer' ), $orderby, $order ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		echo '<th style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
-		echo '<th style="width:220px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
-		echo '<th style="width:60px;">SO</th>';
-		echo '<th style="width:100px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
+		echo '<td class="manage-column column-cb check-column" style="width:30px;"><input type="checkbox" id="son100-htmln-select-all"></td>';
+		echo self::sortable_th( 'ID', 'ID', $orderby, $order, 'width:60px;' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo self::sortable_th( 'title', __( 'Titre', '100son-html-normalizer' ), $orderby, $order ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo self::sortable_th( 'date', __( 'Date', '100son-html-normalizer' ), $orderby, $order, 'width:120px;' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<th class="manage-column" style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
+		echo '<th class="manage-column" style="width:220px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
+		echo '<th class="manage-column" style="width:60px;">SO</th>';
+		echo '<th class="manage-column" style="width:100px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
 		while ( $query->have_posts() ) {
@@ -612,41 +612,60 @@ final class PostsPage {
 	}
 
 	/**
-	 * Construit le contenu HTML d'un `<th>` cliquable pour tri.
+	 * Construit un `<th>` triable au format natif WP admin.
+	 *
+	 * Utilise les classes `sortable` / `sorted asc|desc` reconnues par les
+	 * styles CSS standard de l'admin WP, qui appliquent automatiquement :
+	 *  - cursor:pointer
+	 *  - flèche `<span class="sorting-indicator">` stylée
+	 *  - hover/active states
 	 *
 	 * @param string $key             Clé de la colonne (ID, title, date).
 	 * @param string $label           Libellé affiché.
 	 * @param string $current_orderby Colonne triée actuellement.
 	 * @param string $current_order   Sens courant (ASC/DESC).
-	 * @return string HTML déjà échappé.
+	 * @param string $extra_style     Styles inline supplémentaires (ex: width).
+	 * @return string HTML complet d'un `<th>` (déjà échappé).
 	 */
-	private static function sortable_th_link( string $key, string $label, string $current_orderby, string $current_order ): string {
+	private static function sortable_th( string $key, string $label, string $current_orderby, string $current_order, string $extra_style = '' ): string {
 		$is_current = ( $key === $current_orderby );
-		$next_order = $is_current && 'ASC' === $current_order ? 'desc' : 'asc';
-		$arrow      = '';
+		$cur_lower  = strtolower( $current_order );
+		$next_order = $is_current && 'asc' === $cur_lower ? 'desc' : 'asc';
+
+		// Classes WP : `sortable` (toujours), `sorted` + asc|desc (si actif).
+		$th_classes = 'manage-column column-' . sanitize_html_class( $key ) . ' sortable';
 		if ( $is_current ) {
-			$arrow = 'ASC' === $current_order ? ' ▲' : ' ▼';
+			$th_classes .= ' sorted ' . $cur_lower;
+		} else {
+			$th_classes .= ' desc'; // état non-trié : icône par défaut WP
 		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$url = add_query_arg(
 			array_filter(
 				[
 					'page'    => self::PAGE_SLUG,
 					'orderby' => $key,
 					'order'   => $next_order,
-					's'       => isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-					'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-					'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-					'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					's'       => isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : null,
+					'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
+					'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
+					'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
 				],
 				static fn( $v ): bool => null !== $v
 			),
 			admin_url( 'admin.php' )
 		);
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		$style_attr = '' !== $extra_style ? sprintf( ' style="%s"', esc_attr( $extra_style ) ) : '';
+
 		return sprintf(
-			'<a href="%s" style="text-decoration:none;color:inherit;">%s%s</a>',
+			'<th scope="col" class="%s"%s><a href="%s"><span>%s</span><span class="sorting-indicator"></span></a></th>',
+			esc_attr( $th_classes ),
+			$style_attr,
 			esc_url( $url ),
-			esc_html( $label ),
-			$is_current ? '<span style="font-size:10px;color:#2271b1;">' . esc_html( $arrow ) . '</span>' : ''
+			esc_html( $label )
 		);
 	}
 
