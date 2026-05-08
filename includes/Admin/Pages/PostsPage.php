@@ -29,9 +29,19 @@ final class PostsPage {
 
 	private const NONCE_FILTERS    = 'son100_htmln_posts_filters';
 	private const NONCE_NORMALIZE  = 'son100_htmln_posts_normalize';
+	private const NONCE_BULK       = 'son100_htmln_posts_bulk';
 	private const NONCE_NAME       = '_son100_htmln_nonce';
 	private const PAGE_SLUG        = '100son-html-normalizer-posts';
 	private const PER_PAGE_CHOICES = [ 10, 25, 50, 100, 200 ];
+
+	/**
+	 * Colonnes triables : clé GET => clé orderby WP_Query.
+	 */
+	private const SORTABLE_COLUMNS = [
+		'ID'    => 'ID',
+		'title' => 'title',
+		'date'  => 'date',
+	];
 
 	private SettingsRepository $settings;
 	private SiteOriginDetector $so_detector;
@@ -57,11 +67,14 @@ final class PostsPage {
 			wp_die( esc_html__( 'Permission refusée.', '100son-html-normalizer' ) );
 		}
 
-		// Sauvegarde des filtres post_type (POST séparé du normalize).
+		// Sauvegarde des préférences (POST persisté : post_type, per_page).
 		$this->maybe_handle_filters_save();
 
-		// Action normalize (POST de confirmation depuis l'aperçu).
+		// Action normalize unitaire (POST depuis l'aperçu).
 		$normalize_result = $this->maybe_handle_normalize();
+
+		// Action groupée (POST depuis la liste : "Normaliser la sélection").
+		$bulk_result = $this->maybe_handle_bulk_normalize();
 
 		$action  = isset( $_GET['action'] ) ? sanitize_key( (string) $_GET['action'] ) : '';
 		$post_id = isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0;
@@ -72,11 +85,15 @@ final class PostsPage {
 		if ( null !== $normalize_result ) {
 			$this->render_normalize_notice( $normalize_result );
 		}
+		if ( null !== $bulk_result ) {
+			$this->render_bulk_notice( $bulk_result );
+		}
 
 		if ( 'preview' === $action && $post_id > 0 ) {
 			$this->render_preview( $post_id );
 		} else {
 			$this->render_filters_form();
+			$this->render_search_form();
 			$this->render_posts_list();
 		}
 
@@ -144,6 +161,76 @@ final class PostsPage {
 		return [ 'post_id' => $post_id, 'result' => $result ];
 	}
 
+	/**
+	 * Traite l'action groupée "Normaliser la sélection" (POST depuis la liste).
+	 *
+	 * @return array{counts: array<string, int>, errors: list<string>}|null
+	 */
+	private function maybe_handle_bulk_normalize(): ?array {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+			return null;
+		}
+		if ( ! isset( $_POST['son100_htmln_action'] ) || 'bulk_normalize' !== $_POST['son100_htmln_action'] ) {
+			return null;
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		check_admin_referer( self::NONCE_BULK, self::NONCE_NAME );
+
+		$bulk_action = isset( $_POST['bulk_action'] ) ? sanitize_key( (string) $_POST['bulk_action'] ) : '';
+		if ( ! in_array( $bulk_action, [ 'normalize', 'normalize_force_so' ], true ) ) {
+			return null;
+		}
+
+		$ids_raw = isset( $_POST['post_ids'] ) && is_array( $_POST['post_ids'] )
+			? wp_unslash( $_POST['post_ids'] )
+			: [];
+
+		$ids = array_values(
+			array_filter(
+				array_map( 'intval', $ids_raw ),
+				static fn( int $id ): bool => $id > 0
+			)
+		);
+
+		if ( [] === $ids ) {
+			return [
+				'counts' => [
+					PostNormalizer::STATUS_MODIFIED         => 0,
+					PostNormalizer::STATUS_UNCHANGED        => 0,
+					PostNormalizer::STATUS_SKIPPED_SO       => 0,
+					PostNormalizer::STATUS_ERROR_NOT_FOUND  => 0,
+					PostNormalizer::STATUS_ERROR_WRITE      => 0,
+				],
+				'errors' => [ __( 'Aucun article sélectionné.', '100son-html-normalizer' ) ],
+			];
+		}
+
+		$force_so = ( 'normalize_force_so' === $bulk_action );
+		$counts   = [
+			PostNormalizer::STATUS_MODIFIED         => 0,
+			PostNormalizer::STATUS_UNCHANGED        => 0,
+			PostNormalizer::STATUS_SKIPPED_SO       => 0,
+			PostNormalizer::STATUS_ERROR_NOT_FOUND  => 0,
+			PostNormalizer::STATUS_ERROR_WRITE      => 0,
+		];
+		$errors = [];
+
+		foreach ( $ids as $id ) {
+			$result = $this->post_normalizer->normalize_post( $id, $force_so );
+			$status = (string) ( $result['status'] ?? '' );
+			if ( isset( $counts[ $status ] ) ) {
+				$counts[ $status ]++;
+			}
+			if ( in_array( $status, [ PostNormalizer::STATUS_ERROR_NOT_FOUND, PostNormalizer::STATUS_ERROR_WRITE ], true ) ) {
+				$errors[] = sprintf( '#%d : %s', $id, (string) ( $result['message'] ?? '' ) );
+			}
+		}
+
+		return [ 'counts' => $counts, 'errors' => $errors ];
+	}
+
 	// ===================================================================
 	//  Render filters + posts list
 	// ===================================================================
@@ -203,6 +290,147 @@ final class PostsPage {
 	}
 
 	/**
+	 * Render de la barre de recherche / filtres (GET, navigationnel).
+	 *
+	 * @return void
+	 */
+	private function render_search_form(): void {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- form GET en lecture, sans nonce.
+		$search = isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : '';
+		$cat    = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
+		$year   = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
+		$month  = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		$months = [
+			1  => __( 'Janvier', '100son-html-normalizer' ),
+			2  => __( 'Février', '100son-html-normalizer' ),
+			3  => __( 'Mars', '100son-html-normalizer' ),
+			4  => __( 'Avril', '100son-html-normalizer' ),
+			5  => __( 'Mai', '100son-html-normalizer' ),
+			6  => __( 'Juin', '100son-html-normalizer' ),
+			7  => __( 'Juillet', '100son-html-normalizer' ),
+			8  => __( 'Août', '100son-html-normalizer' ),
+			9  => __( 'Septembre', '100son-html-normalizer' ),
+			10 => __( 'Octobre', '100son-html-normalizer' ),
+			11 => __( 'Novembre', '100son-html-normalizer' ),
+			12 => __( 'Décembre', '100son-html-normalizer' ),
+		];
+
+		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" style="margin:8px 0 16px 0;padding:12px;background:#fff;border:1px solid #c3c4c7;">';
+		printf( '<input type="hidden" name="page" value="%s">', esc_attr( self::PAGE_SLUG ) );
+
+		echo '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">';
+
+		// Recherche par titre.
+		echo '<div>';
+		echo '<label><strong>' . esc_html__( 'Recherche dans le titre :', '100son-html-normalizer' ) . '</strong><br>';
+		printf(
+			'<input type="search" name="s" value="%s" placeholder="%s" style="width:240px;"></label>',
+			esc_attr( $search ),
+			esc_attr__( 'Mots du titre…', '100son-html-normalizer' )
+		);
+		echo '</div>';
+
+		// Filtre catégorie (taxonomie 'category').
+		echo '<div>';
+		echo '<label><strong>' . esc_html__( 'Catégorie :', '100son-html-normalizer' ) . '</strong><br>';
+		echo '<select name="cat" style="min-width:180px;">';
+		echo '<option value="0">' . esc_html__( 'Toutes', '100son-html-normalizer' ) . '</option>';
+		$categories = get_terms(
+			[
+				'taxonomy'   => 'category',
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'number'     => 200,
+			]
+		);
+		if ( is_array( $categories ) ) {
+			foreach ( $categories as $term ) {
+				if ( ! is_object( $term ) || ! isset( $term->term_id, $term->name ) ) {
+					continue;
+				}
+				printf(
+					'<option value="%1$d" %2$s>%3$s (%4$d)</option>',
+					(int) $term->term_id,
+					selected( $cat === (int) $term->term_id, true, false ),
+					esc_html( (string) $term->name ),
+					(int) ( $term->count ?? 0 )
+				);
+			}
+		}
+		echo '</select></label>';
+		echo '</div>';
+
+		// Filtre année.
+		echo '<div>';
+		echo '<label><strong>' . esc_html__( 'Année :', '100son-html-normalizer' ) . '</strong><br>';
+		echo '<select name="year">';
+		echo '<option value="0">' . esc_html__( 'Toutes', '100son-html-normalizer' ) . '</option>';
+		foreach ( $this->get_available_years() as $y ) {
+			printf(
+				'<option value="%1$d" %2$s>%1$d</option>',
+				(int) $y,
+				selected( $year === (int) $y, true, false )
+			);
+		}
+		echo '</select></label>';
+		echo '</div>';
+
+		// Filtre mois.
+		echo '<div>';
+		echo '<label><strong>' . esc_html__( 'Mois :', '100son-html-normalizer' ) . '</strong><br>';
+		echo '<select name="month">';
+		echo '<option value="0">' . esc_html__( 'Tous', '100son-html-normalizer' ) . '</option>';
+		foreach ( $months as $num => $label ) {
+			printf(
+				'<option value="%1$d" %2$s>%3$s</option>',
+				(int) $num,
+				selected( $month === (int) $num, true, false ),
+				esc_html( $label )
+			);
+		}
+		echo '</select></label>';
+		echo '</div>';
+
+		// Boutons.
+		echo '<div>';
+		submit_button( __( 'Filtrer', '100son-html-normalizer' ), 'primary', '', false );
+		printf(
+			' <a href="%s" class="button">%s</a>',
+			esc_url( self::page_url() ),
+			esc_html__( 'Réinitialiser', '100son-html-normalizer' )
+		);
+		echo '</div>';
+
+		echo '</div>';
+		echo '</form>';
+	}
+
+	/**
+	 * Liste des années pour lesquelles il existe au moins un article.
+	 *
+	 * @return list<int>
+	 */
+	private function get_available_years(): array {
+		global $wpdb;
+		if ( ! isset( $wpdb ) ) {
+			return [];
+		}
+		$rows = $wpdb->get_col(
+			"SELECT DISTINCT YEAR(post_date) FROM {$wpdb->posts}
+			 WHERE post_status IN ('publish','draft','private')
+			 AND post_type IN ('post','page')
+			 ORDER BY post_date DESC"
+		);
+		if ( ! is_array( $rows ) ) {
+			return [];
+		}
+		$years = array_values( array_filter( array_map( 'intval', $rows ), static fn( int $y ): bool => $y > 0 ) );
+		return $years;
+	}
+
+	/**
 	 * Render de la liste des articles.
 	 *
 	 * @return void
@@ -214,20 +442,55 @@ final class PostsPage {
 			return;
 		}
 
-		$paged    = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- params GET de navigation.
+		$paged    = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
+		$search   = isset( $_GET['s'] ) ? trim( (string) wp_unslash( $_GET['s'] ) ) : '';
+		$cat      = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
+		$year     = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
+		$month    = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
+		$orderby  = isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : 'date';
+		$order    = isset( $_GET['order'] ) && 'asc' === strtolower( (string) $_GET['order'] ) ? 'ASC' : 'DESC';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		// Validation du tri.
+		if ( ! array_key_exists( $orderby, self::SORTABLE_COLUMNS ) ) {
+			$orderby = 'date';
+		}
 		$per_page = $this->settings->get_f8_per_page();
 
-		$query = new \WP_Query(
-			[
-				'post_type'      => $selected,
-				'post_status'    => [ 'publish', 'draft', 'private' ],
-				'posts_per_page' => $per_page,
-				'paged'          => $paged,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-				'no_found_rows'  => false,
-			]
-		);
+		$query_args = [
+			'post_type'      => $selected,
+			'post_status'    => [ 'publish', 'draft', 'private' ],
+			'posts_per_page' => $per_page,
+			'paged'          => $paged,
+			'orderby'        => self::SORTABLE_COLUMNS[ $orderby ],
+			'order'          => $order,
+			'no_found_rows'  => false,
+		];
+		if ( '' !== $search ) {
+			$query_args['s'] = $search;
+		}
+		if ( $cat > 0 ) {
+			$query_args['cat'] = $cat;
+		}
+		if ( $year > 0 ) {
+			$date_q              = [ 'year' => $year ];
+			if ( $month >= 1 && $month <= 12 ) {
+				$date_q['month'] = $month;
+			}
+			$query_args['date_query'] = [ $date_q ];
+		}
+
+		// Restriction de `s` au seul post_title (pas content / excerpt).
+		if ( '' !== $search ) {
+			add_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10, 2 );
+		}
+
+		$query = new \WP_Query( $query_args );
+
+		if ( '' !== $search ) {
+			remove_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10 );
+		}
 
 		if ( 0 === $query->found_posts ) {
 			echo '<p>' . esc_html__( 'Aucun article trouvé.', '100son-html-normalizer' ) . '</p>';
@@ -243,11 +506,21 @@ final class PostsPage {
 			) )
 		);
 
+		// Form englobant tableau + actions groupées (POST bulk).
+		$bulk_action_url = self::page_url();
+		echo '<form method="post" action="' . esc_url( $bulk_action_url ) . '">';
+		echo '<input type="hidden" name="son100_htmln_action" value="bulk_normalize">';
+		wp_nonce_field( self::NONCE_BULK, self::NONCE_NAME );
+
+		// Top tablenav : actions groupées + pagination compacte.
+		$this->render_bulk_actions_top();
+
 		echo '<table class="wp-list-table widefat fixed striped">';
 		echo '<thead><tr>';
-		echo '<th style="width:60px;">ID</th>';
-		echo '<th>' . esc_html__( 'Titre', '100son-html-normalizer' ) . '</th>';
-		echo '<th style="width:120px;">' . esc_html__( 'Date', '100son-html-normalizer' ) . '</th>';
+		echo '<td style="width:30px;"><input type="checkbox" id="son100-htmln-select-all"></td>';
+		echo '<th style="width:60px;">' . self::sortable_th_link( 'ID', 'ID', $orderby, $order ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<th>' . self::sortable_th_link( 'title', __( 'Titre', '100son-html-normalizer' ), $orderby, $order ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo '<th style="width:120px;">' . self::sortable_th_link( 'date', __( 'Date', '100son-html-normalizer' ), $orderby, $order ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<th style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
 		echo '<th style="width:220px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
 		echo '<th style="width:60px;">SO</th>';
@@ -274,6 +547,10 @@ final class PostsPage {
 			$edit_url    = (string) get_edit_post_link( $post_id );
 
 			echo '<tr>';
+			printf(
+				'<td><input type="checkbox" class="son100-htmln-row-select" name="post_ids[]" value="%d"></td>',
+				(int) $post_id
+			);
 			printf( '<td>%d</td>', (int) $post_id );
 			printf(
 				'<td><strong>%s</strong>%s</td>',
@@ -300,7 +577,126 @@ final class PostsPage {
 
 		echo '</tbody></table>';
 
+		// Bottom tablenav : actions groupées dupliquées + pagination.
+		$this->render_bulk_actions_bottom( $query, $paged );
+
+		echo '</form>';
+
+		// JS minimal pour la case "tout sélectionner".
+		echo "<script>(function(){var a=document.getElementById('son100-htmln-select-all');if(!a)return;a.addEventListener('change',function(){document.querySelectorAll('input.son100-htmln-row-select').forEach(function(c){c.checked=a.checked;});});})();</script>";
+	}
+
+	/**
+	 * Filtre `posts_search` qui restreint la recherche au seul `post_title`
+	 * (au lieu de title + content + excerpt).
+	 *
+	 * @param string    $search Clause SQL de recherche.
+	 * @param \WP_Query $query  Requête.
+	 * @return string
+	 */
+	public static function restrict_search_to_title( string $search, \WP_Query $query ): string {
+		global $wpdb;
+		if ( '' === $search || ! isset( $wpdb ) ) {
+			return $search;
+		}
+		$terms = (array) $query->get( 'search_terms' );
+		if ( [] === $terms ) {
+			return $search;
+		}
+		$clauses = [];
+		foreach ( $terms as $term ) {
+			$like      = '%' . $wpdb->esc_like( (string) $term ) . '%';
+			$clauses[] = $wpdb->prepare( "({$wpdb->posts}.post_title LIKE %s)", $like );
+		}
+		return ' AND ' . implode( ' AND ', $clauses ) . ' ';
+	}
+
+	/**
+	 * Construit le contenu HTML d'un `<th>` cliquable pour tri.
+	 *
+	 * @param string $key             Clé de la colonne (ID, title, date).
+	 * @param string $label           Libellé affiché.
+	 * @param string $current_orderby Colonne triée actuellement.
+	 * @param string $current_order   Sens courant (ASC/DESC).
+	 * @return string HTML déjà échappé.
+	 */
+	private static function sortable_th_link( string $key, string $label, string $current_orderby, string $current_order ): string {
+		$is_current = ( $key === $current_orderby );
+		$next_order = $is_current && 'ASC' === $current_order ? 'desc' : 'asc';
+		$arrow      = '';
+		if ( $is_current ) {
+			$arrow = 'ASC' === $current_order ? ' ▲' : ' ▼';
+		}
+		$url = add_query_arg(
+			array_filter(
+				[
+					'page'    => self::PAGE_SLUG,
+					'orderby' => $key,
+					'order'   => $next_order,
+					's'       => isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				],
+				static fn( $v ): bool => null !== $v
+			),
+			admin_url( 'admin.php' )
+		);
+		return sprintf(
+			'<a href="%s" style="text-decoration:none;color:inherit;">%s%s</a>',
+			esc_url( $url ),
+			esc_html( $label ),
+			$is_current ? '<span style="font-size:10px;color:#2271b1;">' . esc_html( $arrow ) . '</span>' : ''
+		);
+	}
+
+	/**
+	 * Render des actions groupées au-dessus du tableau.
+	 *
+	 * @return void
+	 */
+	private function render_bulk_actions_top(): void {
+		echo '<div class="tablenav top" style="padding:6px 0;">';
+		echo '<div class="alignleft actions bulkactions" style="display:inline-flex;gap:8px;align-items:center;">';
+		echo '<select name="bulk_action">';
+		printf( '<option value="">%s</option>', esc_html__( 'Action groupée…', '100son-html-normalizer' ) );
+		printf( '<option value="normalize">%s</option>', esc_html__( 'Normaliser la sélection', '100son-html-normalizer' ) );
+		printf( '<option value="normalize_force_so">%s</option>', esc_html__( 'Normaliser (forcer SO)', '100son-html-normalizer' ) );
+		echo '</select>';
+		printf(
+			'<button type="submit" class="button" onclick="return confirm(\'%s\');">%s</button>',
+			esc_js( __( 'Confirmer la normalisation des articles sélectionnés ?', '100son-html-normalizer' ) ),
+			esc_html__( 'Appliquer', '100son-html-normalizer' )
+		);
+		echo '</div>';
+		echo '</div>';
+	}
+
+	/**
+	 * Render des actions groupées + pagination en bas du tableau.
+	 *
+	 * @param \WP_Query $query Requête courante.
+	 * @param int       $paged Page courante.
+	 * @return void
+	 */
+	private function render_bulk_actions_bottom( \WP_Query $query, int $paged ): void {
+		echo '<div class="tablenav bottom" style="padding:6px 0;">';
+		echo '<div class="alignleft actions bulkactions" style="display:inline-flex;gap:8px;align-items:center;">';
+		echo '<select name="bulk_action2">';
+		printf( '<option value="">%s</option>', esc_html__( 'Action groupée…', '100son-html-normalizer' ) );
+		printf( '<option value="normalize">%s</option>', esc_html__( 'Normaliser la sélection', '100son-html-normalizer' ) );
+		printf( '<option value="normalize_force_so">%s</option>', esc_html__( 'Normaliser (forcer SO)', '100son-html-normalizer' ) );
+		echo '</select>';
+		printf(
+			'<button type="submit" class="button" onclick="document.getElementsByName(\'bulk_action\')[0].value=document.getElementsByName(\'bulk_action2\')[0].value;return confirm(\'%s\');">%s</button>',
+			esc_js( __( 'Confirmer la normalisation des articles sélectionnés ?', '100son-html-normalizer' ) ),
+			esc_html__( 'Appliquer', '100son-html-normalizer' )
+		);
+		echo '</div>';
+		echo '<div class="alignright">';
 		$this->render_pagination( $query, $paged );
+		echo '</div>';
+		echo '</div>';
 	}
 
 	/**
@@ -352,10 +748,23 @@ final class PostsPage {
 		if ( $total_pages <= 1 ) {
 			return;
 		}
-		$base = add_query_arg(
-			[ 'page' => self::PAGE_SLUG ],
-			admin_url( 'admin.php' )
+		// Préserve filtres + tri lors du changement de page.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$preserved = array_filter(
+			[
+				'page'    => self::PAGE_SLUG,
+				's'       => isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : null,
+				'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
+				'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
+				'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
+				'orderby' => isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : null,
+				'order'   => isset( $_GET['order'] ) ? sanitize_key( (string) $_GET['order'] ) : null,
+			],
+			static fn( $v ): bool => null !== $v && '' !== $v
 		);
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		$base  = add_query_arg( $preserved, admin_url( 'admin.php' ) );
 		$links = paginate_links(
 			[
 				'base'      => $base . '%_%',
@@ -367,7 +776,7 @@ final class PostsPage {
 			]
 		);
 		if ( ! empty( $links ) ) {
-			echo '<div class="tablenav"><div class="tablenav-pages">' . $links . '</div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo '<div class="tablenav-pages">' . $links . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		}
 	}
 
@@ -460,6 +869,59 @@ final class PostsPage {
 			submit_button( __( 'Normaliser et enregistrer', '100son-html-normalizer' ), 'primary' );
 			echo '</form>';
 		}
+	}
+
+	/**
+	 * Affiche une notice après une action groupée de normalisation.
+	 *
+	 * @param array{counts: array<string, int>, errors: list<string>} $info Compte par statut.
+	 * @return void
+	 */
+	private function render_bulk_notice( array $info ): void {
+		$counts = $info['counts'];
+		$errors = $info['errors'];
+
+		$total_processed = array_sum( $counts );
+		if ( 0 === $total_processed && [] !== $errors ) {
+			echo '<div class="notice notice-error"><p>' . esc_html( implode( ' / ', $errors ) ) . '</p></div>';
+			return;
+		}
+
+		$pieces   = [];
+		$pieces[] = sprintf(
+			/* translators: %d: total */
+			_n( '%d article traité.', '%d articles traités.', $total_processed, '100son-html-normalizer' ),
+			$total_processed
+		);
+		if ( $counts[ PostNormalizer::STATUS_MODIFIED ] > 0 ) {
+			$pieces[] = sprintf( __( 'Modifiés : %d', '100son-html-normalizer' ), $counts[ PostNormalizer::STATUS_MODIFIED ] );
+		}
+		if ( $counts[ PostNormalizer::STATUS_UNCHANGED ] > 0 ) {
+			$pieces[] = sprintf( __( 'Inchangés : %d', '100son-html-normalizer' ), $counts[ PostNormalizer::STATUS_UNCHANGED ] );
+		}
+		if ( $counts[ PostNormalizer::STATUS_SKIPPED_SO ] > 0 ) {
+			$pieces[] = sprintf( __( 'Refusés (SO) : %d', '100son-html-normalizer' ), $counts[ PostNormalizer::STATUS_SKIPPED_SO ] );
+		}
+		if ( $counts[ PostNormalizer::STATUS_ERROR_NOT_FOUND ] + $counts[ PostNormalizer::STATUS_ERROR_WRITE ] > 0 ) {
+			$pieces[] = sprintf(
+				__( 'Erreurs : %d', '100son-html-normalizer' ),
+				$counts[ PostNormalizer::STATUS_ERROR_NOT_FOUND ] + $counts[ PostNormalizer::STATUS_ERROR_WRITE ]
+			);
+		}
+
+		$class = $counts[ PostNormalizer::STATUS_ERROR_NOT_FOUND ] + $counts[ PostNormalizer::STATUS_ERROR_WRITE ] > 0
+			? 'notice-warning'
+			: 'notice-success';
+
+		printf( '<div class="notice %s is-dismissible"><p>%s</p>', esc_attr( $class ), esc_html( implode( ' — ', $pieces ) ) );
+		if ( [] !== $errors ) {
+			echo '<ul style="margin-left:24px;">';
+			foreach ( $errors as $err ) {
+				printf( '<li>%s</li>', esc_html( $err ) );
+			}
+			echo '</ul>';
+		}
+		echo '</div>';
 	}
 
 	/**
