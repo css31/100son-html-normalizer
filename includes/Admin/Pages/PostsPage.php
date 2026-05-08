@@ -35,10 +35,14 @@ final class PostsPage {
 	private const PER_PAGE_CHOICES = [ 10, 25, 50, 100, 200 ];
 
 	/**
-	 * Colonnes triables : clé GET => clé orderby WP_Query.
+	 * Colonnes triables : clé GET (lowercase, compatible sanitize_key) => clé orderby WP_Query.
+	 *
+	 * Note : `sanitize_key()` convertit en lowercase, donc la clé GET DOIT être
+	 * en minuscules. La valeur (côté WP_Query) reste avec sa casse d'origine
+	 * (`'ID'` en majuscules est la valeur attendue par WP_Query pour trier par ID).
 	 */
 	private const SORTABLE_COLUMNS = [
-		'ID'    => 'ID',
+		'id'    => 'ID',
 		'title' => 'title',
 		'date'  => 'date',
 	];
@@ -518,7 +522,7 @@ final class PostsPage {
 		echo '<table class="wp-list-table widefat fixed striped">';
 		echo '<thead><tr>';
 		echo '<td class="manage-column column-cb check-column" style="width:30px;"><input type="checkbox" id="son100-htmln-select-all"></td>';
-		echo self::sortable_th( 'ID', 'ID', $orderby, $order, 'width:60px;' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo self::sortable_th( 'id', 'ID', $orderby, $order, 'width:60px;' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo self::sortable_th( 'title', __( 'Titre', '100son-html-normalizer' ), $orderby, $order ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo self::sortable_th( 'date', __( 'Date', '100son-html-normalizer' ), $orderby, $order, 'width:120px;' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<th class="manage-column" style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
