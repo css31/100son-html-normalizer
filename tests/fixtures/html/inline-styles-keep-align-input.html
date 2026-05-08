@@ -1,0 +1,17 @@
+<!--
+  Fixture : inline-styles-keep-align-input.html
+  Test    : tests/Unit/Rules/RemoveInlineStylesRuleTest.php (P6 avec keep_text_align=true)
+  Auteur  : agent
+
+  Cas couverts :
+    1. style avec text-align + autre prop -> garde uniquement text-align
+    2. style avec text-align seul -> conserve
+    3. style sans text-align -> attribut entierement retire
+    4. balise sans style -> inchangee
+    5. multiple proprietes -> seul text-align reste
+-->
+<p style="text-align: center; color: red;">Centre rouge</p>
+<p style="text-align: left;">Aligne a gauche seul</p>
+<p style="font-weight: bold; color: blue;">Pas de text-align</p>
+<p>Sans style</p>
+<h2 style="text-align: right; font-size: 24px; margin: 10px;">Titre droit</h2>
