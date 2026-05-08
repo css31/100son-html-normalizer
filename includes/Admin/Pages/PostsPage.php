@@ -517,8 +517,8 @@ final class PostsPage {
 		echo '<input type="hidden" name="son100_htmln_action" value="bulk_normalize">';
 		wp_nonce_field( self::NONCE_BULK, self::NONCE_NAME );
 
-		// Top tablenav : actions groupées + pagination compacte.
-		$this->render_bulk_actions_top();
+		// Top tablenav : actions groupées + pagination.
+		$this->render_bulk_actions_top( $query, $paged );
 
 		echo '<table class="wp-list-table widefat fixed striped">';
 		echo '<thead><tr>';
@@ -678,11 +678,13 @@ final class PostsPage {
 	}
 
 	/**
-	 * Render des actions groupées au-dessus du tableau.
+	 * Render des actions groupées + pagination au-dessus du tableau.
 	 *
+	 * @param \WP_Query $query Requête courante.
+	 * @param int       $paged Page courante.
 	 * @return void
 	 */
-	private function render_bulk_actions_top(): void {
+	private function render_bulk_actions_top( \WP_Query $query, int $paged ): void {
 		echo '<div class="tablenav top" style="padding:6px 0;">';
 		echo '<div class="alignleft actions bulkactions" style="display:inline-flex;gap:8px;align-items:center;">';
 		echo '<select name="bulk_action">';
@@ -695,6 +697,9 @@ final class PostsPage {
 			esc_js( __( 'Confirmer la normalisation des articles sélectionnés ?', '100son-html-normalizer' ) ),
 			esc_html__( 'Appliquer', '100son-html-normalizer' )
 		);
+		echo '</div>';
+		echo '<div class="alignright">';
+		$this->render_pagination( $query, $paged );
 		echo '</div>';
 		echo '</div>';
 	}
