@@ -138,7 +138,7 @@ final class PresetsPage {
 		echo '<form method="post" action="">';
 		wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
 
-		echo '<table class="form-table" role="presentation">';
+		echo '<table class="widefat striped" style="margin-top:16px;max-width:1100px;">';
 		echo '<tbody>';
 
 		// Whitelist limitée pour wp_kses sur les descriptions (HTML autorisé : code, strong, em, br).
@@ -154,35 +154,37 @@ final class PresetsPage {
 			$enabled = ! empty( $config['enabled'] );
 
 			echo '<tr>';
-			echo '<th scope="row" style="vertical-align:top;">';
+
+			// Colonne GAUCHE : activation + sous-paramètres (compacte).
+			echo '<td style="width:260px;vertical-align:top;padding:16px;">';
 			printf(
-				'<strong>%s — %s</strong>',
+				'<label style="font-weight:600;"><input type="checkbox" name="preset[%1$s][enabled]" value="1" %2$s> %3$s</label>',
+				esc_attr( $preset_id ),
+				checked( $enabled, true, false ),
+				esc_html__( 'Activé', '100son-html-normalizer' )
+			);
+			if ( $meta['has_options'] ) {
+				echo '<div style="margin-top:12px;padding-left:24px;">';
+				$this->render_preset_options( $preset_id, $config );
+				echo '</div>';
+			}
+			echo '</td>';
+
+			// Colonne DROITE : nom + description (large).
+			echo '<td style="vertical-align:top;padding:16px;">';
+			printf(
+				'<strong style="font-size:14px;">%s — %s</strong>',
 				esc_html( $preset_id ),
 				wp_kses( (string) ( $meta['label'] ?? '' ), $allowed_html )
 			);
 			if ( ! empty( $meta['description'] ) ) {
 				printf(
-					'<p class="description" style="font-weight:normal;margin-top:4px;max-width:520px;">%s</p>',
+					'<p class="description" style="margin-top:6px;font-size:13px;line-height:1.5;">%s</p>',
 					wp_kses( (string) $meta['description'], $allowed_html )
 				);
 			}
-			echo '</th>';
-			echo '<td>';
-
-			printf(
-				'<label><input type="checkbox" name="preset[%1$s][enabled]" value="1" %2$s> %3$s</label>',
-				esc_attr( $preset_id ),
-				checked( $enabled, true, false ),
-				esc_html__( 'Activé', '100son-html-normalizer' )
-			);
-
-			if ( $meta['has_options'] ) {
-				echo '<div style="margin-top:8px;padding-left:24px;">';
-				$this->render_preset_options( $preset_id, $config );
-				echo '</div>';
-			}
-
 			echo '</td>';
+
 			echo '</tr>';
 		}
 
