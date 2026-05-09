@@ -35,6 +35,11 @@ final class PostsPage {
 	private const PAGE_SLUG        = '100son-html-normalizer-posts';
 	private const PER_PAGE_CHOICES = [ 10, 25, 50, 100, 200 ];
 
+	/* Types de constructeur détectés (colonne + filtre « Constructeur »). */
+	private const BUILDER_SO    = 'siteorigin';
+	private const BUILDER_GUT   = 'gutenberg';
+	private const BUILDER_OTHER = 'other';
+
 	/**
 	 * Colonnes triables : clé GET (lowercase, compatible sanitize_key) => clé orderby WP_Query.
 	 *
@@ -305,7 +310,7 @@ final class PostsPage {
 		$cat       = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
 		$year      = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
 		$month     = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
-		$so_filter = isset( $_GET['so'] ) ? sanitize_key( (string) $_GET['so'] ) : '';
+		$builder_filter = isset( $_GET['builder'] ) ? sanitize_key( (string) $_GET['builder'] ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$months = [
@@ -399,24 +404,32 @@ final class PostsPage {
 		echo '</select></label>';
 		echo '</div>';
 
-		// Filtre SiteOrigin.
+		// Filtre Constructeur (SO / Gutenberg / Autres).
 		echo '<div>';
-		echo '<label><strong>' . esc_html__( 'SiteOrigin :', '100son-html-normalizer' ) . '</strong><br>';
-		echo '<select name="so">';
+		echo '<label><strong>' . esc_html__( 'Constructeur :', '100son-html-normalizer' ) . '</strong><br>';
+		echo '<select name="builder">';
 		printf(
 			'<option value="" %s>%s</option>',
-			selected( '' === $so_filter, true, false ),
+			selected( '' === $builder_filter, true, false ),
 			esc_html__( 'Tous', '100son-html-normalizer' )
 		);
 		printf(
-			'<option value="only" %s>%s</option>',
-			selected( 'only' === $so_filter, true, false ),
-			esc_html__( 'SO uniquement', '100son-html-normalizer' )
+			'<option value="%s" %s>%s</option>',
+			esc_attr( self::BUILDER_SO ),
+			selected( self::BUILDER_SO === $builder_filter, true, false ),
+			esc_html__( 'SiteOrigin', '100son-html-normalizer' )
 		);
 		printf(
-			'<option value="none" %s>%s</option>',
-			selected( 'none' === $so_filter, true, false ),
-			esc_html__( 'Non-SO uniquement', '100son-html-normalizer' )
+			'<option value="%s" %s>%s</option>',
+			esc_attr( self::BUILDER_GUT ),
+			selected( self::BUILDER_GUT === $builder_filter, true, false ),
+			esc_html__( 'Gutenberg', '100son-html-normalizer' )
+		);
+		printf(
+			'<option value="%s" %s>%s</option>',
+			esc_attr( self::BUILDER_OTHER ),
+			selected( self::BUILDER_OTHER === $builder_filter, true, false ),
+			esc_html__( 'Autres', '100son-html-normalizer' )
 		);
 		echo '</select></label>';
 		echo '</div>';
@@ -476,7 +489,7 @@ final class PostsPage {
 		$cat       = isset( $_GET['cat'] ) ? (int) $_GET['cat'] : 0;
 		$year      = isset( $_GET['year'] ) ? (int) $_GET['year'] : 0;
 		$month     = isset( $_GET['month'] ) ? (int) $_GET['month'] : 0;
-		$so_filter = isset( $_GET['so'] ) ? sanitize_key( (string) $_GET['so'] ) : '';
+		$builder_filter = isset( $_GET['builder'] ) ? sanitize_key( (string) $_GET['builder'] ) : '';
 		$orderby   = isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : 'date';
 		$order     = isset( $_GET['order'] ) && 'asc' === strtolower( (string) $_GET['order'] ) ? 'ASC' : 'DESC';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
@@ -510,15 +523,29 @@ final class PostsPage {
 			$query_args['date_query'] = [ $date_q ];
 		}
 
-		// Filtre SiteOrigin via meta_query sur `panels_data`.
-		if ( 'only' === $so_filter ) {
-			$query_args['meta_query'] = [
-				[ 'key' => 'panels_data', 'compare' => 'EXISTS' ],
-			];
-		} elseif ( 'none' === $so_filter ) {
-			$query_args['meta_query'] = [
-				[ 'key' => 'panels_data', 'compare' => 'NOT EXISTS' ],
-			];
+		// Filtre Constructeur :
+		//  - SO        : `panels_data` EXISTS (meta_query suffit).
+		//  - Gutenberg : pas de `panels_data` ET `post_content LIKE '%<!-- wp:%'`
+		//                (la marque blocs n'est pas une meta → hook posts_where).
+		//  - Autres    : ni l'un ni l'autre.
+		switch ( $builder_filter ) {
+			case self::BUILDER_SO:
+				$query_args['meta_query'] = [
+					[ 'key' => 'panels_data', 'compare' => 'EXISTS' ],
+				];
+				break;
+			case self::BUILDER_GUT:
+				$query_args['meta_query'] = [
+					[ 'key' => 'panels_data', 'compare' => 'NOT EXISTS' ],
+				];
+				add_filter( 'posts_where', [ self::class, 'restrict_to_gutenberg' ] );
+				break;
+			case self::BUILDER_OTHER:
+				$query_args['meta_query'] = [
+					[ 'key' => 'panels_data', 'compare' => 'NOT EXISTS' ],
+				];
+				add_filter( 'posts_where', [ self::class, 'restrict_to_other' ] );
+				break;
 		}
 
 		// Restriction de `s` au seul post_title (pas content / excerpt).
@@ -530,6 +557,11 @@ final class PostsPage {
 
 		if ( '' !== $search ) {
 			remove_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10 );
+		}
+		if ( self::BUILDER_GUT === $builder_filter ) {
+			remove_filter( 'posts_where', [ self::class, 'restrict_to_gutenberg' ] );
+		} elseif ( self::BUILDER_OTHER === $builder_filter ) {
+			remove_filter( 'posts_where', [ self::class, 'restrict_to_other' ] );
 		}
 
 		if ( 0 === $query->found_posts ) {
@@ -564,7 +596,7 @@ final class PostsPage {
 		echo '<th class="manage-column" style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:200px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:70px;text-align:right;">' . esc_html__( 'Mots', '100son-html-normalizer' ) . '</th>';
-		echo '<th class="manage-column" style="width:60px;">SO</th>';
+		echo '<th class="manage-column" style="width:70px;" title="' . esc_attr__( 'Constructeur', '100son-html-normalizer' ) . '">' . esc_html__( 'Constr.', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:100px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
@@ -605,10 +637,8 @@ final class PostsPage {
 			printf( '<td>%s</td>', $cats_html ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
 			$word_count = HtmlMetrics::compute( (string) get_post_field( 'post_content', $post_id ) )['word_count'];
 			printf( '<td style="text-align:right;font-variant-numeric:tabular-nums;">%s</td>', esc_html( number_format_i18n( $word_count ) ) );
-			echo '<td>' . ( $has_so
-				? '<span style="display:inline-block;padding:2px 8px;background:#d63638;color:#fff;border-radius:3px;font-size:11px;font-weight:600;">SO</span>'
-				: '—'
-			) . '</td>';
+			$builder_type = self::classify_builder( $post_id, $has_so );
+			echo '<td>' . self::builder_badge( $builder_type ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
 			printf(
 				'<td><a href="%s" class="button button-small">%s</a></td>',
 				esc_url( $preview_url ),
@@ -655,6 +685,110 @@ final class PostsPage {
 	}
 
 	/**
+	 * Filtre `posts_where` : ne garder que les articles **avec blocs Gutenberg**
+	 * (présence du marqueur `<!-- wp:` dans `post_content`).
+	 *
+	 * Utilisé conjointement à `meta_query NOT EXISTS panels_data` pour exclure
+	 * les articles SiteOrigin qui auraient aussi des blocs (cas marginal mais
+	 * possible après une migration partielle).
+	 *
+	 * @param string $where Clause WHERE SQL.
+	 * @return string
+	 */
+	public static function restrict_to_gutenberg( string $where ): string {
+		global $wpdb;
+		if ( ! isset( $wpdb ) ) {
+			return $where;
+		}
+		return $where . " AND {$wpdb->posts}.post_content LIKE '%<!-- wp:%'";
+	}
+
+	/**
+	 * Filtre `posts_where` : ne garder que les articles **« Autres »** —
+	 * ni SiteOrigin (déjà exclus en amont via `meta_query`), ni Gutenberg.
+	 *
+	 * @param string $where Clause WHERE SQL.
+	 * @return string
+	 */
+	public static function restrict_to_other( string $where ): string {
+		global $wpdb;
+		if ( ! isset( $wpdb ) ) {
+			return $where;
+		}
+		return $where . " AND {$wpdb->posts}.post_content NOT LIKE '%<!-- wp:%'";
+	}
+
+	/**
+	 * Classifie un article selon son constructeur :
+	 *  1. SiteOrigin si `panels_data` non vide,
+	 *  2. sinon Gutenberg si `has_blocks()` détecte le marqueur `<!-- wp:`,
+	 *  3. sinon « Autres » (HTML libre, éditeur classique, …).
+	 *
+	 * L'ordre est figé : un article SO peut techniquement contenir aussi
+	 * des blocs (édition mixte rare), mais la présence de `panels_data`
+	 * prévaut — c'est lui qui pilote le rendu front.
+	 *
+	 * @param int  $post_id Identifiant.
+	 * @param bool $has_so  Résultat pré-calculé de `SiteOriginDetector::has_panels_data()`.
+	 * @return string Une des constantes `BUILDER_*`.
+	 */
+	private static function classify_builder( int $post_id, bool $has_so ): string {
+		if ( $has_so ) {
+			return self::BUILDER_SO;
+		}
+		if ( function_exists( 'has_blocks' ) ) {
+			$content = (string) get_post_field( 'post_content', $post_id );
+			if ( has_blocks( $content ) ) {
+				return self::BUILDER_GUT;
+			}
+		}
+		return self::BUILDER_OTHER;
+	}
+
+	/**
+	 * Badge HTML correspondant à un type de constructeur.
+	 *
+	 * Couleurs alignées sur les conventions WP admin :
+	 *  - SO  → rouge `#d63638` (déjà utilisé pour les avertissements forts)
+	 *  - Gut → vert `#00a32a` (succès)
+	 *  - ?   → jaune `#f0b849` (attention/inconnu)
+	 *
+	 * @param string $type Une des constantes `BUILDER_*`.
+	 * @return string HTML déjà échappé (single `<span>`).
+	 */
+	private static function builder_badge( string $type ): string {
+		$presets = [
+			self::BUILDER_SO    => [
+				'bg'    => '#d63638',
+				'fg'    => '#fff',
+				'label' => 'SO',
+				'title' => __( 'SiteOrigin Page Builder', '100son-html-normalizer' ),
+			],
+			self::BUILDER_GUT   => [
+				'bg'    => '#00a32a',
+				'fg'    => '#fff',
+				'label' => 'Gut',
+				'title' => __( 'Gutenberg (blocs FSE)', '100son-html-normalizer' ),
+			],
+			self::BUILDER_OTHER => [
+				'bg'    => '#f0b849',
+				'fg'    => '#1d2327',
+				'label' => '?',
+				'title' => __( 'Constructeur inconnu (HTML libre / éditeur classique)', '100son-html-normalizer' ),
+			],
+		];
+		$p = $presets[ $type ] ?? $presets[ self::BUILDER_OTHER ];
+
+		return sprintf(
+			'<span title="%s" style="display:inline-block;padding:2px 8px;background:%s;color:%s;border-radius:3px;font-size:11px;font-weight:600;">%s</span>',
+			esc_attr( (string) $p['title'] ),
+			esc_attr( (string) $p['bg'] ),
+			esc_attr( (string) $p['fg'] ),
+			esc_html( (string) $p['label'] )
+		);
+	}
+
+	/**
 	 * Construit un `<th>` triable au format natif WP admin.
 	 *
 	 * Utilise les classes `sortable` / `sorted asc|desc` reconnues par les
@@ -694,7 +828,7 @@ final class PostsPage {
 					'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
 					'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
 					'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
-					'so'      => isset( $_GET['so'] ) && '' !== (string) $_GET['so'] ? sanitize_key( (string) $_GET['so'] ) : null,
+					'builder' => isset( $_GET['builder'] ) && '' !== (string) $_GET['builder'] ? sanitize_key( (string) $_GET['builder'] ) : null,
 				],
 				static fn( $v ): bool => null !== $v
 			),
@@ -825,7 +959,7 @@ final class PostsPage {
 				'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
 				'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
 				'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
-				'so'      => isset( $_GET['so'] ) && '' !== (string) $_GET['so'] ? sanitize_key( (string) $_GET['so'] ) : null,
+				'builder' => isset( $_GET['builder'] ) && '' !== (string) $_GET['builder'] ? sanitize_key( (string) $_GET['builder'] ) : null,
 				'orderby' => isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : null,
 				'order'   => isset( $_GET['order'] ) ? sanitize_key( (string) $_GET['order'] ) : null,
 			],
