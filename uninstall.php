@@ -26,3 +26,6 @@ foreach ( $son100_htmln_options as $son100_htmln_option ) {
 }
 
 unset( $son100_htmln_option, $son100_htmln_options );
+
+// Purge des post-meta plantés par le plugin (tag Out manuel sur la page Normaliser).
+delete_post_meta_by_key( '_son100_htmln_builder_override' );

@@ -31,14 +31,26 @@ final class PostsPage {
 	private const NONCE_FILTERS    = 'son100_htmln_posts_filters';
 	private const NONCE_NORMALIZE  = 'son100_htmln_posts_normalize';
 	private const NONCE_BULK       = 'son100_htmln_posts_bulk';
+	private const NONCE_OVERRIDE   = 'son100_htmln_posts_override';
 	private const NONCE_NAME       = '_son100_htmln_nonce';
 	private const PAGE_SLUG        = '100son-html-normalizer-posts';
 	private const PER_PAGE_CHOICES = [ 10, 25, 50, 100, 200 ];
 
+	/* Hook `admin_post_*` — handler du toggle Out / Auto via admin-post.php.
+	 * Indispensable : la callback de menu admin est appelée APRÈS l'envoi des
+	 * headers HTTP, donc tout `wp_safe_redirect` y échoue silencieusement.
+	 * admin-post.php tourne avant et permet une redirection PRG propre. */
+	private const ACTION_SET_OVERRIDE = 'son100_htmln_set_override';
+
+	/* Post-meta de tag manuel (override de la classification auto). */
+	private const META_OVERRIDE = '_son100_htmln_builder_override';
+
 	/* Types de constructeur détectés (colonne + filtre « Constructeur »). */
-	private const BUILDER_SO    = 'siteorigin';
-	private const BUILDER_GUT   = 'gutenberg';
-	private const BUILDER_OTHER = 'other';
+	private const BUILDER_SO      = 'siteorigin';      // panels_data en meta OU bloc <!-- wp:siteorigin-panels
+	private const BUILDER_SO_FLAT = 'siteorigin_flat'; // rendu HTML SO aplati dans post_content (classes panel-layout / so-panel sans meta ni bloc)
+	private const BUILDER_GUT     = 'gutenberg';
+	private const BUILDER_OTHER   = 'other';
+	private const BUILDER_OUT     = 'out';             // override manuel : article hors périmètre (à ignorer)
 
 	/**
 	 * Colonnes triables : clé GET (lowercase, compatible sanitize_key) => clé orderby WP_Query.
@@ -79,6 +91,9 @@ final class PostsPage {
 
 		// Sauvegarde des préférences (POST persisté : post_type, per_page).
 		$this->maybe_handle_filters_save();
+
+		// NB : le tag manuel Out / Auto (toggle colonne Constr.) est traité par
+		// `handle_set_override()` côté admin-post.php — il ne passe jamais ici.
 
 		// Action normalize unitaire (POST depuis l'aperçu).
 		$normalize_result = $this->maybe_handle_normalize();
@@ -141,6 +156,69 @@ final class PostsPage {
 		if ( isset( $_POST['per_page'] ) ) {
 			$this->settings->set_f8_per_page( (int) $_POST['per_page'] );
 		}
+	}
+
+	/**
+	 * Branche les hooks admin-post.php nécessaires aux form-handlers de la page.
+	 *
+	 * À appeler une seule fois pendant `admin_init` (cf. `Menu::register()`).
+	 * Indispensable pour le toggle Out/Auto qui exige une redirection PRG :
+	 * les callbacks de menu sont appelées APRÈS l'envoi des headers HTTP, donc
+	 * `wp_safe_redirect` y est inopérant. admin-post.php s'exécute en amont.
+	 *
+	 * @return void
+	 */
+	public function register_admin_hooks(): void {
+		if ( ! function_exists( 'add_action' ) ) {
+			return;
+		}
+		add_action( 'admin_post_' . self::ACTION_SET_OVERRIDE, [ $this, 'handle_set_override' ] );
+	}
+
+	/**
+	 * Handler `admin_post_son100_htmln_set_override` — traite le tag manuel
+	 * Out / Auto soumis via le toggle inline de la colonne Constr.
+	 *
+	 * Si l'override est `out` → ajoute la post-meta. Si vide → la supprime
+	 * (retour à la classification auto). Termine par une redirection PRG
+	 * vers l'URL initiale (avec les filtres GET intacts) pour éviter les
+	 * re-soumissions au refresh.
+	 *
+	 * @return void
+	 */
+	public function handle_set_override(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permission refusée.', '100son-html-normalizer' ), '', [ 'response' => 403 ] );
+		}
+
+		check_admin_referer( self::NONCE_OVERRIDE, self::NONCE_NAME );
+
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce déjà vérifié ci-dessus.
+		$post_id  = isset( $_POST['post_id'] ) ? (int) $_POST['post_id'] : 0;
+		$override = isset( $_POST['override'] ) ? sanitize_key( (string) wp_unslash( $_POST['override'] ) ) : '';
+
+		if ( $post_id > 0 && get_post( $post_id ) instanceof \WP_Post ) {
+			if ( self::BUILDER_OUT === $override ) {
+				update_post_meta( $post_id, self::META_OVERRIDE, self::BUILDER_OUT );
+			} else {
+				delete_post_meta( $post_id, self::META_OVERRIDE );
+			}
+		}
+
+		// PRG : redirection vers l'URI d'origine (préserve filtres + tri + pagination).
+		// On n'autorise qu'une URI relative à /wp-admin/ (anti open-redirect),
+		// sinon fallback sur la liste vierge.
+		$redirect_to = self::page_url();
+		if ( isset( $_POST['redirect_to'] ) ) {
+			$candidate = (string) wp_unslash( $_POST['redirect_to'] );
+			if ( str_starts_with( $candidate, '/wp-admin/' ) ) {
+				$redirect_to = site_url( $candidate );
+			}
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		wp_safe_redirect( $redirect_to );
+		exit;
 	}
 
 	/**
@@ -228,6 +306,13 @@ final class PostsPage {
 		$errors = [];
 
 		foreach ( $ids as $id ) {
+			// Sécurité : on saute systématiquement les articles taggés Out,
+			// même si le client a réussi à pousser leur ID dans le POST
+			// (la checkbox `disabled` côté UI les exclut déjà, mais le serveur
+			// reste seul juge — pas de confiance sur l'input client).
+			if ( self::BUILDER_OUT === (string) get_post_meta( $id, self::META_OVERRIDE, true ) ) {
+				continue;
+			}
 			$result = $this->post_normalizer->normalize_post( $id, $force_so );
 			$status = (string) ( $result['status'] ?? '' );
 			if ( isset( $counts[ $status ] ) ) {
@@ -333,13 +418,13 @@ final class PostsPage {
 
 		echo '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">';
 
-		// Recherche par titre.
+		// Recherche par titre OU par ID (un nombre seul → recherche ID exacte).
 		echo '<div>';
-		echo '<label><strong>' . esc_html__( 'Recherche dans le titre :', '100son-html-normalizer' ) . '</strong><br>';
+		echo '<label><strong>' . esc_html__( 'Recherche (titre ou ID) :', '100son-html-normalizer' ) . '</strong><br>';
 		printf(
 			'<input type="search" name="s" value="%s" placeholder="%s" style="width:240px;"></label>',
 			esc_attr( $search ),
-			esc_attr__( 'Mots du titre…', '100son-html-normalizer' )
+			esc_attr__( 'Mots du titre, ou ID exact (ex. 11448)', '100son-html-normalizer' )
 		);
 		echo '</div>';
 
@@ -431,6 +516,12 @@ final class PostsPage {
 			selected( self::BUILDER_OTHER === $builder_filter, true, false ),
 			esc_html__( 'Autres', '100son-html-normalizer' )
 		);
+		printf(
+			'<option value="%s" %s>%s</option>',
+			esc_attr( self::BUILDER_OUT ),
+			selected( self::BUILDER_OUT === $builder_filter, true, false ),
+			esc_html__( 'Out (hors périmètre)', '100son-html-normalizer' )
+		);
 		echo '</select></label>';
 		echo '</div>';
 
@@ -509,7 +600,13 @@ final class PostsPage {
 			'order'          => $order,
 			'no_found_rows'  => false,
 		];
-		if ( '' !== $search ) {
+		// Si la recherche est purement numérique, on l'interprète comme un ID
+		// exact (recherche par clé primaire). On utilise `post__in` plutôt que
+		// `p` pour rester combinable avec les autres filtres (cat, date, builder…).
+		$search_is_id = '' !== $search && ctype_digit( $search );
+		if ( $search_is_id ) {
+			$query_args['post__in'] = [ (int) $search ];
+		} elseif ( '' !== $search ) {
 			$query_args['s'] = $search;
 		}
 		if ( $cat > 0 ) {
@@ -524,15 +621,15 @@ final class PostsPage {
 		}
 
 		// Filtre Constructeur :
-		//  - SO        : `panels_data` EXISTS (meta_query suffit).
-		//  - Gutenberg : pas de `panels_data` ET `post_content LIKE '%<!-- wp:%'`
-		//                (la marque blocs n'est pas une meta → hook posts_where).
-		//  - Autres    : ni l'un ni l'autre.
+		//  - SO        : `panels_data` EXISTS *OU* contenu = bloc siteorigin-panels.
+		//                Comme WP_Query ne sait pas exprimer le OR entre meta et
+		//                content, on passe entièrement par `posts_where`.
+		//  - Gutenberg : pas de `panels_data`, présence de `<!-- wp:`, mais PAS
+		//                de `<!-- wp:siteorigin-panels` (qui est du SO déguisé).
+		//  - Autres    : ni `panels_data`, ni aucun marqueur de bloc `<!-- wp:`.
 		switch ( $builder_filter ) {
 			case self::BUILDER_SO:
-				$query_args['meta_query'] = [
-					[ 'key' => 'panels_data', 'compare' => 'EXISTS' ],
-				];
+				add_filter( 'posts_where', [ self::class, 'restrict_to_siteorigin' ] );
 				break;
 			case self::BUILDER_GUT:
 				$query_args['meta_query'] = [
@@ -546,19 +643,32 @@ final class PostsPage {
 				];
 				add_filter( 'posts_where', [ self::class, 'restrict_to_other' ] );
 				break;
+			case self::BUILDER_OUT:
+				// Filtre Out : tag manuel uniquement (post-meta override = 'out').
+				$query_args['meta_query'] = [
+					[
+						'key'     => self::META_OVERRIDE,
+						'value'   => self::BUILDER_OUT,
+						'compare' => '=',
+					],
+				];
+				break;
 		}
 
-		// Restriction de `s` au seul post_title (pas content / excerpt).
-		if ( '' !== $search ) {
+		// Restriction de `s` au seul post_title (pas content / excerpt) —
+		// uniquement quand la recherche est textuelle (sinon on est en mode ID).
+		if ( '' !== $search && ! $search_is_id ) {
 			add_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10, 2 );
 		}
 
 		$query = new \WP_Query( $query_args );
 
-		if ( '' !== $search ) {
+		if ( '' !== $search && ! $search_is_id ) {
 			remove_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10 );
 		}
-		if ( self::BUILDER_GUT === $builder_filter ) {
+		if ( self::BUILDER_SO === $builder_filter ) {
+			remove_filter( 'posts_where', [ self::class, 'restrict_to_siteorigin' ] );
+		} elseif ( self::BUILDER_GUT === $builder_filter ) {
 			remove_filter( 'posts_where', [ self::class, 'restrict_to_gutenberg' ] );
 		} elseif ( self::BUILDER_OTHER === $builder_filter ) {
 			remove_filter( 'posts_where', [ self::class, 'restrict_to_other' ] );
@@ -596,7 +706,7 @@ final class PostsPage {
 		echo '<th class="manage-column" style="width:80px;">' . esc_html__( 'Type', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:200px;">' . esc_html__( 'Catégories', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:70px;text-align:right;">' . esc_html__( 'Mots', '100son-html-normalizer' ) . '</th>';
-		echo '<th class="manage-column" style="width:70px;" title="' . esc_attr__( 'Constructeur', '100son-html-normalizer' ) . '">' . esc_html__( 'Constr.', '100son-html-normalizer' ) . '</th>';
+		echo '<th class="manage-column" style="width:130px;" title="' . esc_attr__( 'Constructeur', '100son-html-normalizer' ) . '">' . esc_html__( 'Constr.', '100son-html-normalizer' ) . '</th>';
 		echo '<th class="manage-column" style="width:100px;">' . esc_html__( 'Actions', '100son-html-normalizer' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
@@ -619,11 +729,18 @@ final class PostsPage {
 			);
 			$edit_url    = (string) get_edit_post_link( $post_id );
 
-			echo '<tr>';
+			$builder_type = self::classify_builder( $post_id, $has_so );
+			$is_out       = ( self::BUILDER_OUT === $builder_type );
+
+			echo '<tr' . ( $is_out ? ' style="opacity:0.55;"' : '' ) . '>';
+
+			// Checkbox : désactivée sur les Out (exclus des bulk actions).
 			printf(
-				'<td><input type="checkbox" class="son100-htmln-row-select" name="post_ids[]" value="%d"></td>',
-				(int) $post_id
+				'<td><input type="checkbox" class="son100-htmln-row-select" name="post_ids[]" value="%d"%s></td>',
+				(int) $post_id,
+				$is_out ? ' disabled title="' . esc_attr__( 'Article hors périmètre — exclu des actions groupées', '100son-html-normalizer' ) . '"' : ''
 			);
+
 			printf( '<td>%d</td>', (int) $post_id );
 			printf(
 				'<td><strong>%s</strong>%s</td>',
@@ -637,13 +754,27 @@ final class PostsPage {
 			printf( '<td>%s</td>', $cats_html ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
 			$word_count = HtmlMetrics::compute( (string) get_post_field( 'post_content', $post_id ) )['word_count'];
 			printf( '<td style="text-align:right;font-variant-numeric:tabular-nums;">%s</td>', esc_html( number_format_i18n( $word_count ) ) );
-			$builder_type = self::classify_builder( $post_id, $has_so );
-			echo '<td>' . self::builder_badge( $builder_type ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
-			printf(
-				'<td><a href="%s" class="button button-small">%s</a></td>',
-				esc_url( $preview_url ),
-				esc_html__( 'Aperçu', '100son-html-normalizer' )
-			);
+
+			// Cellule Constr. : badge + mini-toggle « → Out » / « → Auto ».
+			echo '<td>';
+			echo self::builder_badge( $builder_type ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
+			echo self::render_override_toggle( $post_id, $is_out ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — escaped inside helper.
+			echo '</td>';
+
+			// Bouton Aperçu : grisé sur les Out (article hors périmètre).
+			if ( $is_out ) {
+				printf(
+					'<td><span class="button button-small" disabled title="%s" style="cursor:not-allowed;opacity:0.6;">%s</span></td>',
+					esc_attr__( 'Article hors périmètre', '100son-html-normalizer' ),
+					esc_html__( 'Aperçu', '100son-html-normalizer' )
+				);
+			} else {
+				printf(
+					'<td><a href="%s" class="button button-small">%s</a></td>',
+					esc_url( $preview_url ),
+					esc_html__( 'Aperçu', '100son-html-normalizer' )
+				);
+			}
 			echo '</tr>';
 		}
 		wp_reset_postdata();
@@ -685,12 +816,12 @@ final class PostsPage {
 	}
 
 	/**
-	 * Filtre `posts_where` : ne garder que les articles **avec blocs Gutenberg**
-	 * (présence du marqueur `<!-- wp:` dans `post_content`).
+	 * Filtre `posts_where` : ne garder que les articles **avec blocs Gutenberg
+	 * « purs »** — présence du marqueur `<!-- wp:` MAIS pas du bloc hybride
+	 * `<!-- wp:siteorigin-panels` (qui est en réalité du SiteOrigin emballé
+	 * dans un bloc Gutenberg, cf. `classify_builder()`).
 	 *
-	 * Utilisé conjointement à `meta_query NOT EXISTS panels_data` pour exclure
-	 * les articles SiteOrigin qui auraient aussi des blocs (cas marginal mais
-	 * possible après une migration partielle).
+	 * Utilisé conjointement à `meta_query NOT EXISTS panels_data`.
 	 *
 	 * @param string $where Clause WHERE SQL.
 	 * @return string
@@ -700,12 +831,18 @@ final class PostsPage {
 		if ( ! isset( $wpdb ) ) {
 			return $where;
 		}
-		return $where . " AND {$wpdb->posts}.post_content LIKE '%<!-- wp:%'";
+		return $where
+			. " AND {$wpdb->posts}.post_content LIKE '%<!-- wp:%'"
+			. " AND {$wpdb->posts}.post_content NOT LIKE '%<!-- wp:siteorigin-panels%'";
 	}
 
 	/**
 	 * Filtre `posts_where` : ne garder que les articles **« Autres »** —
-	 * ni SiteOrigin (déjà exclus en amont via `meta_query`), ni Gutenberg.
+	 * ni SiteOrigin (sous aucun de ses 3 modes : classique / bloc / aplati),
+	 * ni Gutenberg.
+	 *
+	 * Le NOT EXISTS sur `panels_data` est déjà appliqué via `meta_query` en amont.
+	 * Ici on exclut les marqueurs HTML : `<!-- wp:`, `panel-layout`, `so-panel`.
 	 *
 	 * @param string $where Clause WHERE SQL.
 	 * @return string
@@ -715,17 +852,57 @@ final class PostsPage {
 		if ( ! isset( $wpdb ) ) {
 			return $where;
 		}
-		return $where . " AND {$wpdb->posts}.post_content NOT LIKE '%<!-- wp:%'";
+		return $where
+			. " AND {$wpdb->posts}.post_content NOT LIKE '%<!-- wp:%'"
+			. " AND {$wpdb->posts}.post_content NOT LIKE '%panel-layout%'"
+			. " AND {$wpdb->posts}.post_content NOT LIKE '%so-panel%'";
+	}
+
+	/**
+	 * Filtre `posts_where` : ne garder que les articles **SiteOrigin** sous
+	 * l'un de ses 3 modes :
+	 *  - classique : `panels_data` non vide en post_meta,
+	 *  - bloc     : `post_content` contient `<!-- wp:siteorigin-panels`,
+	 *  - aplati   : `post_content` contient les classes du rendu front
+	 *               (`panel-layout` ou `so-panel`) sans structure native.
+	 *
+	 * Construit une clause `OR` que `meta_query` seul ne sait pas exprimer
+	 * (impossible de mêler une condition meta et une condition de contenu
+	 * en disjonction via WP_Query).
+	 *
+	 * @param string $where Clause WHERE SQL.
+	 * @return string
+	 */
+	public static function restrict_to_siteorigin( string $where ): string {
+		global $wpdb;
+		if ( ! isset( $wpdb ) ) {
+			return $where;
+		}
+		return $where . " AND ("
+			. "EXISTS ( SELECT 1 FROM {$wpdb->postmeta} pm_so WHERE pm_so.post_id = {$wpdb->posts}.ID AND pm_so.meta_key = 'panels_data' )"
+			. " OR {$wpdb->posts}.post_content LIKE '%<!-- wp:siteorigin-panels%'"
+			. " OR {$wpdb->posts}.post_content LIKE '%panel-layout%'"
+			. " OR {$wpdb->posts}.post_content LIKE '%so-panel%'"
+			. ")";
 	}
 
 	/**
 	 * Classifie un article selon son constructeur :
-	 *  1. SiteOrigin si `panels_data` non vide,
-	 *  2. sinon Gutenberg si `has_blocks()` détecte le marqueur `<!-- wp:`,
-	 *  3. sinon « Autres » (HTML libre, éditeur classique, …).
+	 *  1. SiteOrigin (mode classique) si `panels_data` non vide,
+	 *  2. SiteOrigin (mode bloc) si le contenu contient `<!-- wp:siteorigin-panels`
+	 *     (depuis SiteOrigin 2.10+, le builder peut être encapsulé dans un bloc
+	 *     Gutenberg `siteorigin-panels/layout-block` sans `panels_data` en meta),
+	 *  3. SiteOrigin (mode aplati) si le contenu porte les classes du rendu front
+	 *     SO (`panel-layout`, `so-panel`) sans avoir aucune des deux structures
+	 *     natives ci-dessus — c'est du HTML SO figé après aplatissement,
+	 *     potentiellement issu d'une édition Gutenberg ou d'un script de migration
+	 *     incomplet. À traiter avec précaution (la normalisation HTML naïve peut
+	 *     casser la structure en grilles imbriquées).
+	 *  4. sinon Gutenberg si `has_blocks()` détecte un autre marqueur `<!-- wp:`,
+	 *  5. sinon « Autres » (HTML libre, éditeur classique, …).
 	 *
 	 * L'ordre est figé : un article SO peut techniquement contenir aussi
-	 * des blocs (édition mixte rare), mais la présence de `panels_data`
+	 * des blocs (édition mixte rare), mais la présence d'un marqueur SO
 	 * prévaut — c'est lui qui pilote le rendu front.
 	 *
 	 * @param int  $post_id Identifiant.
@@ -733,14 +910,30 @@ final class PostsPage {
 	 * @return string Une des constantes `BUILDER_*`.
 	 */
 	private static function classify_builder( int $post_id, bool $has_so ): string {
+		// Override manuel : prend la priorité absolue sur la détection auto.
+		// Posé via le toggle « → Out » de la colonne Constr., stocké en post_meta.
+		$override = (string) get_post_meta( $post_id, self::META_OVERRIDE, true );
+		if ( self::BUILDER_OUT === $override ) {
+			return self::BUILDER_OUT;
+		}
+
 		if ( $has_so ) {
 			return self::BUILDER_SO;
 		}
-		if ( function_exists( 'has_blocks' ) ) {
-			$content = (string) get_post_field( 'post_content', $post_id );
-			if ( has_blocks( $content ) ) {
-				return self::BUILDER_GUT;
-			}
+		$content = (string) get_post_field( 'post_content', $post_id );
+
+		// Mode hybride : SiteOrigin packagé en bloc Gutenberg.
+		if ( str_contains( $content, '<!-- wp:siteorigin-panels' ) ) {
+			return self::BUILDER_SO;
+		}
+
+		// Mode aplati : rendu HTML SO figé dans post_content.
+		if ( str_contains( $content, 'panel-layout' ) || str_contains( $content, 'so-panel' ) ) {
+			return self::BUILDER_SO_FLAT;
+		}
+
+		if ( function_exists( 'has_blocks' ) && has_blocks( $content ) ) {
+			return self::BUILDER_GUT;
 		}
 		return self::BUILDER_OTHER;
 	}
@@ -758,23 +951,35 @@ final class PostsPage {
 	 */
 	private static function builder_badge( string $type ): string {
 		$presets = [
-			self::BUILDER_SO    => [
+			self::BUILDER_SO      => [
 				'bg'    => '#d63638',
 				'fg'    => '#fff',
 				'label' => 'SO',
-				'title' => __( 'SiteOrigin Page Builder', '100son-html-normalizer' ),
+				'title' => __( 'SiteOrigin Page Builder (mode natif : panels_data ou bloc siteorigin-panels)', '100son-html-normalizer' ),
 			],
-			self::BUILDER_GUT   => [
+			self::BUILDER_SO_FLAT => [
+				'bg'    => '#dba617',
+				'fg'    => '#fff',
+				'label' => 'SO~',
+				'title' => __( 'SiteOrigin (mode aplati) — rendu HTML figé sans panels_data ni bloc, normalisation à risque', '100son-html-normalizer' ),
+			],
+			self::BUILDER_GUT     => [
 				'bg'    => '#00a32a',
 				'fg'    => '#fff',
 				'label' => 'Gut',
 				'title' => __( 'Gutenberg (blocs FSE)', '100son-html-normalizer' ),
 			],
-			self::BUILDER_OTHER => [
+			self::BUILDER_OTHER   => [
 				'bg'    => '#f0b849',
 				'fg'    => '#1d2327',
 				'label' => '?',
 				'title' => __( 'Constructeur inconnu (HTML libre / éditeur classique)', '100son-html-normalizer' ),
+			],
+			self::BUILDER_OUT     => [
+				'bg'    => '#646970',
+				'fg'    => '#fff',
+				'label' => 'Out',
+				'title' => __( 'Hors périmètre (tag manuel) — actions de normalisation désactivées', '100son-html-normalizer' ),
 			],
 		];
 		$p = $presets[ $type ] ?? $presets[ self::BUILDER_OTHER ];
@@ -785,6 +990,54 @@ final class PostsPage {
 			esc_attr( (string) $p['bg'] ),
 			esc_attr( (string) $p['fg'] ),
 			esc_html( (string) $p['label'] )
+		);
+	}
+
+	/**
+	 * Mini-form inline pour basculer le tag manuel d'un article entre Out
+	 * et Auto (suppression de l'override → retour à la classification auto).
+	 *
+	 * Stratégie POST classique avec PRG (cf. `maybe_handle_set_override()` qui
+	 * redirige vers la liste filtrée). L'URL de retour est portée par un champ
+	 * caché `redirect_to` qui mémorise les filtres GET courants.
+	 *
+	 * @param int  $post_id ID de l'article.
+	 * @param bool $is_out  Vrai si l'article est actuellement Out.
+	 * @return string HTML déjà échappé.
+	 */
+	private static function render_override_toggle( int $post_id, bool $is_out ): string {
+		$next_value = $is_out ? '' : self::BUILDER_OUT;
+		$label      = $is_out
+			? __( '→ Auto', '100son-html-normalizer' )
+			: __( '→ Out', '100son-html-normalizer' );
+		$title      = $is_out
+			? __( 'Retirer le tag Out (revenir à la classification automatique)', '100son-html-normalizer' )
+			: __( 'Marquer cet article comme hors périmètre', '100son-html-normalizer' );
+
+		// URL de retour = page courante avec ses filtres GET préservés.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$current_query = $_SERVER['REQUEST_URI'] ?? '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		$nonce = wp_nonce_field( self::NONCE_OVERRIDE, self::NONCE_NAME, true, false );
+
+		return sprintf(
+			'<form method="post" action="%s" style="display:inline;margin-left:6px;">'
+				. '<input type="hidden" name="action" value="%s">'
+				. '<input type="hidden" name="post_id" value="%d">'
+				. '<input type="hidden" name="override" value="%s">'
+				. '<input type="hidden" name="redirect_to" value="%s">'
+				. '%s'
+				. '<button type="submit" class="button-link" style="font-size:11px;color:#2271b1;text-decoration:none;cursor:pointer;" title="%s">%s</button>'
+				. '</form>',
+			esc_url( admin_url( 'admin-post.php' ) ),
+			esc_attr( self::ACTION_SET_OVERRIDE ),
+			(int) $post_id,
+			esc_attr( $next_value ),
+			esc_attr( (string) $current_query ),
+			$nonce, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — wp_nonce_field renvoie déjà du HTML échappé.
+			esc_attr( $title ),
+			esc_html( $label )
 		);
 	}
 

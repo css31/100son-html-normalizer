@@ -50,6 +50,10 @@ final class Menu {
 			return;
 		}
 		add_action( 'admin_menu', [ $this, 'on_admin_menu' ] );
+
+		// Form-handlers `admin_post_*` des sous-pages — branchés ici car
+		// admin-post.php n'invoque jamais le menu, seulement les hooks.
+		$this->posts_page->register_admin_hooks();
 	}
 
 	/**
