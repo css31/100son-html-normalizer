@@ -82,7 +82,7 @@ final class Logger {
 	 */
 	private function build_entry( string $event, string $status, ?int $post_id, ?string $post_title, string $message, int $revision_id ): array {
 		[ $user_id, $user_login ] = $this->current_user();
-		return [
+		return array(
 			'timestamp'   => time(),
 			'event'       => $event,
 			'status'      => $status,
@@ -92,7 +92,7 @@ final class Logger {
 			'user_login'  => $user_login,
 			'message'     => $message,
 			'revision_id' => $revision_id,
-		];
+		);
 	}
 
 	/**
@@ -102,12 +102,12 @@ final class Logger {
 	 */
 	private function current_user(): array {
 		if ( ! function_exists( 'wp_get_current_user' ) ) {
-			return [ 0, '' ];
+			return array( 0, '' );
 		}
 		$user = wp_get_current_user();
 		if ( ! $user || ! isset( $user->ID ) ) {
-			return [ 0, '' ];
+			return array( 0, '' );
 		}
-		return [ (int) $user->ID, (string) ( $user->user_login ?? '' ) ];
+		return array( (int) $user->ID, (string) ( $user->user_login ?? '' ) );
 	}
 }

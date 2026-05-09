@@ -27,9 +27,9 @@ final class UserRulesRepository {
 	 * @return list<array<string, mixed>>
 	 */
 	public function all(): array {
-		$rules = get_option( self::OPT_RULES, [] );
+		$rules = get_option( self::OPT_RULES, array() );
 		if ( ! is_array( $rules ) ) {
-			return [];
+			return array();
 		}
 		/** @var list<array<string, mixed>> $rules */
 		return array_values( $rules );

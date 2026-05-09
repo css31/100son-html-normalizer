@@ -27,8 +27,8 @@ final class PresetsPage {
 	private const NONCE_NAME   = '_son100_htmln_nonce';
 
 	private SettingsRepository $settings;
-	private PresetRegistry     $registry;
-	private ?Logger            $logger;
+	private PresetRegistry $registry;
+	private ?Logger $logger;
 
 	public function __construct( SettingsRepository $settings, PresetRegistry $registry, ?Logger $logger = null ) {
 		$this->settings = $settings;
@@ -83,10 +83,10 @@ final class PresetsPage {
 		$presets   = $before;
 		$post_data = isset( $_POST['preset'] ) && is_array( $_POST['preset'] )
 			? wp_unslash( $_POST['preset'] )
-			: [];
+			: array();
 
 		foreach ( $this->registry->get_all_presets_metadata() as $preset_id => $_meta ) {
-			$config              = $presets[ $preset_id ] ?? [];
+			$config              = $presets[ $preset_id ] ?? array();
 			$config['enabled']   = ! empty( $post_data[ $preset_id ]['enabled'] );
 
 			switch ( $preset_id ) {
@@ -100,13 +100,13 @@ final class PresetsPage {
 				case 'P7':
 					$threshold = isset( $post_data['P7']['threshold'] ) ? (int) $post_data['P7']['threshold'] : 2;
 					$config['threshold'] = max( 2, $threshold );
-					$config['markers']   = [
+					$config['markers']   = array(
 						'dash'    => ! empty( $post_data['P7']['markers']['dash'] ),
 						'emdash'  => ! empty( $post_data['P7']['markers']['emdash'] ),
 						'asterix' => ! empty( $post_data['P7']['markers']['asterix'] ),
 						'bullet'  => ! empty( $post_data['P7']['markers']['bullet'] ),
 						'numeric' => ! empty( $post_data['P7']['markers']['numeric'] ),
-					];
+					);
 					$raw_custom               = isset( $post_data['P7']['custom_markers'] )
 						? sanitize_textarea_field( (string) $post_data['P7']['custom_markers'] )
 						: '';
@@ -118,10 +118,10 @@ final class PresetsPage {
 					);
 					break;
 				case 'P8':
-					$config['mappings'] = [
+					$config['mappings'] = array(
 						'bold'   => ! empty( $post_data['P8']['mappings']['bold'] ),
 						'italic' => ! empty( $post_data['P8']['mappings']['italic'] ),
-					];
+					);
 					break;
 			}
 
@@ -145,11 +145,11 @@ final class PresetsPage {
 	 * @return string
 	 */
 	private static function summarize_presets_diff( array $before, array $after ): string {
-		$changes = [];
+		$changes = array();
 		$keys    = array_unique( array_merge( array_keys( $before ), array_keys( $after ) ) );
 		foreach ( $keys as $preset_id ) {
-			$b = $before[ $preset_id ] ?? [];
-			$a = $after[ $preset_id ] ?? [];
+			$b = $before[ $preset_id ] ?? array();
+			$a = $after[ $preset_id ] ?? array();
 			if ( $a === $b ) {
 				continue;
 			}
@@ -161,7 +161,7 @@ final class PresetsPage {
 				$changes[] = $preset_id . ' (paramètres modifiés)';
 			}
 		}
-		if ( [] === $changes ) {
+		if ( array() === $changes ) {
 			return 'Aucun changement effectif';
 		}
 		return implode( ', ', $changes );
@@ -196,15 +196,15 @@ final class PresetsPage {
 		echo '<tbody>';
 
 		// Whitelist limitée pour wp_kses sur les descriptions (HTML autorisé : code, strong, em, br).
-		$allowed_html = [
-			'code'   => [],
-			'strong' => [],
-			'em'     => [],
-			'br'     => [],
-		];
+		$allowed_html = array(
+			'code'   => array(),
+			'strong' => array(),
+			'em'     => array(),
+			'br'     => array(),
+		);
 
 		foreach ( $metadata as $preset_id => $meta ) {
-			$config  = $presets[ $preset_id ] ?? [];
+			$config  = $presets[ $preset_id ] ?? array();
 			$enabled = ! empty( $config['enabled'] );
 
 			echo '<tr>';
@@ -248,24 +248,24 @@ final class PresetsPage {
 		submit_button( __( 'Enregistrer', '100son-html-normalizer' ) );
 
 		// JS minimal : case maître <-> cases individuelles (vanilla, sans dépendance).
-		echo "<script>(function(){"
+		echo '<script>(function(){'
 			. "var master=document.getElementById('son100-htmln-toggle-all-presets');"
-			. "if(!master)return;"
+			. 'if(!master)return;'
 			. "var rows=document.querySelectorAll('input[type=\"checkbox\"][name^=\"preset[\"][name$=\"[enabled]\"]');"
-			. "function refreshMaster(){"
-			. "var arr=Array.prototype.slice.call(rows);"
-			. "var allOn=arr.every(function(r){return r.checked;});"
-			. "var allOff=arr.every(function(r){return !r.checked;});"
-			. "master.checked=allOn;"
-			. "master.indeterminate=!allOn&&!allOff;"
-			. "}"
-			. "refreshMaster();"
+			. 'function refreshMaster(){'
+			. 'var arr=Array.prototype.slice.call(rows);'
+			. 'var allOn=arr.every(function(r){return r.checked;});'
+			. 'var allOff=arr.every(function(r){return !r.checked;});'
+			. 'master.checked=allOn;'
+			. 'master.indeterminate=!allOn&&!allOff;'
+			. '}'
+			. 'refreshMaster();'
 			. "master.addEventListener('change',function(){"
-			. "rows.forEach(function(r){r.checked=master.checked;});"
-			. "master.indeterminate=false;"
-			. "});"
+			. 'rows.forEach(function(r){r.checked=master.checked;});'
+			. 'master.indeterminate=false;'
+			. '});'
 			. "rows.forEach(function(r){r.addEventListener('change',refreshMaster);});"
-			. "})();</script>";
+			. '})();</script>';
 
 		echo '</form>';
 	}
@@ -299,7 +299,7 @@ final class PresetsPage {
 
 			case 'P7':
 				$threshold = isset( $config['threshold'] ) ? (int) $config['threshold'] : 2;
-				$markers   = isset( $config['markers'] ) && is_array( $config['markers'] ) ? $config['markers'] : [];
+				$markers   = isset( $config['markers'] ) && is_array( $config['markers'] ) ? $config['markers'] : array();
 				$custom    = isset( $config['custom_markers'] ) && is_array( $config['custom_markers'] )
 					? implode( "\n", array_map( 'strval', $config['custom_markers'] ) )
 					: '';
@@ -310,13 +310,13 @@ final class PresetsPage {
 					(int) $threshold
 				);
 
-				$marker_labels = [
+				$marker_labels = array(
 					'dash'    => '- (tiret ASCII)',
 					'emdash'  => '– (cadratin)',
 					'asterix' => '* (astérisque)',
 					'bullet'  => '• (puce)',
 					'numeric' => '1. 2. 3. (numéros → <ol>)',
-				];
+				);
 				echo '<p>' . esc_html__( 'Marqueurs activés :', '100son-html-normalizer' ) . '</p>';
 				echo '<ul style="margin:4px 0 8px 0;">';
 				foreach ( $marker_labels as $key => $label ) {
@@ -339,7 +339,7 @@ final class PresetsPage {
 				break;
 
 			case 'P8':
-				$mappings = isset( $config['mappings'] ) && is_array( $config['mappings'] ) ? $config['mappings'] : [];
+				$mappings = isset( $config['mappings'] ) && is_array( $config['mappings'] ) ? $config['mappings'] : array();
 				$bold     = ! isset( $mappings['bold'] ) || (bool) $mappings['bold'];
 				$italic   = ! isset( $mappings['italic'] ) || (bool) $mappings['italic'];
 				echo '<p>' . esc_html__( 'Mappings sémantiques activés :', '100son-html-normalizer' ) . '</p>';

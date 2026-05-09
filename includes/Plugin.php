@@ -110,8 +110,8 @@ final class Plugin {
 		}
 
 		// (Phases ultérieures cf. cahier §11 :
-		//  - étapes 8+ : REST, CLI, F4 (UserRules + Validator + Preview),
-		//                F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController),
-		//                15 (SPA React).)
+		// - étapes 8+ : REST, CLI, F4 (UserRules + Validator + Preview),
+		// F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController),
+		// 15 (SPA React).)
 	}
 }

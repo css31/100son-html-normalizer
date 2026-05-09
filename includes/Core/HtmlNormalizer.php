@@ -69,7 +69,7 @@ final class HtmlNormalizer {
 	 * @param array<string, mixed> $context Contexte d'appel (cf. hyp. 20).
 	 * @return string HTML normalise.
 	 */
-	public function normalize( string $html, array $context = [] ): string {
+	public function normalize( string $html, array $context = array() ): string {
 		// Garde-fou contre les types non-string (defensif au-dela du type-hint).
 		if ( '' === $html ) {
 			return '';
@@ -81,7 +81,7 @@ final class HtmlNormalizer {
 			}
 
 			$rules    = $this->preset_registry->get_enabled_rules();
-			$warnings = [];
+			$warnings = array();
 			$out      = $this->pipeline->run( $rules, $html, $context, $warnings );
 
 			// V1+ : ici viendront F5 (HeadingStrategist) puis F4 (UserRulesRepository).

@@ -58,9 +58,9 @@ final class LogRepository {
 	 * @return list<array<string, mixed>>
 	 */
 	public function all(): array {
-		$entries = get_option( self::OPT_NAME, [] );
+		$entries = get_option( self::OPT_NAME, array() );
 		if ( ! is_array( $entries ) ) {
-			return [];
+			return array();
 		}
 		/** @var list<array<string, mixed>> $entries */
 		return array_values( $entries );
@@ -88,11 +88,11 @@ final class LogRepository {
 		$per_page = max( 1, $per_page );
 		$page     = max( 1, $page );
 		$offset   = ( $page - 1 ) * $per_page;
-		return [
+		return array(
 			'entries'     => array_slice( $all, $offset, $per_page ),
 			'total'       => $total,
 			'total_pages' => (int) ceil( $total / $per_page ),
-		];
+		);
 	}
 
 	/**
@@ -110,6 +110,6 @@ final class LogRepository {
 	 * @return void
 	 */
 	public function clear(): void {
-		update_option( self::OPT_NAME, [], false );
+		update_option( self::OPT_NAME, array(), false );
 	}
 }

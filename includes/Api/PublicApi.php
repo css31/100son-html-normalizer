@@ -55,7 +55,7 @@ final class PublicApi {
 		if ( ! function_exists( 'add_filter' ) ) {
 			return;
 		}
-		add_filter( 'htmln/normalize', [ $this, 'on_filter_normalize' ], 10, 2 );
+		add_filter( 'htmln/normalize', array( $this, 'on_filter_normalize' ), 10, 2 );
 	}
 
 	/**
@@ -65,12 +65,12 @@ final class PublicApi {
 	 * @param mixed $context Contexte (devrait etre un tableau).
 	 * @return string HTML normalise (toujours une string, jamais null/false/throw).
 	 */
-	public function on_filter_normalize( mixed $html, mixed $context = [] ): string {
+	public function on_filter_normalize( mixed $html, mixed $context = array() ): string {
 		// Garde-fou type : si l'appelant passe autre chose qu'une string, retourner ''.
 		if ( ! is_string( $html ) ) {
 			return '';
 		}
-		$ctx = is_array( $context ) ? $context : [];
+		$ctx = is_array( $context ) ? $context : array();
 
 		try {
 			$result = $this->normalizer->normalize( $html, $ctx );

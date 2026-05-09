@@ -31,7 +31,7 @@ final class LogsPage {
 	private const PAGE_SLUG         = '100son-html-normalizer-logs';
 	private const PER_PAGE          = 50;
 
-	private LogRepository   $repo;
+	private LogRepository $repo;
 	private NotesRepository $notes;
 
 	public function __construct( LogRepository $repo, NotesRepository $notes ) {
@@ -200,7 +200,7 @@ final class LogsPage {
 			echo '<tr>';
 			printf( '<td style="white-space:nowrap;">%s</td>', esc_html( (string) $date_str ) );
 			printf( '<td>%s</td>', esc_html( self::label_event( $event ) ) );
-			printf( '<td>%s</td>', wp_kses( self::badge_status( $status ), [ 'span' => [ 'style' => true ] ] ) );
+			printf( '<td>%s</td>', wp_kses( self::badge_status( $status ), array( 'span' => array( 'style' => true ) ) ) );
 
 			if ( $post_id > 0 ) {
 				printf( '<td>%d</td>', (int) $post_id );
@@ -258,16 +258,16 @@ final class LogsPage {
 		if ( $total_pages <= 1 ) {
 			return;
 		}
-		$base  = add_query_arg( [ 'page' => self::PAGE_SLUG ], admin_url( 'admin.php' ) );
+		$base  = add_query_arg( array( 'page' => self::PAGE_SLUG ), admin_url( 'admin.php' ) );
 		$links = paginate_links(
-			[
+			array(
 				'base'      => $base . '%_%',
 				'format'    => '&paged=%#%',
 				'current'   => $paged,
 				'total'     => $total_pages,
 				'prev_text' => '‹',
 				'next_text' => '›',
-			]
+			)
 		);
 		if ( ! empty( $links ) ) {
 			echo '<div class="tablenav"><div class="tablenav-pages">' . $links . '</div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
@@ -288,7 +288,7 @@ final class LogsPage {
 
 		echo '<div style="margin-top:16px;padding:12px;background:#fff;border:1px solid #c3c4c7;max-width:900px;">';
 		echo '<h2 style="margin-top:0;">' . esc_html__( 'Note libre', '100son-html-normalizer' ) . '</h2>';
-		echo '<p class="description" style="margin-top:0;">' . esc_html__( "Espace de notes contextuelles persistantes. Indépendant du journal des actions.", '100son-html-normalizer' ) . '</p>';
+		echo '<p class="description" style="margin-top:0;">' . esc_html__( 'Espace de notes contextuelles persistantes. Indépendant du journal des actions.', '100son-html-normalizer' ) . '</p>';
 
 		// Form 1 : sauvegarde de la note (form principal qui contient la textarea).
 		echo '<form id="son100-htmln-save-notes-form" method="post" action="">';
@@ -296,7 +296,7 @@ final class LogsPage {
 		wp_nonce_field( self::NONCE_NOTES_SAVE, self::NONCE_NAME );
 		printf(
 			'<textarea name="son100_htmln_notes" rows="6" style="width:100%%;font-family:monospace;" placeholder="%s">%s</textarea>',
-			esc_attr__( "Tape ici les notes que tu veux garder à portée de main…", '100son-html-normalizer' ),
+			esc_attr__( 'Tape ici les notes que tu veux garder à portée de main…', '100son-html-normalizer' ),
 			esc_textarea( $current )
 		);
 		echo '</form>';
@@ -358,7 +358,7 @@ final class LogsPage {
 	}
 
 	// ===================================================================
-	//  Helpers d'affichage
+	// Helpers d'affichage
 	// ===================================================================
 
 	private static function label_event( string $event ): string {
@@ -394,7 +394,7 @@ final class LogsPage {
 			return '';
 		}
 
-		$bits = [];
+		$bits = array();
 		if ( 0 !== $word_delta ) {
 			$bits[] = sprintf(
 				'%s%d mots (%s%.1f%%)',
@@ -420,16 +420,48 @@ final class LogsPage {
 	}
 
 	private static function badge_status( string $status ): string {
-		$styles = [
-			PostNormalizer::STATUS_MODIFIED         => [ 'bg' => '#00a32a', 'fg' => '#fff', 'label' => __( 'Modifié', '100son-html-normalizer' ) ],
-			PostNormalizer::STATUS_UNCHANGED        => [ 'bg' => '#dcdcde', 'fg' => '#1d2327', 'label' => __( 'Inchangé', '100son-html-normalizer' ) ],
-			PostNormalizer::STATUS_SKIPPED_SO       => [ 'bg' => '#f0b849', 'fg' => '#1d2327', 'label' => __( 'Refusé SO', '100son-html-normalizer' ) ],
-			PostNormalizer::STATUS_ERROR_NOT_FOUND  => [ 'bg' => '#d63638', 'fg' => '#fff', 'label' => __( 'Introuvable', '100son-html-normalizer' ) ],
-			PostNormalizer::STATUS_ERROR_PERMISSION => [ 'bg' => '#d63638', 'fg' => '#fff', 'label' => __( 'Permission', '100son-html-normalizer' ) ],
-			PostNormalizer::STATUS_ERROR_WRITE      => [ 'bg' => '#d63638', 'fg' => '#fff', 'label' => __( 'Erreur', '100son-html-normalizer' ) ],
-			'updated'                               => [ 'bg' => '#2271b1', 'fg' => '#fff', 'label' => __( 'Mise à jour', '100son-html-normalizer' ) ],
-		];
-		$style = $styles[ $status ] ?? [ 'bg' => '#dcdcde', 'fg' => '#1d2327', 'label' => $status ];
+		$styles = array(
+			PostNormalizer::STATUS_MODIFIED         => array(
+				'bg' => '#00a32a',
+				'fg' => '#fff',
+				'label' => __( 'Modifié', '100son-html-normalizer' ),
+			),
+			PostNormalizer::STATUS_UNCHANGED        => array(
+				'bg' => '#dcdcde',
+				'fg' => '#1d2327',
+				'label' => __( 'Inchangé', '100son-html-normalizer' ),
+			),
+			PostNormalizer::STATUS_SKIPPED_SO       => array(
+				'bg' => '#f0b849',
+				'fg' => '#1d2327',
+				'label' => __( 'Refusé SO', '100son-html-normalizer' ),
+			),
+			PostNormalizer::STATUS_ERROR_NOT_FOUND  => array(
+				'bg' => '#d63638',
+				'fg' => '#fff',
+				'label' => __( 'Introuvable', '100son-html-normalizer' ),
+			),
+			PostNormalizer::STATUS_ERROR_PERMISSION => array(
+				'bg' => '#d63638',
+				'fg' => '#fff',
+				'label' => __( 'Permission', '100son-html-normalizer' ),
+			),
+			PostNormalizer::STATUS_ERROR_WRITE      => array(
+				'bg' => '#d63638',
+				'fg' => '#fff',
+				'label' => __( 'Erreur', '100son-html-normalizer' ),
+			),
+			'updated'                               => array(
+				'bg' => '#2271b1',
+				'fg' => '#fff',
+				'label' => __( 'Mise à jour', '100son-html-normalizer' ),
+			),
+		);
+		$style = $styles[ $status ] ?? array(
+			'bg' => '#dcdcde',
+			'fg' => '#1d2327',
+			'label' => $status,
+		);
 		return sprintf(
 			'<span style="display:inline-block;padding:2px 8px;background:%s;color:%s;border-radius:3px;font-size:11px;font-weight:600;">%s</span>',
 			esc_attr( $style['bg'] ),

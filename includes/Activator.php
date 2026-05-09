@@ -43,9 +43,9 @@ final class Activator {
 			return;
 		}
 
-		$defaults = [
-			'f8_post_types_selection' => [ 'post' ],
-		];
+		$defaults = array(
+			'f8_post_types_selection' => array( 'post' ),
+		);
 
 		add_option( 'son100_htmln_settings', $defaults, '', 'no' );
 	}
@@ -63,39 +63,39 @@ final class Activator {
 			return;
 		}
 
-		$defaults = [
-			'P1' => [ 'enabled' => true ],
-			'P2' => [ 'enabled' => true ],
-			'P3' => [ 'enabled' => true ],
-			'P4' => [ 'enabled' => true ],
-			'P5' => [
+		$defaults = array(
+			'P1' => array( 'enabled' => true ),
+			'P2' => array( 'enabled' => true ),
+			'P3' => array( 'enabled' => true ),
+			'P4' => array( 'enabled' => true ),
+			'P5' => array(
 				'enabled'   => true,
 				'threshold' => 2,
-			],
-			'P6' => [
+			),
+			'P6' => array(
 				'enabled'         => true,
 				'keep_text_align' => true,
-			],
-			'P7' => [
+			),
+			'P7' => array(
 				'enabled'        => true,
 				'threshold'      => 2,
-				'markers'        => [
+				'markers'        => array(
 					'dash'    => true,
 					'emdash'  => true,
 					'asterix' => true,
 					'bullet'  => true,
 					'numeric' => true,
-				],
-				'custom_markers' => [],
-			],
-			'P8' => [
+				),
+				'custom_markers' => array(),
+			),
+			'P8' => array(
 				'enabled'  => true,
-				'mappings' => [
+				'mappings' => array(
 					'bold'   => true,
 					'italic' => true,
-				],
-			],
-		];
+				),
+			),
+		);
 
 		add_option( 'son100_htmln_presets', $defaults, '', 'no' );
 	}
@@ -109,6 +109,6 @@ final class Activator {
 		if ( false !== get_option( 'son100_htmln_rules_user', false ) ) {
 			return;
 		}
-		add_option( 'son100_htmln_rules_user', [], '', 'no' );
+		add_option( 'son100_htmln_rules_user', array(), '', 'no' );
 	}
 }

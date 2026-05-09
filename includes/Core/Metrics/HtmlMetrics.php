@@ -49,11 +49,11 @@ final class HtmlMetrics {
 		$text = str_replace( "\xc2\xa0", ' ', $text );
 		$text_trimmed = trim( $text );
 
-		return [
+		return array(
 			'word_count'  => '' === $text_trimmed ? 0 : self::count_words_utf8( $text_trimmed ),
 			'char_count'  => self::strlen_utf8( $text_trimmed ),
 			'image_count' => self::count_images( $html ),
-		];
+		);
 	}
 
 	/**
@@ -81,14 +81,14 @@ final class HtmlMetrics {
 			: 0.0;
 		$image_delta = (int) $after['image_count'] - (int) $before['image_count'];
 
-		return [
+		return array(
 			'word_delta'  => $word_delta,
 			'word_pct'    => round( $word_pct, 2 ),
 			'char_delta'  => $char_delta,
 			'char_pct'    => round( $char_pct, 2 ),
 			'image_delta' => $image_delta,
 			'severity'    => self::compute_severity( $word_pct, $image_delta ),
-		];
+		);
 	}
 
 	/**

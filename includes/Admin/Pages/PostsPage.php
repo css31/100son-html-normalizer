@@ -34,9 +34,10 @@ final class PostsPage {
 	private const NONCE_OVERRIDE   = 'son100_htmln_posts_override';
 	private const NONCE_NAME       = '_son100_htmln_nonce';
 	private const PAGE_SLUG        = '100son-html-normalizer-posts';
-	private const PER_PAGE_CHOICES = [ 10, 25, 50, 100, 200 ];
+	private const PER_PAGE_CHOICES = array( 10, 25, 50, 100, 200 );
 
-	/* Hook `admin_post_*` — handler du toggle Out / Auto via admin-post.php.
+	/*
+	 Hook `admin_post_*` — handler du toggle Out / Auto via admin-post.php.
 	 * Indispensable : la callback de menu admin est appelée APRÈS l'envoi des
 	 * headers HTTP, donc tout `wp_safe_redirect` y échoue silencieusement.
 	 * admin-post.php tourne avant et permet une redirection PRG propre. */
@@ -59,15 +60,15 @@ final class PostsPage {
 	 * en minuscules. La valeur (côté WP_Query) reste avec sa casse d'origine
 	 * (`'ID'` en majuscules est la valeur attendue par WP_Query pour trier par ID).
 	 */
-	private const SORTABLE_COLUMNS = [
+	private const SORTABLE_COLUMNS = array(
 		'id'    => 'ID',
 		'title' => 'title',
 		'date'  => 'date',
-	];
+	);
 
 	private SettingsRepository $settings;
 	private SiteOriginDetector $so_detector;
-	private PostNormalizer     $post_normalizer;
+	private PostNormalizer $post_normalizer;
 
 	public function __construct(
 		SettingsRepository $settings,
@@ -126,7 +127,7 @@ final class PostsPage {
 	}
 
 	// ===================================================================
-	//  POST handlers
+	// POST handlers
 	// ===================================================================
 
 	/**
@@ -148,7 +149,7 @@ final class PostsPage {
 
 		$selected = isset( $_POST['post_types'] ) && is_array( $_POST['post_types'] )
 			? array_map( 'sanitize_key', wp_unslash( $_POST['post_types'] ) )
-			: [];
+			: array();
 
 		$this->settings->set_f8_post_types_selection( $selected );
 
@@ -172,7 +173,7 @@ final class PostsPage {
 		if ( ! function_exists( 'add_action' ) ) {
 			return;
 		}
-		add_action( 'admin_post_' . self::ACTION_SET_OVERRIDE, [ $this, 'handle_set_override' ] );
+		add_action( 'admin_post_' . self::ACTION_SET_OVERRIDE, array( $this, 'handle_set_override' ) );
 	}
 
 	/**
@@ -188,7 +189,7 @@ final class PostsPage {
 	 */
 	public function handle_set_override(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Permission refusée.', '100son-html-normalizer' ), '', [ 'response' => 403 ] );
+			wp_die( esc_html__( 'Permission refusée.', '100son-html-normalizer' ), '', array( 'response' => 403 ) );
 		}
 
 		check_admin_referer( self::NONCE_OVERRIDE, self::NONCE_NAME );
@@ -246,7 +247,10 @@ final class PostsPage {
 		}
 
 		$result = $this->post_normalizer->normalize_post( $post_id, $force );
-		return [ 'post_id' => $post_id, 'result' => $result ];
+		return array(
+			'post_id' => $post_id,
+			'result' => $result,
+		);
 	}
 
 	/**
@@ -267,13 +271,13 @@ final class PostsPage {
 		check_admin_referer( self::NONCE_BULK, self::NONCE_NAME );
 
 		$bulk_action = isset( $_POST['bulk_action'] ) ? sanitize_key( (string) $_POST['bulk_action'] ) : '';
-		if ( ! in_array( $bulk_action, [ 'normalize', 'normalize_force_so' ], true ) ) {
+		if ( ! in_array( $bulk_action, array( 'normalize', 'normalize_force_so' ), true ) ) {
 			return null;
 		}
 
 		$ids_raw = isset( $_POST['post_ids'] ) && is_array( $_POST['post_ids'] )
 			? wp_unslash( $_POST['post_ids'] )
-			: [];
+			: array();
 
 		$ids = array_values(
 			array_filter(
@@ -282,28 +286,28 @@ final class PostsPage {
 			)
 		);
 
-		if ( [] === $ids ) {
-			return [
-				'counts' => [
+		if ( array() === $ids ) {
+			return array(
+				'counts' => array(
 					PostNormalizer::STATUS_MODIFIED         => 0,
 					PostNormalizer::STATUS_UNCHANGED        => 0,
 					PostNormalizer::STATUS_SKIPPED_SO       => 0,
 					PostNormalizer::STATUS_ERROR_NOT_FOUND  => 0,
 					PostNormalizer::STATUS_ERROR_WRITE      => 0,
-				],
-				'errors' => [ __( 'Aucun article sélectionné.', '100son-html-normalizer' ) ],
-			];
+				),
+				'errors' => array( __( 'Aucun article sélectionné.', '100son-html-normalizer' ) ),
+			);
 		}
 
 		$force_so = ( 'normalize_force_so' === $bulk_action );
-		$counts   = [
+		$counts   = array(
 			PostNormalizer::STATUS_MODIFIED         => 0,
 			PostNormalizer::STATUS_UNCHANGED        => 0,
 			PostNormalizer::STATUS_SKIPPED_SO       => 0,
 			PostNormalizer::STATUS_ERROR_NOT_FOUND  => 0,
 			PostNormalizer::STATUS_ERROR_WRITE      => 0,
-		];
-		$errors = [];
+		);
+		$errors = array();
 
 		foreach ( $ids as $id ) {
 			// Sécurité : on saute systématiquement les articles taggés Out,
@@ -318,16 +322,19 @@ final class PostsPage {
 			if ( isset( $counts[ $status ] ) ) {
 				$counts[ $status ]++;
 			}
-			if ( in_array( $status, [ PostNormalizer::STATUS_ERROR_NOT_FOUND, PostNormalizer::STATUS_ERROR_WRITE ], true ) ) {
+			if ( in_array( $status, array( PostNormalizer::STATUS_ERROR_NOT_FOUND, PostNormalizer::STATUS_ERROR_WRITE ), true ) ) {
 				$errors[] = sprintf( '#%d : %s', $id, (string) ( $result['message'] ?? '' ) );
 			}
 		}
 
-		return [ 'counts' => $counts, 'errors' => $errors ];
+		return array(
+			'counts' => $counts,
+			'errors' => $errors,
+		);
 	}
 
 	// ===================================================================
-	//  Render filters + posts list
+	// Render filters + posts list
 	// ===================================================================
 
 	/**
@@ -398,7 +405,7 @@ final class PostsPage {
 		$builder_filter = isset( $_GET['builder'] ) ? sanitize_key( (string) $_GET['builder'] ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		$months = [
+		$months = array(
 			1  => __( 'Janvier', '100son-html-normalizer' ),
 			2  => __( 'Février', '100son-html-normalizer' ),
 			3  => __( 'Mars', '100son-html-normalizer' ),
@@ -411,7 +418,7 @@ final class PostsPage {
 			10 => __( 'Octobre', '100son-html-normalizer' ),
 			11 => __( 'Novembre', '100son-html-normalizer' ),
 			12 => __( 'Décembre', '100son-html-normalizer' ),
-		];
+		);
 
 		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '" style="margin:8px 0 16px 0;padding:12px;background:#fff;border:1px solid #c3c4c7;">';
 		printf( '<input type="hidden" name="page" value="%s">', esc_attr( self::PAGE_SLUG ) );
@@ -434,12 +441,12 @@ final class PostsPage {
 		echo '<select name="cat" style="min-width:180px;">';
 		echo '<option value="0">' . esc_html__( 'Toutes', '100son-html-normalizer' ) . '</option>';
 		$categories = get_terms(
-			[
+			array(
 				'taxonomy'   => 'category',
 				'hide_empty' => false,
 				'orderby'    => 'name',
 				'number'     => 200,
-			]
+			)
 		);
 		if ( is_array( $categories ) ) {
 			foreach ( $categories as $term ) {
@@ -547,7 +554,7 @@ final class PostsPage {
 	private function get_available_years(): array {
 		global $wpdb;
 		if ( ! isset( $wpdb ) ) {
-			return [];
+			return array();
 		}
 		$rows = $wpdb->get_col(
 			"SELECT DISTINCT YEAR(post_date) FROM {$wpdb->posts}
@@ -556,7 +563,7 @@ final class PostsPage {
 			 ORDER BY post_date DESC"
 		);
 		if ( ! is_array( $rows ) ) {
-			return [];
+			return array();
 		}
 		$years = array_values( array_filter( array_map( 'intval', $rows ), static fn( int $y ): bool => $y > 0 ) );
 		return $years;
@@ -569,8 +576,8 @@ final class PostsPage {
 	 */
 	private function render_posts_list(): void {
 		$selected = $this->settings->get_f8_post_types_selection();
-		if ( [] === $selected ) {
-			echo '<p>' . esc_html__( "Aucun type de contenu sélectionné dans les filtres.", '100son-html-normalizer' ) . '</p>';
+		if ( array() === $selected ) {
+			echo '<p>' . esc_html__( 'Aucun type de contenu sélectionné dans les filtres.', '100son-html-normalizer' ) . '</p>';
 			return;
 		}
 
@@ -591,21 +598,21 @@ final class PostsPage {
 		}
 		$per_page = $this->settings->get_f8_per_page();
 
-		$query_args = [
+		$query_args = array(
 			'post_type'      => $selected,
-			'post_status'    => [ 'publish', 'draft', 'private' ],
+			'post_status'    => array( 'publish', 'draft', 'private' ),
 			'posts_per_page' => $per_page,
 			'paged'          => $paged,
 			'orderby'        => self::SORTABLE_COLUMNS[ $orderby ],
 			'order'          => $order,
 			'no_found_rows'  => false,
-		];
+		);
 		// Si la recherche est purement numérique, on l'interprète comme un ID
 		// exact (recherche par clé primaire). On utilise `post__in` plutôt que
 		// `p` pour rester combinable avec les autres filtres (cat, date, builder…).
 		$search_is_id = '' !== $search && ctype_digit( $search );
 		if ( $search_is_id ) {
-			$query_args['post__in'] = [ (int) $search ];
+			$query_args['post__in'] = array( (int) $search );
 		} elseif ( '' !== $search ) {
 			$query_args['s'] = $search;
 		}
@@ -613,65 +620,71 @@ final class PostsPage {
 			$query_args['cat'] = $cat;
 		}
 		if ( $year > 0 ) {
-			$date_q              = [ 'year' => $year ];
+			$date_q              = array( 'year' => $year );
 			if ( $month >= 1 && $month <= 12 ) {
 				$date_q['month'] = $month;
 			}
-			$query_args['date_query'] = [ $date_q ];
+			$query_args['date_query'] = array( $date_q );
 		}
 
 		// Filtre Constructeur :
-		//  - SO        : `panels_data` EXISTS *OU* contenu = bloc siteorigin-panels.
-		//                Comme WP_Query ne sait pas exprimer le OR entre meta et
-		//                content, on passe entièrement par `posts_where`.
-		//  - Gutenberg : pas de `panels_data`, présence de `<!-- wp:`, mais PAS
-		//                de `<!-- wp:siteorigin-panels` (qui est du SO déguisé).
-		//  - Autres    : ni `panels_data`, ni aucun marqueur de bloc `<!-- wp:`.
+		// - SO        : `panels_data` EXISTS *OU* contenu = bloc siteorigin-panels.
+		// Comme WP_Query ne sait pas exprimer le OR entre meta et
+		// content, on passe entièrement par `posts_where`.
+		// - Gutenberg : pas de `panels_data`, présence de `<!-- wp:`, mais PAS
+		// de `<!-- wp:siteorigin-panels` (qui est du SO déguisé).
+		// - Autres    : ni `panels_data`, ni aucun marqueur de bloc `<!-- wp:`.
 		switch ( $builder_filter ) {
 			case self::BUILDER_SO:
-				add_filter( 'posts_where', [ self::class, 'restrict_to_siteorigin' ] );
+				add_filter( 'posts_where', array( self::class, 'restrict_to_siteorigin' ) );
 				break;
 			case self::BUILDER_GUT:
-				$query_args['meta_query'] = [
-					[ 'key' => 'panels_data', 'compare' => 'NOT EXISTS' ],
-				];
-				add_filter( 'posts_where', [ self::class, 'restrict_to_gutenberg' ] );
+				$query_args['meta_query'] = array(
+					array(
+						'key' => 'panels_data',
+						'compare' => 'NOT EXISTS',
+					),
+				);
+				add_filter( 'posts_where', array( self::class, 'restrict_to_gutenberg' ) );
 				break;
 			case self::BUILDER_OTHER:
-				$query_args['meta_query'] = [
-					[ 'key' => 'panels_data', 'compare' => 'NOT EXISTS' ],
-				];
-				add_filter( 'posts_where', [ self::class, 'restrict_to_other' ] );
+				$query_args['meta_query'] = array(
+					array(
+						'key' => 'panels_data',
+						'compare' => 'NOT EXISTS',
+					),
+				);
+				add_filter( 'posts_where', array( self::class, 'restrict_to_other' ) );
 				break;
 			case self::BUILDER_OUT:
 				// Filtre Out : tag manuel uniquement (post-meta override = 'out').
-				$query_args['meta_query'] = [
-					[
+				$query_args['meta_query'] = array(
+					array(
 						'key'     => self::META_OVERRIDE,
 						'value'   => self::BUILDER_OUT,
 						'compare' => '=',
-					],
-				];
+					),
+				);
 				break;
 		}
 
 		// Restriction de `s` au seul post_title (pas content / excerpt) —
 		// uniquement quand la recherche est textuelle (sinon on est en mode ID).
 		if ( '' !== $search && ! $search_is_id ) {
-			add_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10, 2 );
+			add_filter( 'posts_search', array( self::class, 'restrict_search_to_title' ), 10, 2 );
 		}
 
 		$query = new \WP_Query( $query_args );
 
 		if ( '' !== $search && ! $search_is_id ) {
-			remove_filter( 'posts_search', [ self::class, 'restrict_search_to_title' ], 10 );
+			remove_filter( 'posts_search', array( self::class, 'restrict_search_to_title' ), 10 );
 		}
 		if ( self::BUILDER_SO === $builder_filter ) {
-			remove_filter( 'posts_where', [ self::class, 'restrict_to_siteorigin' ] );
+			remove_filter( 'posts_where', array( self::class, 'restrict_to_siteorigin' ) );
 		} elseif ( self::BUILDER_GUT === $builder_filter ) {
-			remove_filter( 'posts_where', [ self::class, 'restrict_to_gutenberg' ] );
+			remove_filter( 'posts_where', array( self::class, 'restrict_to_gutenberg' ) );
 		} elseif ( self::BUILDER_OTHER === $builder_filter ) {
-			remove_filter( 'posts_where', [ self::class, 'restrict_to_other' ] );
+			remove_filter( 'posts_where', array( self::class, 'restrict_to_other' ) );
 		}
 
 		if ( 0 === $query->found_posts ) {
@@ -681,11 +694,13 @@ final class PostsPage {
 
 		printf(
 			'<p>%s</p>',
-			esc_html( sprintf(
+			esc_html(
+				sprintf(
 				/* translators: %d: number of posts found */
-				_n( '%d article trouvé.', '%d articles trouvés.', (int) $query->found_posts, '100son-html-normalizer' ),
-				(int) $query->found_posts
-			) )
+					_n( '%d article trouvé.', '%d articles trouvés.', (int) $query->found_posts, '100son-html-normalizer' ),
+					(int) $query->found_posts
+				)
+			)
 		);
 
 		// Form englobant tableau + actions groupées (POST bulk).
@@ -720,11 +735,11 @@ final class PostsPage {
 			$cats_html = self::format_terms( $post_id, $post_type );
 
 			$preview_url = add_query_arg(
-				[
+				array(
 					'page'    => self::PAGE_SLUG,
 					'action'  => 'preview',
 					'post_id' => $post_id,
-				],
+				),
 				admin_url( 'admin.php' )
 			);
 			$edit_url    = (string) get_edit_post_link( $post_id );
@@ -804,10 +819,10 @@ final class PostsPage {
 			return $search;
 		}
 		$terms = (array) $query->get( 'search_terms' );
-		if ( [] === $terms ) {
+		if ( array() === $terms ) {
 			return $search;
 		}
-		$clauses = [];
+		$clauses = array();
 		foreach ( $terms as $term ) {
 			$like      = '%' . $wpdb->esc_like( (string) $term ) . '%';
 			$clauses[] = $wpdb->prepare( "({$wpdb->posts}.post_title LIKE %s)", $like );
@@ -878,12 +893,12 @@ final class PostsPage {
 		if ( ! isset( $wpdb ) ) {
 			return $where;
 		}
-		return $where . " AND ("
+		return $where . ' AND ('
 			. "EXISTS ( SELECT 1 FROM {$wpdb->postmeta} pm_so WHERE pm_so.post_id = {$wpdb->posts}.ID AND pm_so.meta_key = 'panels_data' )"
 			. " OR {$wpdb->posts}.post_content LIKE '%<!-- wp:siteorigin-panels%'"
 			. " OR {$wpdb->posts}.post_content LIKE '%panel-layout%'"
 			. " OR {$wpdb->posts}.post_content LIKE '%so-panel%'"
-			. ")";
+			. ')';
 	}
 
 	/**
@@ -950,38 +965,38 @@ final class PostsPage {
 	 * @return string HTML déjà échappé (single `<span>`).
 	 */
 	private static function builder_badge( string $type ): string {
-		$presets = [
-			self::BUILDER_SO      => [
+		$presets = array(
+			self::BUILDER_SO      => array(
 				'bg'    => '#d63638',
 				'fg'    => '#fff',
 				'label' => 'SO',
 				'title' => __( 'SiteOrigin Page Builder (mode natif : panels_data ou bloc siteorigin-panels)', '100son-html-normalizer' ),
-			],
-			self::BUILDER_SO_FLAT => [
+			),
+			self::BUILDER_SO_FLAT => array(
 				'bg'    => '#dba617',
 				'fg'    => '#fff',
 				'label' => 'SO~',
 				'title' => __( 'SiteOrigin (mode aplati) — rendu HTML figé sans panels_data ni bloc, normalisation à risque', '100son-html-normalizer' ),
-			],
-			self::BUILDER_GUT     => [
+			),
+			self::BUILDER_GUT     => array(
 				'bg'    => '#00a32a',
 				'fg'    => '#fff',
 				'label' => 'Gut',
 				'title' => __( 'Gutenberg (blocs FSE)', '100son-html-normalizer' ),
-			],
-			self::BUILDER_OTHER   => [
+			),
+			self::BUILDER_OTHER   => array(
 				'bg'    => '#f0b849',
 				'fg'    => '#1d2327',
 				'label' => '?',
 				'title' => __( 'Constructeur inconnu (HTML libre / éditeur classique)', '100son-html-normalizer' ),
-			],
-			self::BUILDER_OUT     => [
+			),
+			self::BUILDER_OUT     => array(
 				'bg'    => '#646970',
 				'fg'    => '#fff',
 				'label' => 'Out',
 				'title' => __( 'Hors périmètre (tag manuel) — actions de normalisation désactivées', '100son-html-normalizer' ),
-			],
-		];
+			),
+		);
 		$p = $presets[ $type ] ?? $presets[ self::BUILDER_OTHER ];
 
 		return sprintf(
@@ -1073,7 +1088,7 @@ final class PostsPage {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$url = add_query_arg(
 			array_filter(
-				[
+				array(
 					'page'    => self::PAGE_SLUG,
 					'orderby' => $key,
 					'order'   => $next_order,
@@ -1082,7 +1097,7 @@ final class PostsPage {
 					'year'    => isset( $_GET['year'] ) && (int) $_GET['year'] > 0 ? (int) $_GET['year'] : null,
 					'month'   => isset( $_GET['month'] ) && (int) $_GET['month'] > 0 ? (int) $_GET['month'] : null,
 					'builder' => isset( $_GET['builder'] ) && '' !== (string) $_GET['builder'] ? sanitize_key( (string) $_GET['builder'] ) : null,
-				],
+				),
 				static fn( $v ): bool => null !== $v
 			),
 			admin_url( 'admin.php' )
@@ -1165,7 +1180,7 @@ final class PostsPage {
 	private static function format_terms( int $post_id, string $post_type ): string {
 		// Récupère les taxonomies hiérarchiques attachées au post_type.
 		$taxonomies = get_object_taxonomies( $post_type, 'objects' );
-		$names      = [];
+		$names      = array();
 		foreach ( $taxonomies as $tax ) {
 			if ( ! is_object( $tax ) ) {
 				continue;
@@ -1185,7 +1200,7 @@ final class PostsPage {
 				}
 			}
 		}
-		if ( [] === $names ) {
+		if ( array() === $names ) {
 			return '<span style="color:#646970;">—</span>';
 		}
 		return esc_html( implode( ', ', $names ) );
@@ -1206,7 +1221,7 @@ final class PostsPage {
 		// Préserve filtres + tri lors du changement de page.
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$preserved = array_filter(
-			[
+			array(
 				'page'    => self::PAGE_SLUG,
 				's'       => isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : null,
 				'cat'     => isset( $_GET['cat'] ) && (int) $_GET['cat'] > 0 ? (int) $_GET['cat'] : null,
@@ -1215,29 +1230,29 @@ final class PostsPage {
 				'builder' => isset( $_GET['builder'] ) && '' !== (string) $_GET['builder'] ? sanitize_key( (string) $_GET['builder'] ) : null,
 				'orderby' => isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : null,
 				'order'   => isset( $_GET['order'] ) ? sanitize_key( (string) $_GET['order'] ) : null,
-			],
+			),
 			static fn( $v ): bool => null !== $v && '' !== $v
 		);
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
-		$base  = add_query_arg( $preserved, admin_url( 'admin.php' ) );
-		$links = paginate_links(
-			[
-				'base'      => $base . '%_%',
-				'format'    => '&paged=%#%',
-				'current'   => $paged,
-				'total'     => $total_pages,
-				'prev_text' => '‹',
-				'next_text' => '›',
-			]
-		);
+			$base  = add_query_arg( $preserved, admin_url( 'admin.php' ) );
+			$links = paginate_links(
+				array(
+					'base'      => $base . '%_%',
+					'format'    => '&paged=%#%',
+					'current'   => $paged,
+					'total'     => $total_pages,
+					'prev_text' => '‹',
+					'next_text' => '›',
+				)
+			);
 		if ( ! empty( $links ) ) {
 			echo '<div class="tablenav-pages">' . $links . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		}
 	}
 
 	// ===================================================================
-	//  Render preview (avant / après + confirm)
+	// Render preview (avant / après + confirm)
 	// ===================================================================
 
 	/**
@@ -1272,12 +1287,12 @@ final class PostsPage {
 		if ( $preview['has_panels_data'] ) {
 			echo '<div class="notice notice-warning" style="margin:16px 0;">';
 			echo '<p><strong>' . esc_html__( '⚠ Article SiteOrigin détecté', '100son-html-normalizer' ) . '</strong></p>';
-			echo '<p>' . esc_html__( "Cet article utilise SiteOrigin Page Builder. Normaliser le post_content brut ignorera la structure du builder. Préférer SO to Blocks pour la migration. Si vous savez ce que vous faites, cochez « Continuer quand même » avant de cliquer sur Normaliser.", '100son-html-normalizer' ) . '</p>';
+			echo '<p>' . esc_html__( 'Cet article utilise SiteOrigin Page Builder. Normaliser le post_content brut ignorera la structure du builder. Préférer SO to Blocks pour la migration. Si vous savez ce que vous faites, cochez « Continuer quand même » avant de cliquer sur Normaliser.', '100son-html-normalizer' ) . '</p>';
 			echo '</div>';
 		}
 
 		if ( PostNormalizer::STATUS_UNCHANGED === $preview['status'] ) {
-			echo '<div class="notice notice-info"><p>' . esc_html__( "Aucune modification : le HTML est déjà conforme aux préréglages actifs.", '100son-html-normalizer' ) . '</p></div>';
+			echo '<div class="notice notice-info"><p>' . esc_html__( 'Aucune modification : le HTML est déjà conforme aux préréglages actifs.', '100son-html-normalizer' ) . '</p></div>';
 		}
 
 		// Encart métriques avant/après.
@@ -1308,11 +1323,11 @@ final class PostsPage {
 		// Form de confirmation (sauf si unchanged).
 		if ( PostNormalizer::STATUS_MODIFIED === $preview['status'] ) {
 			$action_url = add_query_arg(
-				[
+				array(
 					'page'    => self::PAGE_SLUG,
 					'action'  => 'preview',
 					'post_id' => $post_id,
-				],
+				),
 				admin_url( 'admin.php' )
 			);
 			echo '<form method="post" action="' . esc_url( $action_url ) . '" style="margin-top:24px;padding:16px;background:#fff;border:1px solid #c3c4c7;">';
@@ -1322,7 +1337,7 @@ final class PostsPage {
 
 			if ( $preview['has_panels_data'] ) {
 				echo '<p><label><input type="checkbox" name="force_siteorigin" value="1" required> ';
-				echo esc_html__( "Continuer quand même (article SiteOrigin)", '100son-html-normalizer' );
+				echo esc_html__( 'Continuer quand même (article SiteOrigin)', '100son-html-normalizer' );
 				echo '</label></p>';
 			}
 
@@ -1343,12 +1358,12 @@ final class PostsPage {
 		$errors = $info['errors'];
 
 		$total_processed = array_sum( $counts );
-		if ( 0 === $total_processed && [] !== $errors ) {
+		if ( 0 === $total_processed && array() !== $errors ) {
 			echo '<div class="notice notice-error"><p>' . esc_html( implode( ' / ', $errors ) ) . '</p></div>';
 			return;
 		}
 
-		$pieces   = [];
+		$pieces   = array();
 		$pieces[] = sprintf(
 			/* translators: %d: total */
 			_n( '%d article traité.', '%d articles traités.', $total_processed, '100son-html-normalizer' ),
@@ -1375,7 +1390,7 @@ final class PostsPage {
 			: 'notice-success';
 
 		printf( '<div class="notice %s is-dismissible"><p>%s</p>', esc_attr( $class ), esc_html( implode( ' — ', $pieces ) ) );
-		if ( [] !== $errors ) {
+		if ( array() !== $errors ) {
 			echo '<ul style="margin-left:24px;">';
 			foreach ( $errors as $err ) {
 				printf( '<li>%s</li>', esc_html( $err ) );
@@ -1399,13 +1414,13 @@ final class PostsPage {
 			case PostNormalizer::STATUS_MODIFIED:
 				$msg = sprintf(
 					/* translators: %d: post id */
-					__( "Article #%d normalisé avec succès. Une révision a été créée pour rollback.", '100son-html-normalizer' ),
+					__( 'Article #%d normalisé avec succès. Une révision a été créée pour rollback.', '100son-html-normalizer' ),
 					(int) $info['post_id']
 				);
 				echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
 				break;
 			case PostNormalizer::STATUS_UNCHANGED:
-				echo '<div class="notice notice-info is-dismissible"><p>' . esc_html__( "Aucune modification appliquée.", '100son-html-normalizer' ) . '</p></div>';
+				echo '<div class="notice notice-info is-dismissible"><p>' . esc_html__( 'Aucune modification appliquée.', '100son-html-normalizer' ) . '</p></div>';
 				break;
 			case PostNormalizer::STATUS_SKIPPED_SO:
 				echo '<div class="notice notice-warning"><p>' . esc_html( (string) ( $result['message'] ?? '' ) ) . '</p></div>';
@@ -1424,9 +1439,9 @@ final class PostsPage {
 	 * @return void
 	 */
 	private function render_metrics_box( array $metrics ): void {
-		$before = $metrics['before'] ?? [];
-		$after  = $metrics['after']  ?? [];
-		$diff   = $metrics['diff']   ?? [];
+		$before = $metrics['before'] ?? array();
+		$after  = $metrics['after'] ?? array();
+		$diff   = $metrics['diff'] ?? array();
 		if ( ! is_array( $before ) || ! is_array( $after ) || ! is_array( $diff ) ) {
 			return;
 		}
@@ -1448,11 +1463,11 @@ final class PostsPage {
 		echo '<th style="text-align:right;">%</th>';
 		echo '</tr></thead><tbody>';
 
-		$rows = [
-			[ __( 'Mots', '100son-html-normalizer' ), 'word_count', 'word_delta', 'word_pct' ],
-			[ __( 'Caractères', '100son-html-normalizer' ), 'char_count', 'char_delta', 'char_pct' ],
-			[ __( 'Images', '100son-html-normalizer' ), 'image_count', 'image_delta', null ],
-		];
+		$rows = array(
+			array( __( 'Mots', '100son-html-normalizer' ), 'word_count', 'word_delta', 'word_pct' ),
+			array( __( 'Caractères', '100son-html-normalizer' ), 'char_count', 'char_delta', 'char_pct' ),
+			array( __( 'Images', '100son-html-normalizer' ), 'image_count', 'image_delta', null ),
+		);
 		foreach ( $rows as $row ) {
 			[ $label, $count_key, $delta_key, $pct_key ] = $row;
 			$b   = (int) ( $before[ $count_key ] ?? 0 );
@@ -1494,11 +1509,23 @@ final class PostsPage {
 	 * @return string HTML déjà échappé.
 	 */
 	public static function severity_badge( string $severity ): string {
-		$presets = [
-			HtmlMetrics::SEVERITY_OK       => [ 'bg' => '#00a32a', 'fg' => '#fff', 'label' => __( 'OK', '100son-html-normalizer' ) ],
-			HtmlMetrics::SEVERITY_WARNING  => [ 'bg' => '#f0b849', 'fg' => '#1d2327', 'label' => __( 'Attention', '100son-html-normalizer' ) ],
-			HtmlMetrics::SEVERITY_CRITICAL => [ 'bg' => '#d63638', 'fg' => '#fff', 'label' => __( 'Perte significative', '100son-html-normalizer' ) ],
-		];
+		$presets = array(
+			HtmlMetrics::SEVERITY_OK       => array(
+				'bg' => '#00a32a',
+				'fg' => '#fff',
+				'label' => __( 'OK', '100son-html-normalizer' ),
+			),
+			HtmlMetrics::SEVERITY_WARNING  => array(
+				'bg' => '#f0b849',
+				'fg' => '#1d2327',
+				'label' => __( 'Attention', '100son-html-normalizer' ),
+			),
+			HtmlMetrics::SEVERITY_CRITICAL => array(
+				'bg' => '#d63638',
+				'fg' => '#fff',
+				'label' => __( 'Perte significative', '100son-html-normalizer' ),
+			),
+		);
 		$p = $presets[ $severity ] ?? $presets[ HtmlMetrics::SEVERITY_OK ];
 		return sprintf(
 			'<span style="display:inline-block;padding:2px 8px;background:%s;color:%s;border-radius:3px;font-size:11px;font-weight:600;">%s</span>',
@@ -1509,7 +1536,7 @@ final class PostsPage {
 	}
 
 	// ===================================================================
-	//  Helpers
+	// Helpers
 	// ===================================================================
 
 	/**
@@ -1518,8 +1545,8 @@ final class PostsPage {
 	 * @return array<string, string> slug => label
 	 */
 	private function get_available_post_types(): array {
-		$out = [];
-		$pt  = get_post_types( [ 'public' => true ], 'objects' );
+		$out = array();
+		$pt  = get_post_types( array( 'public' => true ), 'objects' );
 		foreach ( $pt as $obj ) {
 			if ( ! is_object( $obj ) ) {
 				continue;
@@ -1540,6 +1567,6 @@ final class PostsPage {
 	 * @return string
 	 */
 	private static function page_url(): string {
-		return add_query_arg( [ 'page' => self::PAGE_SLUG ], admin_url( 'admin.php' ) );
+		return add_query_arg( array( 'page' => self::PAGE_SLUG ), admin_url( 'admin.php' ) );
 	}
 }

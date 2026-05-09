@@ -29,9 +29,9 @@ final class Menu {
 	public const SLUG       = '100son-html-normalizer';
 
 	private PresetsPage $presets_page;
-	private TesterPage  $tester_page;
-	private PostsPage   $posts_page;
-	private LogsPage    $logs_page;
+	private TesterPage $tester_page;
+	private PostsPage $posts_page;
+	private LogsPage $logs_page;
 
 	public function __construct( PresetsPage $presets_page, TesterPage $tester_page, PostsPage $posts_page, LogsPage $logs_page ) {
 		$this->presets_page = $presets_page;
@@ -49,7 +49,7 @@ final class Menu {
 		if ( ! function_exists( 'add_action' ) ) {
 			return;
 		}
-		add_action( 'admin_menu', [ $this, 'on_admin_menu' ] );
+		add_action( 'admin_menu', array( $this, 'on_admin_menu' ) );
 
 		// Form-handlers `admin_post_*` des sous-pages — branchés ici car
 		// admin-post.php n'invoque jamais le menu, seulement les hooks.
@@ -67,7 +67,7 @@ final class Menu {
 			__( 'HTML Normalizer', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG,
-			[ $this->presets_page, 'render' ],
+			array( $this->presets_page, 'render' ),
 			'dashicons-editor-removeformatting',
 			80
 		);
@@ -79,7 +79,7 @@ final class Menu {
 			__( 'Préréglages', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG,
-			[ $this->presets_page, 'render' ]
+			array( $this->presets_page, 'render' )
 		);
 
 		// Sous-page "Tester un fragment".
@@ -89,7 +89,7 @@ final class Menu {
 			__( 'Tester un fragment', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-tester',
-			[ $this->tester_page, 'render' ]
+			array( $this->tester_page, 'render' )
 		);
 
 		// Sous-page "Normaliser" (F8).
@@ -99,7 +99,7 @@ final class Menu {
 			__( 'Normaliser', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-posts',
-			[ $this->posts_page, 'render' ]
+			array( $this->posts_page, 'render' )
 		);
 
 		// Sous-page "Journal".
@@ -109,7 +109,7 @@ final class Menu {
 			__( 'Journal', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-logs',
-			[ $this->logs_page, 'render' ]
+			array( $this->logs_page, 'render' )
 		);
 	}
 }

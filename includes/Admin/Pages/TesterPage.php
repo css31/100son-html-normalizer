@@ -93,10 +93,10 @@ final class TesterPage {
 	private function maybe_handle_run(): array {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing
 		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
-			return [ '', null, '' ];
+			return array( '', null, '' );
 		}
 		if ( ! isset( $_POST[ self::NONCE_NAME ] ) ) {
-			return [ '', null, '' ];
+			return array( '', null, '' );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
@@ -107,11 +107,11 @@ final class TesterPage {
 			: '';
 
 		if ( strlen( $raw_input ) > self::SAMPLE_LIMIT ) {
-			return [ $raw_input, null, __( "Fragment trop volumineux (max 50 Ko).", '100son-html-normalizer' ) ];
+			return array( $raw_input, null, __( 'Fragment trop volumineux (max 50 Ko).', '100son-html-normalizer' ) );
 		}
 
-		$output = $this->normalizer->normalize( $raw_input, [ 'source' => 'admin-tester' ] );
+		$output = $this->normalizer->normalize( $raw_input, array( 'source' => 'admin-tester' ) );
 
-		return [ $raw_input, $output, '' ];
+		return array( $raw_input, $output, '' );
 	}
 }

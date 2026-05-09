@@ -32,9 +32,9 @@ final class PostNormalizer {
 	public const STATUS_ERROR_PERMISSION = 'error_permission';
 	public const STATUS_ERROR_WRITE      = 'error_write';
 
-	private HtmlNormalizer    $normalizer;
+	private HtmlNormalizer $normalizer;
 	private SiteOriginDetector $so_detector;
-	private ?Logger            $logger;
+	private ?Logger $logger;
 
 	public function __construct( HtmlNormalizer $normalizer, SiteOriginDetector $so_detector, ?Logger $logger = null ) {
 		$this->normalizer  = $normalizer;
@@ -58,38 +58,44 @@ final class PostNormalizer {
 		$post = $this->fetch_post( $post_id );
 		if ( null === $post ) {
 			$this->logger?->log_preview( $post_id, '', self::STATUS_ERROR_NOT_FOUND );
-			return [
+			return array(
 				'status'          => self::STATUS_ERROR_NOT_FOUND,
 				'html_before'     => '',
 				'html_after'      => '',
 				'has_panels_data' => false,
-				'message'         => __( "Article introuvable.", '100son-html-normalizer' ),
-			];
+				'message'         => __( 'Article introuvable.', '100son-html-normalizer' ),
+			);
 		}
 
 		$has_so      = $this->so_detector->has_panels_data( $post_id );
 		$html_before = (string) $post->post_content;
-		$html_after  = $this->normalizer->normalize( $html_before, [ 'source' => 'admin-f8', 'post_id' => $post_id ] );
+		$html_after  = $this->normalizer->normalize(
+			$html_before,
+			array(
+				'source' => 'admin-f8',
+				'post_id' => $post_id,
+			)
+		);
 		$status      = $html_before === $html_after ? self::STATUS_UNCHANGED : self::STATUS_MODIFIED;
 
 		$metrics_before = HtmlMetrics::compute( $html_before );
 		$metrics_after  = HtmlMetrics::compute( $html_after );
 		$metrics_diff   = HtmlMetrics::compare( $metrics_before, $metrics_after );
-		$metrics        = [
+		$metrics        = array(
 			'before' => $metrics_before,
 			'after'  => $metrics_after,
 			'diff'   => $metrics_diff,
-		];
+		);
 
 		$this->logger?->log_preview( $post_id, (string) $post->post_title, $status, $metrics );
 
-		return [
+		return array(
 			'status'          => $status,
 			'html_before'     => $html_before,
 			'html_after'      => $html_after,
 			'has_panels_data' => $has_so,
 			'metrics'         => $metrics,
-		];
+		);
 	}
 
 	/**
@@ -107,46 +113,52 @@ final class PostNormalizer {
 	public function normalize_post( int $post_id, bool $force_siteorigin = false ): array {
 		$post = $this->fetch_post( $post_id );
 		if ( null === $post ) {
-			$this->logger?->log_normalize( $post_id, '', self::STATUS_ERROR_NOT_FOUND, __( "Article introuvable.", '100son-html-normalizer' ) );
-			return [
+			$this->logger?->log_normalize( $post_id, '', self::STATUS_ERROR_NOT_FOUND, __( 'Article introuvable.', '100son-html-normalizer' ) );
+			return array(
 				'status'          => self::STATUS_ERROR_NOT_FOUND,
-				'message'         => __( "Article introuvable.", '100son-html-normalizer' ),
+				'message'         => __( 'Article introuvable.', '100son-html-normalizer' ),
 				'has_panels_data' => false,
-			];
+			);
 		}
 
 		$post_title = (string) $post->post_title;
 		$has_so     = $this->so_detector->has_panels_data( $post_id );
 		if ( $has_so && ! $force_siteorigin ) {
-			$skip_msg = __( "Article SiteOrigin détecté. Cocher « Continuer quand même » pour outrepasser, ou utiliser SO to Blocks pour la migration.", '100son-html-normalizer' );
+			$skip_msg = __( 'Article SiteOrigin détecté. Cocher « Continuer quand même » pour outrepasser, ou utiliser SO to Blocks pour la migration.', '100son-html-normalizer' );
 			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_SKIPPED_SO, $skip_msg );
-			return [
+			return array(
 				'status'          => self::STATUS_SKIPPED_SO,
 				'message'         => $skip_msg,
 				'has_panels_data' => true,
-			];
+			);
 		}
 
 		$html_before = (string) $post->post_content;
-		$html_after  = $this->normalizer->normalize( $html_before, [ 'source' => 'admin-f8', 'post_id' => $post_id ] );
+		$html_after  = $this->normalizer->normalize(
+			$html_before,
+			array(
+				'source' => 'admin-f8',
+				'post_id' => $post_id,
+			)
+		);
 
 		$metrics_before = HtmlMetrics::compute( $html_before );
 		$metrics_after  = HtmlMetrics::compute( $html_after );
-		$metrics        = [
+		$metrics        = array(
 			'before' => $metrics_before,
 			'after'  => $metrics_after,
 			'diff'   => HtmlMetrics::compare( $metrics_before, $metrics_after ),
-		];
+		);
 
 		if ( $html_before === $html_after ) {
-			$unchanged_msg = __( "Aucune modification : le HTML est déjà conforme.", '100son-html-normalizer' );
+			$unchanged_msg = __( 'Aucune modification : le HTML est déjà conforme.', '100son-html-normalizer' );
 			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_UNCHANGED, $unchanged_msg, 0, $metrics );
-			return [
+			return array(
 				'status'          => self::STATUS_UNCHANGED,
 				'message'         => $unchanged_msg,
 				'has_panels_data' => $has_so,
 				'metrics'         => $metrics,
-			];
+			);
 		}
 
 		// Crée une révision AVANT écriture pour rollback natif WP.
@@ -159,30 +171,30 @@ final class PostNormalizer {
 		}
 
 		$update_result = wp_update_post(
-			[
+			array(
 				'ID'           => $post_id,
 				'post_content' => $html_after,
-			],
+			),
 			true
 		);
 
 		if ( is_wp_error( $update_result ) || 0 === $update_result ) {
 			$msg = is_wp_error( $update_result ) ? $update_result->get_error_message() : __( 'Échec de la mise à jour.', '100son-html-normalizer' );
 			$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_ERROR_WRITE, (string) $msg );
-			return [
+			return array(
 				'status'          => self::STATUS_ERROR_WRITE,
 				'message'         => (string) $msg,
 				'has_panels_data' => $has_so,
-			];
+			);
 		}
 
 		$this->logger?->log_normalize( $post_id, $post_title, self::STATUS_MODIFIED, '', $revision_id, $metrics );
-		return [
+		return array(
 			'status'          => self::STATUS_MODIFIED,
 			'revision_id'     => $revision_id,
 			'has_panels_data' => $has_so,
 			'metrics'         => $metrics,
-		];
+		);
 	}
 
 	/**
