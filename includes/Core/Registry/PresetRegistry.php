@@ -27,8 +27,13 @@ use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
  * Registry des presets de normalisation.
+ *
+ * Volontairement non-final pour permettre l'extension/stub en tests
+ * d'intégration (DiagnosticEngineTest, StepRunnerTest…). Même convention
+ * que `SettingsRepository`. Ne pas la rendre `final` sans extraire au
+ * préalable une interface dédiée.
  */
-final class PresetRegistry {
+class PresetRegistry {
 
 	/**
 	 * Ordre canonique des presets dans le pipeline (cf. cahier 4.4).
