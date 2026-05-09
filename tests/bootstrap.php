@@ -171,3 +171,95 @@ if ( ! function_exists( 'add_option' ) ) {
 		return false;
 	}
 }
+
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $name ): bool {
+		if ( isset( $GLOBALS['son100_htmln_options'][ $name ] ) ) {
+			unset( $GLOBALS['son100_htmln_options'][ $name ] );
+			return true;
+		}
+		return false;
+	}
+}
+
+// ===================================================================
+// Stub minimal de $wpdb + dbDelta pour ActivatorTest et repos V1.0.
+// Le stub enregistre les SQL passes a dbDelta() et les writes ($wpdb->insert,
+// $wpdb->update) pour assertion en test, mais n'execute pas de vraie requete.
+// ===================================================================
+
+if ( ! class_exists( 'Son100_Htmln_Test_Wpdb' ) ) {
+	final class Son100_Htmln_Test_Wpdb {
+		public string $prefix = 'wptests_';
+		public string $postmeta = 'wptests_postmeta';
+		public int $insert_id = 0;
+		/** @var list<array{table: string, data: array<string, mixed>, formats: array|null}> */
+		public array $insert_log = [];
+		/** @var list<array{table: string, data: array<string, mixed>, where: array<string, mixed>}> */
+		public array $update_log = [];
+		/** @var list<string> */
+		public array $query_log = [];
+		/** @var array<string, array<int, array<string, mixed>>> Rows pour get_row/get_results, keyees par table. */
+		public array $rows = [];
+
+		public function get_charset_collate(): string {
+			return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci';
+		}
+
+		public function prepare( string $query, mixed ...$args ): string {
+			return vsprintf( str_replace( [ '%s', '%d', '%f' ], [ "'%s'", '%d', '%F' ], $query ), $args );
+		}
+
+		public function esc_like( string $text ): string {
+			return addcslashes( $text, '_%\\' );
+		}
+
+		public function query( string $sql ): int {
+			$this->query_log[] = $sql;
+			return 0;
+		}
+
+		public function insert( string $table, array $data, ?array $formats = null ): int {
+			$this->insert_log[] = [ 'table' => $table, 'data' => $data, 'formats' => $formats ];
+			$this->insert_id    = count( $this->insert_log );
+			$this->rows[ $table ][ $this->insert_id ] = $data;
+			return 1;
+		}
+
+		public function update( string $table, array $data, array $where, ?array $formats = null, ?array $where_formats = null ): int {
+			$this->update_log[] = [ 'table' => $table, 'data' => $data, 'where' => $where ];
+			return 1;
+		}
+
+		public function get_row( string $sql, string $output = 'OBJECT' ): mixed {
+			$this->query_log[] = $sql;
+			return null;
+		}
+
+		public function get_results( string $sql, string $output = 'OBJECT' ): array {
+			$this->query_log[] = $sql;
+			return [];
+		}
+
+		public function get_var( string $sql ): mixed {
+			$this->query_log[] = $sql;
+			return null;
+		}
+	}
+}
+
+if ( ! function_exists( 'dbDelta' ) ) {
+	$GLOBALS['son100_htmln_dbdelta_log'] = $GLOBALS['son100_htmln_dbdelta_log'] ?? [];
+	function dbDelta( string|array $sql ): array {
+		$queries                                   = is_array( $sql ) ? $sql : [ $sql ];
+		$GLOBALS['son100_htmln_dbdelta_log']       = array_merge(
+			$GLOBALS['son100_htmln_dbdelta_log'] ?? [],
+			$queries
+		);
+		return [];
+	}
+}
+
+if ( ! defined( 'ABSPATH' ) ) {
+	// Deja defini plus haut — garde-fou si on charge ce bloc plusieurs fois.
+}

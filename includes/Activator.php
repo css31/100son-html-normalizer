@@ -2,7 +2,8 @@
 /**
  * Activation du plugin.
  *
- * Seed des options par défaut (cf. cahier §11 étape 1).
+ * Seed des options par défaut + création des tables custom V1.0
+ * (cf. cahier v2.0 §4.2 et §11 étape 1).
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -19,6 +20,17 @@ defined( 'ABSPATH' ) || exit;
 final class Activator {
 
 	/**
+	 * Version courante du schéma BDD (incrémentée à chaque évolution
+	 * structurelle des tables custom). Utilisée pour piloter les futures
+	 * migrations conditionnelles.
+	 *
+	 * Historique :
+	 *  - 1.0.0 : V0.1 (aucune table custom)
+	 *  - 2.0.0 : V1.0 Phase 2.1 — ajout `son100_htmln_diagnostics` et `son100_htmln_steps`
+	 */
+	public const DB_VERSION = '2.0.0';
+
+	/**
 	 * Exécuté à l'activation du plugin.
 	 *
 	 * @return void
@@ -27,8 +39,67 @@ final class Activator {
 		self::seed_settings();
 		self::seed_presets();
 		self::seed_user_rules();
+		self::create_tables();
 
-		update_option( 'son100_htmln_db_version', SON100_HTMLN_VERSION, false );
+		update_option( 'son100_htmln_db_version', self::DB_VERSION, false );
+	}
+
+	/**
+	 * Crée (ou met à niveau) les tables custom V1.0 via `dbDelta()`.
+	 *
+	 * Idempotent : `dbDelta()` ne touche que les colonnes/clés divergentes.
+	 * Les schémas sont la source de vérité du cahier v2.0 §4.2.
+	 *
+	 * @return void
+	 */
+	private static function create_tables(): void {
+		global $wpdb;
+
+		if ( ! function_exists( 'dbDelta' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		}
+
+		$charset_collate = $wpdb->get_charset_collate();
+		$diag_table      = $wpdb->prefix . 'son100_htmln_diagnostics';
+		$steps_table     = $wpdb->prefix . 'son100_htmln_steps';
+
+		// F12 — Diagnostic batch (status par article + matching_rules + métriques + is_stale).
+		$sql_diag = "CREATE TABLE $diag_table (
+			id BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
+			post_id BIGINT UNSIGNED NOT NULL,
+			status VARCHAR(20) NOT NULL,
+			matching_rules LONGTEXT NULL,
+			metrics LONGTEXT NULL,
+			is_stale TINYINT(1) NOT NULL DEFAULT 0,
+			diagnosed_at DATETIME NOT NULL,
+			post_modified_at_diagnosis DATETIME NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_post_id (post_id),
+			KEY idx_status (status),
+			KEY idx_stale (is_stale)
+		) $charset_collate;";
+
+		// F14/F16 — Historique des pas (UUID, règles appliquées, articles touchés, résultats par article).
+		$sql_steps = "CREATE TABLE $steps_table (
+			id BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
+			step_uuid VARCHAR(36) NOT NULL,
+			applied_rules LONGTEXT NOT NULL,
+			affected_post_ids LONGTEXT NOT NULL,
+			total_articles INT UNSIGNED NOT NULL,
+			successful_articles INT UNSIGNED NOT NULL DEFAULT 0,
+			refused_articles INT UNSIGNED NOT NULL DEFAULT 0,
+			errored_articles INT UNSIGNED NOT NULL DEFAULT 0,
+			per_article_results LONGTEXT NULL,
+			user_id BIGINT UNSIGNED NULL,
+			started_at DATETIME NOT NULL,
+			finished_at DATETIME NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY uniq_step_uuid (step_uuid),
+			KEY idx_started_at (started_at)
+		) $charset_collate;";
+
+		dbDelta( $sql_diag );
+		dbDelta( $sql_steps );
 	}
 
 	/**
