@@ -79,4 +79,27 @@ final class ShareaholicShortcodeRuleTest extends TestCase {
 		$input = '[shareaholic-not-a-shortcode without brackets';
 		$this->assertSame( $input, $this->rule->apply( $input ) );
 	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_counts_shortcode_occurrences(): void {
+		$html = '[shareaholic id="123"][shareaholic][gallery]Texte[shareaholic foo=bar]';
+		$this->assertSame( 3, $this->rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_zero_when_no_shareaholic(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '[gallery ids="1,2,3"] texte normal [foo]' ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$html  = '[shareaholic id="123"][gallery][shareaholic]';
+		$after = $this->rule->apply( $html );
+		$this->assertSame( 0, $this->rule->countMatches( $after ) );
+	}
 }

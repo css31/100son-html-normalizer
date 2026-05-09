@@ -104,4 +104,37 @@ final class PinterestArtifactsRuleTest extends TestCase {
 		$input = '<div data-pin-do="button">x</div>';
 		$this->assertHtmlEquals( $input, $this->rule->apply( $input ) );
 	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_zero_when_no_pinterest(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '<p>texte<span>x</span></p>' ) );
+	}
+
+	public function test_count_matches_counts_form_a_data_pin(): void {
+		$html = '<span data-pin-do="button">a</span><span data-pin-id="42">b</span><span>c</span>';
+		$this->assertSame( 2, $this->rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_counts_form_b_z_index_signature(): void {
+		$html = '<span style="z-index: 8675309; color: red;">save</span><span style="color:red">other</span>';
+		$this->assertSame( 1, $this->rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_does_not_count_div_with_data_pin(): void {
+		// Forme A : la règle cible exclusivement <span>, pas <div>.
+		$this->assertSame( 0, $this->rule->countMatches( '<div data-pin-do="button">x</div>' ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$html  = '<span data-pin-do="button">a</span><span style="z-index: 8675309;">b</span><span>c</span>';
+		$after = $this->rule->apply( $html );
+		$this->assertSame( 0, $this->rule->countMatches( $after ) );
+	}
 }

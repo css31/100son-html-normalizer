@@ -75,7 +75,7 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === trim( $html ) ) {
 			return $html;
 		}
@@ -91,7 +91,7 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 
 		$xpath    = new DOMXPath( $doc );
 		$styled   = $xpath->query( './/*[@style]', $wrapper );
-		$elements = [];
+		$elements = array();
 		if ( $styled !== false ) {
 			foreach ( $styled as $node ) {
 				if ( $node instanceof DOMElement ) {
@@ -105,6 +105,45 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 		}
 
 		return DomHtml::serialize_fragment( $doc );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Compte les elements dont apply() enroberait le contenu dans <strong>
+	 * et/ou <em>, en tenant compte des mappings actives. Un element peut
+	 * cumuler bold + italic = 1 match (un seul element transforme), pas 2.
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === trim( $html ) ) {
+			return 0;
+		}
+		if ( ! $this->map_bold && ! $this->map_italic ) {
+			return 0;
+		}
+		$doc     = DomHtml::parse_fragment( $html );
+		$wrapper = DomHtml::get_root_wrapper( $doc );
+		if ( null === $wrapper ) {
+			return 0;
+		}
+		$xpath  = new DOMXPath( $doc );
+		$styled = $xpath->query( './/*[@style]', $wrapper );
+		if ( false === $styled ) {
+			return 0;
+		}
+		$count = 0;
+		foreach ( $styled as $node ) {
+			if ( ! $node instanceof DOMElement ) {
+				continue;
+			}
+			[ , $is_bold, $is_italic ] = self::scan_declarations( (string) $node->getAttribute( 'style' ) );
+			$wrap_bold   = $this->map_bold && $is_bold;
+			$wrap_italic = $this->map_italic && $is_italic;
+			if ( $wrap_bold || $wrap_italic ) {
+				++$count;
+			}
+		}
+		return $count;
 	}
 
 	/**
@@ -157,7 +196,7 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 	 *         [declarations parsees, est_bold, est_italic]
 	 */
 	private static function scan_declarations( string $style ): array {
-		$kept      = [];
+		$kept      = array();
 		$is_bold   = false;
 		$is_italic = false;
 
@@ -179,13 +218,13 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 				$is_italic = true;
 			}
 
-			$kept[] = [
+			$kept[] = array(
 				'property' => $property,
 				'value'    => $value,
-			];
+			);
 		}
 
-		return [ $kept, $is_bold, $is_italic ];
+		return array( $kept, $is_bold, $is_italic );
 	}
 
 	/**
@@ -217,7 +256,7 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 	 * @return string
 	 */
 	private static function rebuild_style( array $declarations, bool $omit_bold, bool $omit_italic ): string {
-		$parts = [];
+		$parts = array();
 		foreach ( $declarations as $decl ) {
 			$prop  = $decl['property'];
 			$value = $decl['value'];
@@ -246,11 +285,11 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 			return;
 		}
 		// Snapshot des enfants actuels (sinon iteration invalidee par appendChild).
-		$children = [];
+		$children = array();
 		foreach ( $el->childNodes as $child ) {
 			$children[] = $child;
 		}
-		if ( [] === $children ) {
+		if ( array() === $children ) {
 			return;
 		}
 

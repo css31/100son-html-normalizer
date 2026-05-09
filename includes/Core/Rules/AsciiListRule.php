@@ -60,31 +60,57 @@ final class AsciiListRule implements RuleInterface {
 	 * Cle : nom du marqueur (cle de configuration utilisateur).
 	 * Valeur : ['regex' => pattern PCRE, 'list_tag' => 'ul'|'ol'].
 	 */
-	private const MARKER_DEFINITIONS = [
-		'dash'    => [ 'regex' => '/^-[\s\xc2\xa0]+/', 'list_tag' => 'ul' ],
-		'emdash'  => [ 'regex' => '/^\xe2\x80\x93[\s\xc2\xa0]+/', 'list_tag' => 'ul' ], // U+2013
-		'asterix' => [ 'regex' => '/^\*[\s\xc2\xa0]+/', 'list_tag' => 'ul' ],
-		'bullet'  => [ 'regex' => '/^\xe2\x80\xa2[\s\xc2\xa0]+/', 'list_tag' => 'ul' ], // U+2022
-		'numeric' => [ 'regex' => '/^\d+\.[\s\xc2\xa0]+/', 'list_tag' => 'ol' ],
-	];
+	private const MARKER_DEFINITIONS = array(
+		'dash'    => array(
+			'regex' => '/^-[\s\xc2\xa0]+/',
+			'list_tag' => 'ul',
+		),
+		'emdash'  => array(
+			'regex' => '/^\xe2\x80\x93[\s\xc2\xa0]+/',
+			'list_tag' => 'ul',
+		), // U+2013
+		'asterix' => array(
+			'regex' => '/^\*[\s\xc2\xa0]+/',
+			'list_tag' => 'ul',
+		),
+		'bullet'  => array(
+			'regex' => '/^\xe2\x80\xa2[\s\xc2\xa0]+/',
+			'list_tag' => 'ul',
+		), // U+2022
+		'numeric' => array(
+			'regex' => '/^\d+\.[\s\xc2\xa0]+/',
+			'list_tag' => 'ol',
+		),
+	);
 
 	/**
 	 * Balises inline porteuses de sens (preservees).
 	 */
-	private const SEMANTIC_INLINE_TAGS = [
-		'strong', 'em', 'b', 'i', 'a', 'code', 'q', 'cite', 'mark',
-		'sub', 'sup', 'abbr', 'time',
-	];
+	private const SEMANTIC_INLINE_TAGS = array(
+		'strong',
+		'em',
+		'b',
+		'i',
+		'a',
+		'code',
+		'q',
+		'cite',
+		'mark',
+		'sub',
+		'sup',
+		'abbr',
+		'time',
+	);
 
 	/**
 	 * Conteneurs de presentation (desenrobes si vides d'attributs semantiques).
 	 */
-	private const CONTAINER_TAGS = [ 'span', 'font' ];
+	private const CONTAINER_TAGS = array( 'span', 'font' );
 
 	/**
 	 * Attributs de presentation a supprimer lors de la copie d'un inline.
 	 */
-	private const PRESENTATION_ATTRIBUTES = [ 'style', 'class', 'id' ];
+	private const PRESENTATION_ATTRIBUTES = array( 'style', 'class', 'id' );
 
 	/**
 	 * Marqueurs actives par configuration.
@@ -115,17 +141,17 @@ final class AsciiListRule implements RuleInterface {
 	 * @param list<string>        $custom_markers Marqueurs custom utilisateur (1 par ligne).
 	 */
 	public function __construct(
-		array $markers = [
+		array $markers = array(
 			'dash'    => true,
 			'emdash'  => true,
 			'asterix' => true,
 			'bullet'  => true,
 			'numeric' => true,
-		],
+		),
 		int $threshold = 2,
-		array $custom_markers = []
+		array $custom_markers = array()
 	) {
-		$this->enabled_markers = [];
+		$this->enabled_markers = array();
 		foreach ( $markers as $key => $enabled ) {
 			if ( $enabled && isset( self::MARKER_DEFINITIONS[ $key ] ) ) {
 				$this->enabled_markers[ $key ] = true;
@@ -157,7 +183,7 @@ final class AsciiListRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === trim( $html ) ) {
 			return $html;
 		}
@@ -178,6 +204,96 @@ final class AsciiListRule implements RuleInterface {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 *
+	 * Compte le nombre d'items qui SERAIENT convertis en <li>, sans modifier
+	 * le HTML. Cumule les deux passes :
+	 *  - Pass 1 (intra-<p>) : pour chaque <p> contenant des <br>, si le nombre
+	 *    de fragments marker-prefixed atteint le seuil, on compte tous ces
+	 *    fragments bullets. Le <p> est marque "consomme" pour Pass 2.
+	 *  - Pass 2 (document-level) : pour chaque sequence de <p> consecutifs
+	 *    marker-prefixed (meme list_tag), si la longueur atteint le seuil,
+	 *    on compte la sequence entiere. Les <p> consommes par Pass 1 cassent
+	 *    un run.
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === trim( $html ) ) {
+			return 0;
+		}
+		$doc     = DomHtml::parse_fragment( $html );
+		$wrapper = DomHtml::get_root_wrapper( $doc );
+		if ( null === $wrapper ) {
+			return 0;
+		}
+
+		// Pass 1 — comptage + memoire des <p> consommes.
+		$consumed_by_pass1 = new \SplObjectStorage();
+		$total             = 0;
+
+		foreach ( $doc->getElementsByTagName( 'p' ) as $p ) {
+			if ( ! $p instanceof DOMElement ) {
+				continue;
+			}
+			if ( 0 === $p->getElementsByTagName( 'br' )->length ) {
+				continue;
+			}
+			$fragments    = self::split_paragraph_on_br( $p );
+			$bullet_count = 0;
+			foreach ( $fragments as $frag ) {
+				if ( null !== $this->detect_marker_in_fragment( $frag ) ) {
+					++$bullet_count;
+				}
+			}
+			if ( $bullet_count >= $this->threshold ) {
+				$total += $bullet_count;
+				$consumed_by_pass1->attach( $p );
+			}
+		}
+
+		// Pass 2 — comptage des runs document-level >= seuil, en sautant les
+		// <p> consommes par Pass 1 (ils n'existeraient plus a ce stade).
+		$run_len = 0;
+		$run_tag = null;
+		foreach ( $wrapper->childNodes as $child ) {
+			// Whitespace text-nodes et commentaires : transparents, n'interrompent pas un run.
+			if ( $child instanceof DOMText && '' === trim( str_replace( "\xc2\xa0", ' ', (string) $child->data ) ) ) {
+				continue;
+			}
+			if ( XML_COMMENT_NODE === $child->nodeType ) {
+				continue;
+			}
+			if ( $child instanceof DOMElement && 'p' === strtolower( $child->nodeName ) && ! $consumed_by_pass1->contains( $child ) ) {
+				$marker = $this->detect_marker_in_node( $child );
+				if ( null !== $marker ) {
+					if ( null === $run_tag || $marker['list_tag'] === $run_tag ) {
+						$run_tag = $marker['list_tag'];
+						++$run_len;
+						continue;
+					}
+					// Tag different -> flush.
+					if ( $run_len >= $this->threshold ) {
+						$total += $run_len;
+					}
+					$run_tag = $marker['list_tag'];
+					$run_len = 1;
+					continue;
+				}
+			}
+			// Element non-bullet ou <p> consomme par Pass 1 -> flush.
+			if ( $run_len >= $this->threshold ) {
+				$total += $run_len;
+			}
+			$run_len = 0;
+			$run_tag = null;
+		}
+		if ( $run_len >= $this->threshold ) {
+			$total += $run_len;
+		}
+
+		return $total;
+	}
+
+	/**
 	 * Pass 1 : traite chaque <p> contenant des <br /> et possedant assez de
 	 * fragments marker-prefixed pour declencher la conversion.
 	 *
@@ -186,7 +302,7 @@ final class AsciiListRule implements RuleInterface {
 	 * @return void
 	 */
 	private function process_intra_paragraphs( DOMDocument $doc, DOMNode $wrapper ): void {
-		$paragraphs = [];
+		$paragraphs = array();
 		foreach ( $doc->getElementsByTagName( 'p' ) as $p ) {
 			$paragraphs[] = $p;
 		}
@@ -234,12 +350,12 @@ final class AsciiListRule implements RuleInterface {
 	 */
 	private function process_document_level( DOMDocument $doc, DOMNode $wrapper ): void {
 		// Snapshot des enfants directs du wrapper (ils peuvent inclure des <p> et autres).
-		$children = [];
+		$children = array();
 		foreach ( $wrapper->childNodes as $child ) {
 			$children[] = $child;
 		}
 
-		$run         = []; // Liste de <p> en cours de regroupement.
+		$run         = array(); // Liste de <p> en cours de regroupement.
 		$run_tag     = null;
 		$next_anchor = null;
 
@@ -257,7 +373,7 @@ final class AsciiListRule implements RuleInterface {
 				}
 				unset( $run_typed );
 			}
-			$run         = [];
+			$run         = array();
 			$run_tag     = null;
 			$next_anchor = null;
 		};
@@ -298,7 +414,7 @@ final class AsciiListRule implements RuleInterface {
 	}
 
 	// ===================================================================
-	//  Detection des marqueurs
+	// Detection des marqueurs
 	// ===================================================================
 
 	/**
@@ -344,11 +460,11 @@ final class AsciiListRule implements RuleInterface {
 		foreach ( $this->enabled_markers as $key => $_ ) {
 			$def = self::MARKER_DEFINITIONS[ $key ];
 			if ( preg_match( $def['regex'], $ltrimmed, $matches ) ) {
-				return [
+				return array(
 					'marker_key'   => $key,
 					'marker_match' => $matches[0],
 					'list_tag'     => $def['list_tag'],
-				];
+				);
 			}
 		}
 
@@ -356,11 +472,11 @@ final class AsciiListRule implements RuleInterface {
 		foreach ( $this->custom_markers as $custom ) {
 			$pattern = '/^' . preg_quote( $custom, '/' ) . '[\s\xc2\xa0]+/';
 			if ( preg_match( $pattern, $ltrimmed, $matches ) ) {
-				return [
+				return array(
 					'marker_key'   => 'custom',
 					'marker_match' => $matches[0],
 					'list_tag'     => 'ul',
-				];
+				);
 			}
 		}
 
@@ -393,7 +509,7 @@ final class AsciiListRule implements RuleInterface {
 	}
 
 	// ===================================================================
-	//  Split <p> sur <br />
+	// Split <p> sur <br />
 	// ===================================================================
 
 	/**
@@ -403,12 +519,12 @@ final class AsciiListRule implements RuleInterface {
 	 * @return list<list<DOMNode>> Liste de fragments (chaque fragment = liste de noeuds).
 	 */
 	private static function split_paragraph_on_br( DOMElement $p ): array {
-		$fragments = [];
-		$current   = [];
+		$fragments = array();
+		$current   = array();
 		foreach ( $p->childNodes as $child ) {
 			if ( $child instanceof DOMElement && 'br' === strtolower( $child->nodeName ) ) {
 				$fragments[] = $current;
-				$current     = [];
+				$current     = array();
 				continue;
 			}
 			$current[] = $child;
@@ -418,26 +534,26 @@ final class AsciiListRule implements RuleInterface {
 	}
 
 	// ===================================================================
-	//  Construction des remplacements
+	// Construction des remplacements
 	// ===================================================================
 
 	/**
 	 * Construit la sequence de noeuds de remplacement pour un <p> mixte.
 	 *
-	 * @param DOMDocument           $doc       Document parent.
-	 * @param list<list<DOMNode>>   $fragments Fragments du <p> original.
+	 * @param DOMDocument         $doc       Document parent.
+	 * @param list<list<DOMNode>> $fragments Fragments du <p> original.
 	 * @return list<DOMNode> Sequence de noeuds (p, ul, ol) a inserer.
 	 */
 	private function build_intra_replacement( DOMDocument $doc, array $fragments ): array {
-		$result   = [];
-		$buffer   = []; // Bullets en attente de regroupement.
+		$result   = array();
+		$buffer   = array(); // Bullets en attente de regroupement.
 		$buf_tag  = null;
 
 		$flush_buffer = function () use ( &$result, &$buffer, &$buf_tag, $doc ): void {
-			if ( [] !== $buffer && null !== $buf_tag ) {
+			if ( array() !== $buffer && null !== $buf_tag ) {
 				$result[] = $this->build_list_from_items( $doc, $buffer, $buf_tag );
 			}
-			$buffer  = [];
+			$buffer  = array();
 			$buf_tag = null;
 		};
 
@@ -460,7 +576,10 @@ final class AsciiListRule implements RuleInterface {
 				$flush_buffer();
 			}
 			$buf_tag  = $marker['list_tag'];
-			$buffer[] = [ 'fragment' => $frag, 'marker' => $marker ];
+			$buffer[] = array(
+				'fragment' => $frag,
+				'marker' => $marker,
+			);
 		}
 		$flush_buffer();
 
@@ -480,7 +599,7 @@ final class AsciiListRule implements RuleInterface {
 			}
 			// Element sans texte mais structurel ?
 			if ( $node instanceof DOMElement ) {
-				$structural = [ 'img', 'iframe', 'video', 'audio', 'embed', 'object', 'picture', 'source', 'br' ];
+				$structural = array( 'img', 'iframe', 'video', 'audio', 'embed', 'object', 'picture', 'source', 'br' );
 				if ( in_array( strtolower( $node->nodeName ), $structural, true ) ) {
 					return false;
 				}
@@ -492,9 +611,9 @@ final class AsciiListRule implements RuleInterface {
 	/**
 	 * Construit un <ul>/<ol> a partir d'une liste de fragments bullets.
 	 *
-	 * @param DOMDocument                                                                $doc   Document.
+	 * @param DOMDocument                                                                                                     $doc   Document.
 	 * @param list<array{fragment: list<DOMNode>, marker: array{list_tag: string, marker_match: string, marker_key: string}}> $items Items.
-	 * @param string                                                                     $tag   'ul' ou 'ol'.
+	 * @param string                                                                                                          $tag   'ul' ou 'ol'.
 	 * @return DOMElement
 	 */
 	private function build_list_from_items( DOMDocument $doc, array $items, string $tag ): DOMElement {
@@ -509,9 +628,9 @@ final class AsciiListRule implements RuleInterface {
 	/**
 	 * Construit un <ul>/<ol> a partir de <p> consecutifs marker-prefixed.
 	 *
-	 * @param DOMDocument       $doc        Document.
-	 * @param list<DOMElement>  $paragraphs <p> du run.
-	 * @param string            $tag        'ul' ou 'ol'.
+	 * @param DOMDocument      $doc        Document.
+	 * @param list<DOMElement> $paragraphs <p> du run.
+	 * @param string           $tag        'ul' ou 'ol'.
 	 * @return DOMElement
 	 */
 	private function build_list_from_paragraphs( DOMDocument $doc, array $paragraphs, string $tag ): DOMElement {
@@ -520,7 +639,7 @@ final class AsciiListRule implements RuleInterface {
 			$marker = $this->detect_marker_in_node( $p );
 			$marker_match = ( null !== $marker ) ? $marker['marker_match'] : '';
 			// Convertir tous les enfants du <p> en fragment.
-			$fragment = [];
+			$fragment = array();
 			foreach ( $p->childNodes as $child ) {
 				$fragment[] = $child;
 			}
@@ -594,7 +713,7 @@ final class AsciiListRule implements RuleInterface {
 		$tag = strtolower( $node->nodeName );
 
 		// Cloner les enfants recursivement.
-		$child_clones = [];
+		$child_clones = array();
 		foreach ( $node->childNodes as $child ) {
 			$cc = $this->clone_with_cleanup( $child, $doc );
 			if ( null !== $cc ) {

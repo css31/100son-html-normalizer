@@ -54,7 +54,7 @@ final class PinterestArtifactsRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === trim( $html ) ) {
 			return $html;
 		}
@@ -66,7 +66,7 @@ final class PinterestArtifactsRule implements RuleInterface {
 		}
 
 		// Collecter avant suppression — modifier en cours d'itération sur DOMNodeList est risqué.
-		$candidates = [];
+		$candidates = array();
 		foreach ( $doc->getElementsByTagName( 'span' ) as $span ) {
 			$candidates[] = $span;
 		}
@@ -81,6 +81,27 @@ final class PinterestArtifactsRule implements RuleInterface {
 		}
 
 		return DomHtml::serialize_fragment( $doc );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === trim( $html ) ) {
+			return 0;
+		}
+		$doc     = DomHtml::parse_fragment( $html );
+		$wrapper = DomHtml::get_root_wrapper( $doc );
+		if ( null === $wrapper ) {
+			return 0;
+		}
+		$count = 0;
+		foreach ( $doc->getElementsByTagName( 'span' ) as $span ) {
+			if ( $span instanceof DOMElement && self::is_pinterest_artifact( $span ) ) {
+				++$count;
+			}
+		}
+		return $count;
 	}
 
 	/**

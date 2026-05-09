@@ -62,7 +62,7 @@ final class ExcessiveBrRule implements RuleInterface {
 	 * @param array<string, mixed> $context Contexte d'appel.
 	 * @return string
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === $html ) {
 			return $html;
 		}
@@ -70,6 +70,21 @@ final class ExcessiveBrRule implements RuleInterface {
 		$pattern = '#(?:<br\b[^>]*>\s*)' . '{' . $this->threshold . ',}#i';
 		$result  = preg_replace( $pattern, '</p><p>', $html );
 		return $result ?? $html;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Compte le nombre de SEQUENCES de >= seuil <br> consecutifs (= nombre de
+	 * remplacements que ferait apply()), pas le nombre brut de <br>.
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === $html ) {
+			return 0;
+		}
+		$pattern = '#(?:<br\b[^>]*>\s*)' . '{' . $this->threshold . ',}#i';
+		$count   = preg_match_all( $pattern, $html );
+		return false === $count ? 0 : $count;
 	}
 
 	/**

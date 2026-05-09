@@ -33,9 +33,9 @@ class SettingsRepository {
 	 */
 	public function get_f8_post_types_selection(): array {
 		$settings  = $this->get_settings();
-		$selection = $settings['f8_post_types_selection'] ?? [ 'post' ];
+		$selection = $settings['f8_post_types_selection'] ?? array( 'post' );
 		if ( ! is_array( $selection ) ) {
-			return [ 'post' ];
+			return array( 'post' );
 		}
 		return array_values(
 			array_filter(
@@ -52,7 +52,7 @@ class SettingsRepository {
 	 * @return void
 	 */
 	public function set_f8_post_types_selection( array $slugs ): void {
-		$valid_slugs   = array_keys( get_post_types( [ 'public' => true ] ) );
+		$valid_slugs   = array_keys( get_post_types( array( 'public' => true ) ) );
 		$filtered      = array_values( array_intersect( $slugs, $valid_slugs ) );
 		$settings      = $this->get_settings();
 		$settings['f8_post_types_selection'] = $filtered;
@@ -67,7 +67,7 @@ class SettingsRepository {
 	public function get_f8_per_page(): int {
 		$settings = $this->get_settings();
 		$value    = (int) ( $settings['f8_per_page'] ?? 25 );
-		$allowed  = [ 10, 25, 50, 100, 200 ];
+		$allowed  = array( 10, 25, 50, 100, 200 );
 		return in_array( $value, $allowed, true ) ? $value : 25;
 	}
 
@@ -78,7 +78,7 @@ class SettingsRepository {
 	 * @return void
 	 */
 	public function set_f8_per_page( int $per_page ): void {
-		$allowed                  = [ 10, 25, 50, 100, 200 ];
+		$allowed                  = array( 10, 25, 50, 100, 200 );
 		$valid                    = in_array( $per_page, $allowed, true ) ? $per_page : 25;
 		$settings                 = $this->get_settings();
 		$settings['f8_per_page']  = $valid;
@@ -91,8 +91,8 @@ class SettingsRepository {
 	 * @return array<string, mixed>
 	 */
 	public function get_settings(): array {
-		$settings = get_option( self::OPT_SETTINGS, [] );
-		return is_array( $settings ) ? $settings : [];
+		$settings = get_option( self::OPT_SETTINGS, array() );
+		return is_array( $settings ) ? $settings : array();
 	}
 
 	/**
@@ -103,8 +103,8 @@ class SettingsRepository {
 	 */
 	public function get_preset_config( string $preset_id ): array {
 		$presets = $this->get_all_presets();
-		$config  = $presets[ $preset_id ] ?? [];
-		return is_array( $config ) ? $config : [];
+		$config  = $presets[ $preset_id ] ?? array();
+		return is_array( $config ) ? $config : array();
 	}
 
 	/**
@@ -137,11 +137,76 @@ class SettingsRepository {
 	 * @return array<string, array<string, mixed>>
 	 */
 	public function get_all_presets(): array {
-		$presets = get_option( self::OPT_PRESETS, [] );
+		$presets = get_option( self::OPT_PRESETS, array() );
 		if ( ! is_array( $presets ) ) {
-			return [];
+			return array();
 		}
 		/** @var array<string, array<string, mixed>> $presets */
 		return $presets;
+	}
+
+	/**
+	 * Seuils de régression γ utilisés par F15 (RegressionDetector). Source de
+	 * vérité : cahier v2.0 §14 hyp. 24 (defaults) et §3.1 F15 (sémantique).
+	 *
+	 * Les 7 clés correspondent aux 7 métriques structurelles (cf. §3.1 F15) ;
+	 * leur unité dépend de la métrique :
+	 *  - `text_loss_pct`, `words_loss_pct`, `paragraphs_loss_pct` : pourcentage
+	 *    de perte tolérée (entier ou flottant >= 0).
+	 *  - `images_loss`, `headings_loss`, `links_loss`, `lists_loss` : nombre
+	 *    absolu d'éléments perdus toléré (entier >= 0). `headings_loss`
+	 *    s'applique à chaque niveau h1..h6 indépendamment.
+	 *
+	 * Le dépassement (perte > seuil) déclenche la modale "Régression détectée"
+	 * de F15. Les valeurs sont overridables dans `son100_htmln_settings`
+	 * via la clé `regression_thresholds` (UI Réglages, cf. F15 §4.2).
+	 */
+	public const REGRESSION_THRESHOLD_DEFAULTS = array(
+		'text_loss_pct'       => 0,
+		'words_loss_pct'      => 0,
+		'paragraphs_loss_pct' => 5,
+		'headings_loss'       => 0,
+		'images_loss'         => 0,
+		'links_loss'          => 0,
+		'lists_loss'          => 0,
+	);
+
+	/**
+	 * Récupère les 7 seuils γ de régression structurelle (F15).
+	 *
+	 * Lecture du sous-tableau `regression_thresholds` dans
+	 * `son100_htmln_settings`, fusionne avec les defaults pour garantir que
+	 * les 7 clés sont toujours présentes et correctement typées (int ≥ 0).
+	 *
+	 * @return array{
+	 *   text_loss_pct: int,
+	 *   words_loss_pct: int,
+	 *   paragraphs_loss_pct: int,
+	 *   headings_loss: int,
+	 *   images_loss: int,
+	 *   links_loss: int,
+	 *   lists_loss: int,
+	 * }
+	 */
+	public function getRegressionThresholds(): array {
+		$settings = $this->get_settings();
+		$raw      = $settings['regression_thresholds'] ?? array();
+		if ( ! is_array( $raw ) ) {
+			$raw = array();
+		}
+		$result = array();
+		foreach ( self::REGRESSION_THRESHOLD_DEFAULTS as $key => $default ) {
+			$value = $raw[ $key ] ?? $default;
+			if ( ! is_numeric( $value ) ) {
+				$value = $default;
+			}
+			$value = (int) $value;
+			if ( $value < 0 ) {
+				$value = $default;
+			}
+			$result[ $key ] = $value;
+		}
+		/** @var array{text_loss_pct:int,words_loss_pct:int,paragraphs_loss_pct:int,headings_loss:int,images_loss:int,links_loss:int,lists_loss:int} $result */
+		return $result;
 	}
 }

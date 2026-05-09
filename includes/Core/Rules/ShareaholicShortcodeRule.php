@@ -52,11 +52,22 @@ final class ShareaholicShortcodeRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === $html ) {
 			return $html;
 		}
 		$result = preg_replace( self::PATTERN_SELF_CLOSED, '', $html );
 		return $result ?? $html;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === $html ) {
+			return 0;
+		}
+		$count = preg_match_all( self::PATTERN_SELF_CLOSED, $html );
+		return false === $count ? 0 : $count;
 	}
 }

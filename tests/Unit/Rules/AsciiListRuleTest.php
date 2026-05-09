@@ -73,7 +73,13 @@ final class AsciiListRuleTest extends TestCase {
 
 	public function test_threshold_3_requires_three_consecutive(): void {
 		$rule = new AsciiListRule(
-			[ 'dash' => true, 'emdash' => true, 'asterix' => true, 'bullet' => true, 'numeric' => true ],
+			array(
+				'dash' => true,
+				'emdash' => true,
+				'asterix' => true,
+				'bullet' => true,
+				'numeric' => true,
+			),
 			3
 		);
 		// 2 consecutifs + seuil 3 -> pas de conversion.
@@ -169,9 +175,15 @@ final class AsciiListRuleTest extends TestCase {
 
 	public function test_custom_marker_with_threshold(): void {
 		$rule = new AsciiListRule(
-			[ 'dash' => true, 'emdash' => true, 'asterix' => true, 'bullet' => true, 'numeric' => true ],
+			array(
+				'dash' => true,
+				'emdash' => true,
+				'asterix' => true,
+				'bullet' => true,
+				'numeric' => true,
+			),
 			2,
-			[ '▸' ]
+			array( '▸' )
 		);
 		$this->assertHtmlEquals(
 			'<ul><li>Custom 1</li><li>Custom 2</li></ul>',
@@ -184,7 +196,13 @@ final class AsciiListRuleTest extends TestCase {
 	public function test_disabled_marker_is_not_converted(): void {
 		// Numeric desactive -> les <p> 1./2./3. ne sont pas transformes.
 		$rule  = new AsciiListRule(
-			[ 'dash' => true, 'emdash' => true, 'asterix' => true, 'bullet' => true, 'numeric' => false ]
+			array(
+				'dash' => true,
+				'emdash' => true,
+				'asterix' => true,
+				'bullet' => true,
+				'numeric' => false,
+			)
 		);
 		$input = '<p>1. A</p><p>2. B</p>';
 		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
@@ -210,5 +228,65 @@ final class AsciiListRuleTest extends TestCase {
 		$input    = (string) file_get_contents( __DIR__ . '/../../fixtures/html/ascii-list-input.html' );
 		$expected = (string) file_get_contents( __DIR__ . '/../../fixtures/html/ascii-list-expected.html' );
 		$this->assertHtmlEquals( $expected, $rule->apply( $input ) );
+	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$rule = new AsciiListRule();
+		$this->assertSame( 0, $rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_zero_below_threshold_document_level(): void {
+		// 1 seul <p> marker-prefixed -> run_len = 1 < 2 -> 0.
+		$rule = new AsciiListRule();
+		$this->assertSame( 0, $rule->countMatches( '<p>- item</p><p>texte normal</p>' ) );
+	}
+
+	public function test_count_matches_counts_document_level_run(): void {
+		// 3 <p> consecutifs avec dash -> run de 3 >= seuil -> 3.
+		$rule = new AsciiListRule();
+		$html = '<p>- a</p><p>- b</p><p>- c</p>';
+		$this->assertSame( 3, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_counts_intra_paragraph_fragments(): void {
+		// 1 <p> avec 3 fragments dash -> 3.
+		$rule = new AsciiListRule();
+		$html = '<p>- a<br/>- b<br/>- c</p>';
+		$this->assertSame( 3, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_sums_both_passes(): void {
+		// Pass 1 : 1er <p> avec 2 fragments dash -> 2.
+		// Pass 2 : 2 <p> consecutifs dash apres -> run de 2 -> 2.
+		$rule = new AsciiListRule();
+		$html = '<p>- a<br/>- b</p><p>- c</p><p>- d</p>';
+		$this->assertSame( 4, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_below_threshold_in_one_marker_type(): void {
+		// dash run de 2 (compte) + numeric run de 1 (ne compte pas).
+		$rule = new AsciiListRule(
+			array(
+				'dash' => true,
+				'numeric' => true,
+				'emdash' => true,
+				'asterix' => true,
+				'bullet' => true,
+			),
+			2
+		);
+		$html = '<p>- a</p><p>- b</p><p>1. only one</p>';
+		$this->assertSame( 2, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$rule  = new AsciiListRule();
+		$html  = '<p>- a</p><p>- b</p><p>- c</p>';
+		$after = $rule->apply( $html );
+		$this->assertSame( 0, $rule->countMatches( $after ) );
 	}
 }

@@ -126,4 +126,43 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 			$rule->apply( '<p style="text-align: center; color: red;">x</p>' )
 		);
 	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$rule = new RemoveInlineStylesRule();
+		$this->assertSame( 0, $rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_keep_text_align_skips_pure_text_align(): void {
+		// keep_text_align = true : un style="text-align:..." pur reste tel quel,
+		// donc apply() ne le modifierait pas → pas compte.
+		$rule = new RemoveInlineStylesRule( true );
+		$this->assertSame( 0, $rule->countMatches( '<p style="text-align: center;">x</p>' ) );
+	}
+
+	public function test_count_matches_keep_text_align_counts_when_other_declarations(): void {
+		// 2 elements avec declarations autres que text-align => 2.
+		$rule = new RemoveInlineStylesRule( true );
+		$html = '<p style="color: red;">a</p>'
+			. '<span style="text-align:left; font-size: 12px;">b</span>'
+			. '<p style="text-align: center;">c</p>';
+		$this->assertSame( 2, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_strict_mode_counts_all_styled(): void {
+		// keep_text_align = false : strip total, tout @style compte.
+		$rule = new RemoveInlineStylesRule( false );
+		$html = '<p style="text-align: center;">a</p><p style="color: red;">b</p>';
+		$this->assertSame( 2, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$rule  = new RemoveInlineStylesRule( true );
+		$html  = '<p style="color: red; text-align: center;">x</p><span style="font-size:12px">y</span>';
+		$after = $rule->apply( $html );
+		$this->assertSame( 0, $rule->countMatches( $after ) );
+	}
 }

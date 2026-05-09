@@ -78,4 +78,32 @@ final class EmptyParagraphsRuleTest extends TestCase {
 		$html = '<h2>Titre</h2><div>Contenu</div>';
 		$this->assertHtmlEquals( $html, $this->rule->apply( $html ) );
 	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_zero_when_no_empty_paragraph(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '<p>texte</p><h2>Titre</h2>' ) );
+	}
+
+	public function test_count_matches_returns_count_of_removable_paragraphs(): void {
+		$html = '<p></p><p>ok</p><p>&nbsp;</p><p><strong></strong></p>';
+		$this->assertSame( 3, $this->rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_does_not_count_paragraph_with_image(): void {
+		$html = '<p><img src="x.jpg" alt="x"/></p><p></p>';
+		$this->assertSame( 1, $this->rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$html  = '<p></p><p>ok</p><p>&nbsp;</p>';
+		$after = $this->rule->apply( $html );
+		$this->assertSame( 0, $this->rule->countMatches( $after ) );
+	}
 }

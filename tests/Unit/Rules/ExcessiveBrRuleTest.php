@@ -105,4 +105,41 @@ final class ExcessiveBrRuleTest extends TestCase {
 		$input = '<p>Pas de br ici.</p><h2>Titre</h2>';
 		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
 	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$rule = new ExcessiveBrRule();
+		$this->assertSame( 0, $rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_counts_each_sequence_not_each_br(): void {
+		// Une sequence de 4 br + une sequence de 2 br = 2 sequences (PAS 6).
+		$rule = new ExcessiveBrRule( 2 );
+		$html = '<p>a<br/><br/><br/><br/>b<br/><br/>c</p>';
+		$this->assertSame( 2, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_zero_when_below_threshold(): void {
+		// Avec seuil = 3, 2 br consecutifs ne declenchent rien.
+		$rule = new ExcessiveBrRule( 3 );
+		$html = '<p>a<br/><br/>b</p>';
+		$this->assertSame( 0, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_respects_threshold(): void {
+		// Avec seuil = 3, sequence de 3 br = 1, sequence de 5 br = 1.
+		$rule = new ExcessiveBrRule( 3 );
+		$html = '<p>a<br/><br/><br/>b<br/><br/><br/><br/><br/>c</p>';
+		$this->assertSame( 2, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$rule  = new ExcessiveBrRule( 2 );
+		$html  = '<p>a<br/><br/><br/>b<br/><br/>c</p>';
+		$after = $rule->apply( $html );
+		$this->assertSame( 0, $rule->countMatches( $after ) );
+	}
 }

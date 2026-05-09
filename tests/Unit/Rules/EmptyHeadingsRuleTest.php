@@ -39,14 +39,14 @@ final class EmptyHeadingsRuleTest extends TestCase {
 	 * @return array<string, array{0:string}>
 	 */
 	public static function provide_levels(): array {
-		return [
-			'h1' => [ 'h1' ],
-			'h2' => [ 'h2' ],
-			'h3' => [ 'h3' ],
-			'h4' => [ 'h4' ],
-			'h5' => [ 'h5' ],
-			'h6' => [ 'h6' ],
-		];
+		return array(
+			'h1' => array( 'h1' ),
+			'h2' => array( 'h2' ),
+			'h3' => array( 'h3' ),
+			'h4' => array( 'h4' ),
+			'h5' => array( 'h5' ),
+			'h6' => array( 'h6' ),
+		);
 	}
 
 	public function test_heading_with_nbsp_only_is_removed(): void {
@@ -84,5 +84,29 @@ final class EmptyHeadingsRuleTest extends TestCase {
 
 	public function test_empty_input_returns_empty(): void {
 		$this->assertSame( '', $this->rule->apply( '' ) );
+	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_zero_when_no_empty_heading(): void {
+		$this->assertSame( 0, $this->rule->countMatches( '<h2>Titre</h2><p>texte</p>' ) );
+	}
+
+	public function test_count_matches_counts_each_empty_heading_level(): void {
+		// h1, h3, h4, h6 vides ; h2 et h5 non-vides.
+		$html = '<h1></h1><h2>ok</h2><h3>&nbsp;</h3><h4></h4><h5>x</h5><h6>   </h6>';
+		$this->assertSame( 4, $this->rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$html  = '<h1></h1><h2>ok</h2><h3>&nbsp;</h3>';
+		$after = $this->rule->apply( $html );
+		$this->assertSame( 0, $this->rule->countMatches( $after ) );
 	}
 }

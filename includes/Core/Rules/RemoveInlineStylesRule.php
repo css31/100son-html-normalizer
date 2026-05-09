@@ -63,7 +63,7 @@ final class RemoveInlineStylesRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === trim( $html ) ) {
 			return $html;
 		}
@@ -76,7 +76,7 @@ final class RemoveInlineStylesRule implements RuleInterface {
 
 		$xpath    = new DOMXPath( $doc );
 		$styled   = $xpath->query( './/*[@style]', $wrapper );
-		$elements = [];
+		$elements = array();
 		if ( $styled !== false ) {
 			foreach ( $styled as $node ) {
 				if ( $node instanceof DOMElement ) {
@@ -102,13 +102,80 @@ final class RemoveInlineStylesRule implements RuleInterface {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 *
+	 * Compte les elements dont l'attribut style serait modifie ou supprime :
+	 *  - keep_text_align=false : tous les elements avec un attribut style.
+	 *  - keep_text_align=true  : seulement ceux dont au moins une declaration
+	 *    n'est pas text-align (les style="text-align: …" purs sont preserves
+	 *    a l'identique par apply() et ne sont donc PAS comptes).
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === trim( $html ) ) {
+			return 0;
+		}
+		$doc     = DomHtml::parse_fragment( $html );
+		$wrapper = DomHtml::get_root_wrapper( $doc );
+		if ( null === $wrapper ) {
+			return 0;
+		}
+		$xpath   = new DOMXPath( $doc );
+		$styled  = $xpath->query( './/*[@style]', $wrapper );
+		if ( false === $styled ) {
+			return 0;
+		}
+		if ( ! $this->keep_text_align ) {
+			return $styled->length;
+		}
+		$count = 0;
+		foreach ( $styled as $node ) {
+			if ( ! $node instanceof DOMElement ) {
+				continue;
+			}
+			if ( self::has_non_text_align_declaration( (string) $node->getAttribute( 'style' ) ) ) {
+				++$count;
+			}
+		}
+		return $count;
+	}
+
+	/**
+	 * Indique si un attribut style contient au moins une declaration autre
+	 * que text-align (donc serait modifie par apply() en mode keep_text_align).
+	 *
+	 * @param string $style Valeur brute de l'attribut style.
+	 * @return bool
+	 */
+	private static function has_non_text_align_declaration( string $style ): bool {
+		foreach ( explode( ';', $style ) as $declaration ) {
+			$declaration = trim( $declaration );
+			if ( '' === $declaration ) {
+				continue;
+			}
+			$pos = strpos( $declaration, ':' );
+			if ( false === $pos ) {
+				continue;
+			}
+			$property = strtolower( trim( substr( $declaration, 0, $pos ) ) );
+			$value    = trim( substr( $declaration, $pos + 1 ) );
+			if ( '' === $value ) {
+				continue;
+			}
+			if ( 'text-align' !== $property ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Filtre une chaine `style="..."` pour ne garder que la declaration text-align.
 	 *
 	 * @param string $style Valeur brute de l'attribut style.
 	 * @return string Style filtre, ou chaine vide si aucun text-align trouve.
 	 */
 	private static function keep_only_text_align( string $style ): string {
-		$kept = [];
+		$kept = array();
 		foreach ( explode( ';', $style ) as $declaration ) {
 			$declaration = trim( $declaration );
 			if ( '' === $declaration ) {

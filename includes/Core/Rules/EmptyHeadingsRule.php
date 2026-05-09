@@ -29,7 +29,7 @@ final class EmptyHeadingsRule implements RuleInterface {
 	 *
 	 * @var list<string>
 	 */
-	private const HEADING_TAGS = [ 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ];
+	private const HEADING_TAGS = array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' );
 
 	/**
 	 * {@inheritDoc}
@@ -48,7 +48,7 @@ final class EmptyHeadingsRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === trim( $html ) ) {
 			return $html;
 		}
@@ -59,7 +59,7 @@ final class EmptyHeadingsRule implements RuleInterface {
 			return $html;
 		}
 
-		$headings = [];
+		$headings = array();
 		foreach ( self::HEADING_TAGS as $tag ) {
 			foreach ( $doc->getElementsByTagName( $tag ) as $heading ) {
 				$headings[] = $heading;
@@ -79,6 +79,29 @@ final class EmptyHeadingsRule implements RuleInterface {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === trim( $html ) ) {
+			return 0;
+		}
+		$doc     = DomHtml::parse_fragment( $html );
+		$wrapper = DomHtml::get_root_wrapper( $doc );
+		if ( null === $wrapper ) {
+			return 0;
+		}
+		$count = 0;
+		foreach ( self::HEADING_TAGS as $tag ) {
+			foreach ( $doc->getElementsByTagName( $tag ) as $heading ) {
+				if ( $heading instanceof DOMElement && self::is_empty_heading( $heading ) ) {
+					++$count;
+				}
+			}
+		}
+		return $count;
+	}
+
+	/**
 	 * Indique si un heading est vide ou ne contient que du blanc / inline vides.
 	 *
 	 * Considère comme vide un heading dont le texte effectif (textContent
@@ -89,7 +112,7 @@ final class EmptyHeadingsRule implements RuleInterface {
 	 * @return bool
 	 */
 	private static function is_empty_heading( DOMElement $heading ): bool {
-		static $structural = [ 'img', 'iframe', 'video', 'audio', 'embed', 'object', 'picture', 'source' ];
+		static $structural = array( 'img', 'iframe', 'video', 'audio', 'embed', 'object', 'picture', 'source' );
 		foreach ( $heading->getElementsByTagName( '*' ) as $descendant ) {
 			if ( in_array( strtolower( $descendant->nodeName ), $structural, true ) ) {
 				return false;

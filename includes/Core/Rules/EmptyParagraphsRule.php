@@ -40,7 +40,7 @@ final class EmptyParagraphsRule implements RuleInterface {
 	/**
 	 * {@inheritDoc}
 	 */
-	public function apply( string $html, array $context = [] ): string {
+	public function apply( string $html, array $context = array() ): string {
 		if ( '' === trim( $html ) ) {
 			return $html;
 		}
@@ -52,7 +52,7 @@ final class EmptyParagraphsRule implements RuleInterface {
 		}
 
 		// Collecter avant suppression — modifier en cours d'itération sur DOMNodeList est risqué.
-		$paragraphs = [];
+		$paragraphs = array();
 		foreach ( $doc->getElementsByTagName( 'p' ) as $p ) {
 			$paragraphs[] = $p;
 		}
@@ -70,6 +70,27 @@ final class EmptyParagraphsRule implements RuleInterface {
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	public function countMatches( string $html, array $context = array() ): int {
+		if ( '' === trim( $html ) ) {
+			return 0;
+		}
+		$doc     = DomHtml::parse_fragment( $html );
+		$wrapper = DomHtml::get_root_wrapper( $doc );
+		if ( null === $wrapper ) {
+			return 0;
+		}
+		$count = 0;
+		foreach ( $doc->getElementsByTagName( 'p' ) as $p ) {
+			if ( $p instanceof DOMElement && self::is_empty_paragraph( $p ) ) {
+				++$count;
+			}
+		}
+		return $count;
+	}
+
+	/**
 	 * Indique si un `<p>` est vide ou ne contient que du blanc.
 	 *
 	 * Considère comme vide un `<p>` dont le texte effectif (text content) est
@@ -82,9 +103,18 @@ final class EmptyParagraphsRule implements RuleInterface {
 	 */
 	private static function is_empty_paragraph( DOMElement $p ): bool {
 		// 1. Si le <p> contient un élément non-textuel structurel, il n'est pas "vide".
-		static $structural = [
-			'img', 'hr', 'br', 'iframe', 'video', 'audio', 'embed', 'object', 'picture', 'source',
-		];
+		static $structural = array(
+			'img',
+			'hr',
+			'br',
+			'iframe',
+			'video',
+			'audio',
+			'embed',
+			'object',
+			'picture',
+			'source',
+		);
 		foreach ( $p->getElementsByTagName( '*' ) as $descendant ) {
 			if ( in_array( strtolower( $descendant->nodeName ), $structural, true ) ) {
 				return false;

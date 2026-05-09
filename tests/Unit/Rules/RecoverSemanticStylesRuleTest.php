@@ -196,4 +196,49 @@ final class RecoverSemanticStylesRuleTest extends TestCase {
 		$input = '<p style="font: bold 11px Arial;">x</p>';
 		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
 	}
+
+	// =========================================================================
+	// countMatches() — Phase 1 V1.0
+	// =========================================================================
+
+	public function test_count_matches_zero_on_empty(): void {
+		$rule = new RecoverSemanticStylesRule();
+		$this->assertSame( 0, $rule->countMatches( '' ) );
+	}
+
+	public function test_count_matches_counts_bold_and_italic_elements(): void {
+		// 2 elements transformes (1 bold + 1 italic), 1 ignore (couleur seule).
+		$rule = new RecoverSemanticStylesRule();
+		$html = '<p style="font-weight: bold;">a</p>'
+			. '<p style="font-style: italic;">b</p>'
+			. '<p style="color:red">c</p>';
+		$this->assertSame( 2, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_counts_one_per_element_even_if_both_mappings(): void {
+		// 1 element cumulant bold + italic = 1 element transforme = 1.
+		$rule = new RecoverSemanticStylesRule();
+		$html = '<p style="font-weight: 700; font-style: italic;">x</p>';
+		$this->assertSame( 1, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_respects_mapping_disabled(): void {
+		// map_bold = false, map_italic = true : seul l'element italic compte.
+		$rule = new RecoverSemanticStylesRule( false, true );
+		$html = '<p style="font-weight: bold;">a</p><p style="font-style: italic;">b</p>';
+		$this->assertSame( 1, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_zero_when_both_mappings_disabled(): void {
+		$rule = new RecoverSemanticStylesRule( false, false );
+		$html = '<p style="font-weight: bold; font-style: italic;">x</p>';
+		$this->assertSame( 0, $rule->countMatches( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_idempotence(): void {
+		$rule  = new RecoverSemanticStylesRule();
+		$html  = '<p style="font-weight: bold;">a</p><p style="font-style: italic;">b</p>';
+		$after = $rule->apply( $html );
+		$this->assertSame( 0, $rule->countMatches( $after ) );
+	}
 }
