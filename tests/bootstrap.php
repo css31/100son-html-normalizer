@@ -142,6 +142,34 @@ if ( ! function_exists( 'wp_get_current_user' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_is_post_revision' ) ) {
+	$GLOBALS['son100_htmln_test_is_revision'] = $GLOBALS['son100_htmln_test_is_revision'] ?? [];
+	function wp_is_post_revision( int|\WP_Post $post ): false|int {
+		$id = $post instanceof \WP_Post ? $post->ID : (int) $post;
+		return $GLOBALS['son100_htmln_test_is_revision'][ $id ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'wp_is_post_autosave' ) ) {
+	$GLOBALS['son100_htmln_test_is_autosave'] = $GLOBALS['son100_htmln_test_is_autosave'] ?? [];
+	function wp_is_post_autosave( int|\WP_Post $post ): false|int {
+		$id = $post instanceof \WP_Post ? $post->ID : (int) $post;
+		return $GLOBALS['son100_htmln_test_is_autosave'][ $id ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	$GLOBALS['son100_htmln_test_actions'] = $GLOBALS['son100_htmln_test_actions'] ?? [];
+	function add_action( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+		$GLOBALS['son100_htmln_test_actions'][ $hook ][] = array(
+			'callback'      => $callback,
+			'priority'      => $priority,
+			'accepted_args' => $accepted_args,
+		);
+		return true;
+	}
+}
+
 if ( ! function_exists( 'get_post_types' ) ) {
 	function get_post_types( array $args = [], string $output = 'names' ): array {
 		// Stub minimal : retourne par défaut post + page comme types publics.

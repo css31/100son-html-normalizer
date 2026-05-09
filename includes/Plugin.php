@@ -21,6 +21,8 @@ use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 use Cent_Son\Html_Normalizer\Api\PublicApi;
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
+use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticInvalidator;
+use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
 use Cent_Son\Html_Normalizer\Core\Logs\Logger;
 use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
 use Cent_Son\Html_Normalizer\Core\Logs\NotesRepository;
@@ -91,6 +93,11 @@ final class Plugin {
 		// API publique : branche le filtre `htmln/normalize`.
 		$public_api = new PublicApi( $normalizer );
 		$public_api->register();
+
+		// V1.0 — Invalidation diagnostic au save_post (Phase 3.4).
+		$diagnostics_repo    = new DiagnosticsRepository();
+		$diagnostic_invalida = new DiagnosticInvalidator( $diagnostics_repo, $settings );
+		$diagnostic_invalida->register();
 
 		// UI admin minimale V0.1 (PHP classique, pas SPA — phase 15 §11 ultérieure).
 		if ( is_admin() ) {

@@ -21,8 +21,12 @@ defined( 'ABSPATH' ) || exit;
  *  - Méthodes écriture renvoient `int` (rows affectées) ou `bool` (succès).
  *  - Tous les accès passent par `wpdb::prepare()` quand des valeurs externes
  *    entrent dans le SQL — pas de concaténation directe.
+ *
+ * Volontairement non-final pour permettre l'extension/stub en tests
+ * d'intégration (DiagnosticInvalidatorTest…). Même convention que
+ * `SettingsRepository` et `PresetRegistry`.
  */
-final class DiagnosticsRepository {
+class DiagnosticsRepository {
 
 	/**
 	 * Adapter `$wpdb`.
