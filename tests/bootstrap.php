@@ -142,6 +142,38 @@ if ( ! function_exists( 'wp_get_current_user' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_post_types' ) ) {
+	function get_post_types( array $args = [], string $output = 'names' ): array {
+		// Stub minimal : retourne par défaut post + page comme types publics.
+		$types = array( 'post' => 'post', 'page' => 'page' );
+		return $types;
+	}
+}
+
+if ( ! function_exists( 'get_posts' ) ) {
+	function get_posts( array $args = [] ): array {
+		// Stub : prefiltre `Son100_Htmln_Test_Posts_Registry::$posts` selon
+		// post_type et post_status, retourne soit ids soit WP_Post selon `fields`.
+		$wanted_types  = (array) ( $args['post_type'] ?? [ 'post' ] );
+		$wanted_status = (array) ( $args['post_status'] ?? [ 'publish' ] );
+		$fields        = (string) ( $args['fields'] ?? '' );
+		$matching      = array();
+		foreach ( \Son100_Htmln_Test_Posts_Registry::$posts as $post ) {
+			if ( ! in_array( $post->post_type, $wanted_types, true ) ) {
+				continue;
+			}
+			if ( ! in_array( $post->post_status, $wanted_status, true ) ) {
+				continue;
+			}
+			$matching[] = $post;
+		}
+		if ( 'ids' === $fields ) {
+			return array_map( static fn( $p ) => $p->ID, $matching );
+		}
+		return $matching;
+	}
+}
+
 if ( ! function_exists( 'wp_date' ) ) {
 	function wp_date( string $format, int $timestamp ): string {
 		return date( $format, $timestamp );
