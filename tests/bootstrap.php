@@ -172,6 +172,25 @@ if ( ! function_exists( 'add_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): string|false {
+		return json_encode( $data, $options, $depth );
+	}
+}
+
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	function wp_generate_uuid4(): string {
+		return sprintf(
+			'%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+			random_int( 0, 0xffff ), random_int( 0, 0xffff ),
+			random_int( 0, 0xffff ),
+			random_int( 0, 0x0fff ) | 0x4000,
+			random_int( 0, 0x3fff ) | 0x8000,
+			random_int( 0, 0xffff ), random_int( 0, 0xffff ), random_int( 0, 0xffff )
+		);
+	}
+}
+
 if ( ! function_exists( 'delete_option' ) ) {
 	function delete_option( string $name ): bool {
 		if ( isset( $GLOBALS['son100_htmln_options'][ $name ] ) ) {
@@ -189,24 +208,52 @@ if ( ! function_exists( 'delete_option' ) ) {
 // ===================================================================
 
 if ( ! class_exists( 'Son100_Htmln_Test_Wpdb' ) ) {
+	/**
+	 * Stub minimal de `\wpdb` pour tests unitaires.
+	 *
+	 * Strategie : journalise les appels (insert_log, update_log, query_log),
+	 * et expose 3 files (`get_row_queue`, `get_results_queue`,
+	 * `get_var_queue`) que les tests preremplissent pour simuler les
+	 * resultats des SELECT. C'est explicite et trace l'intention de chaque
+	 * test sans avoir a parser du SQL.
+	 *
+	 * `prepare()` est volontairement simpliste : suffit pour assertion sur
+	 * les SQL envoyes a `query()`/`get_row()`/`get_results()`/`get_var()`,
+	 * pas pour reproduire fidelement WordPress.
+	 */
 	final class Son100_Htmln_Test_Wpdb {
 		public string $prefix = 'wptests_';
 		public string $postmeta = 'wptests_postmeta';
 		public int $insert_id = 0;
+		/** @var int|false Valeur retournee par insert/update/query (par defaut 1 = success ; false = echec). */
+		public int|false $insert_return = 1;
+		public int|false $update_return = 1;
+		public int|false $query_return  = 1;
+
 		/** @var list<array{table: string, data: array<string, mixed>, formats: array|null}> */
 		public array $insert_log = [];
 		/** @var list<array{table: string, data: array<string, mixed>, where: array<string, mixed>}> */
 		public array $update_log = [];
 		/** @var list<string> */
 		public array $query_log = [];
-		/** @var array<string, array<int, array<string, mixed>>> Rows pour get_row/get_results, keyees par table. */
-		public array $rows = [];
+
+		// Queues stub pour les SELECT. Le test prepare la queue, le code consomme.
+		/** @var list<mixed> */
+		public array $get_row_queue = [];
+		/** @var list<mixed> */
+		public array $get_results_queue = [];
+		/** @var list<mixed> */
+		public array $get_var_queue = [];
 
 		public function get_charset_collate(): string {
 			return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci';
 		}
 
 		public function prepare( string $query, mixed ...$args ): string {
+			// Aplatissement defensif si appele avec un tableau unique (cas array_unpack).
+			if ( 1 === count( $args ) && is_array( $args[0] ) ) {
+				$args = $args[0];
+			}
 			return vsprintf( str_replace( [ '%s', '%d', '%f' ], [ "'%s'", '%d', '%F' ], $query ), $args );
 		}
 
@@ -216,34 +263,37 @@ if ( ! class_exists( 'Son100_Htmln_Test_Wpdb' ) ) {
 
 		public function query( string $sql ): int {
 			$this->query_log[] = $sql;
-			return 0;
+			return $this->query_return;
 		}
 
-		public function insert( string $table, array $data, ?array $formats = null ): int {
+		public function insert( string $table, array $data, ?array $formats = null ): int|false {
 			$this->insert_log[] = [ 'table' => $table, 'data' => $data, 'formats' => $formats ];
-			$this->insert_id    = count( $this->insert_log );
-			$this->rows[ $table ][ $this->insert_id ] = $data;
-			return 1;
+			if ( false === $this->insert_return || 0 === $this->insert_return ) {
+				return $this->insert_return;
+			}
+			++$this->insert_id;
+			return $this->insert_return;
 		}
 
-		public function update( string $table, array $data, array $where, ?array $formats = null, ?array $where_formats = null ): int {
+		public function update( string $table, array $data, array $where, ?array $formats = null, ?array $where_formats = null ): int|false {
 			$this->update_log[] = [ 'table' => $table, 'data' => $data, 'where' => $where ];
-			return 1;
+			return $this->update_return;
 		}
 
 		public function get_row( string $sql, string $output = 'OBJECT' ): mixed {
 			$this->query_log[] = $sql;
-			return null;
+			return [] === $this->get_row_queue ? null : array_shift( $this->get_row_queue );
 		}
 
 		public function get_results( string $sql, string $output = 'OBJECT' ): array {
 			$this->query_log[] = $sql;
-			return [];
+			$next = [] === $this->get_results_queue ? [] : array_shift( $this->get_results_queue );
+			return is_array( $next ) ? $next : [];
 		}
 
 		public function get_var( string $sql ): mixed {
 			$this->query_log[] = $sql;
-			return null;
+			return [] === $this->get_var_queue ? null : array_shift( $this->get_var_queue );
 		}
 	}
 }
