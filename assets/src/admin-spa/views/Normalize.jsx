@@ -34,6 +34,8 @@ import ArticlesTable from './Normalize/ArticlesTable';
 import RulesSidebar from './Normalize/RulesSidebar';
 import StepProgressBanner from './Normalize/StepProgressBanner';
 import StepResumeBanner from './Normalize/StepResumeBanner';
+import DiffModal from './Normalize/DiffModal';
+import RegressionModal from './Normalize/RegressionModal';
 import { useDiagnosticsStats } from '../hooks/useDiagnosticsStats';
 import { useDiagnosticsList } from '../hooks/useDiagnosticsList';
 import { useStepRunner } from '../hooks/useStepRunner';
@@ -94,8 +96,21 @@ export default function Normalize() {
 		regressionPending,
 		error: stepError,
 		startStep,
+		confirmDecision,
 		abandonStep,
 	} = useStepRunner( handleStepFinalized );
+
+	// Article ouvert dans DiffModal pour preview à la volée
+	// (bouton « Voir le diff » d'une ligne du tableau).
+	const [ diffPostId, setDiffPostId ] = useState( null );
+
+	const handleViewDiff = useCallback( ( postId ) => {
+		setDiffPostId( postId );
+	}, [] );
+
+	const handleCloseDiff = useCallback( () => {
+		setDiffPostId( null );
+	}, [] );
 
 	// Verrou onglet pendant un pas (cf. cahier §13 — beforeunload natif).
 	useBeforeunload( isRunning );
@@ -196,7 +211,6 @@ export default function Normalize() {
 
 					<StepProgressBanner
 						progress={ progress }
-						regressionPending={ regressionPending }
 						error={ stepError }
 						onAbandon={ abandonStep }
 					/>
@@ -214,6 +228,7 @@ export default function Normalize() {
 						onToggleArticle={ handleToggleArticle }
 						onToggleAllOnPage={ handleToggleAllOnPage }
 						disabled={ isRunning }
+						onViewDiff={ handleViewDiff }
 					/>
 				</main>
 
@@ -225,6 +240,24 @@ export default function Normalize() {
 					onApplyStep={ handleApplyStep }
 				/>
 			</div>
+
+			{ /* DiffModal — preview à la volée depuis le tableau (bouton ligne). */ }
+			{ null !== diffPostId && (
+				<DiffModal
+					postId={ diffPostId }
+					ruleIds={ selectedRules }
+					onClose={ handleCloseDiff }
+				/>
+			) }
+
+			{ /* RegressionModal — pause sur régression pendant un pas (F15). */ }
+			{ regressionPending && (
+				<RegressionModal
+					pending={ regressionPending }
+					ruleIds={ selectedRules }
+					onDecision={ confirmDecision }
+				/>
+			) }
 		</div>
 	);
 }

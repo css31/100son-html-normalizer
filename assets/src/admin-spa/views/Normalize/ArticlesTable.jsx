@@ -90,6 +90,7 @@ function StatusBadge( { item } ) {
  * @param {(id: number, checked: boolean) => void} props.onToggleArticle   Toggle d'un article.
  * @param {(checked: boolean) => void}             props.onToggleAllOnPage Toggle de tous les articles de la page.
  * @param {boolean}                                props.disabled          Désactive les checkboxes (pas en cours).
+ * @param {(id: number) => void}                   props.onViewDiff        Callback bouton « Voir le diff » par ligne.
  * @return {JSX.Element} Tableau + pagination.
  */
 export default function ArticlesTable( {
@@ -105,6 +106,7 @@ export default function ArticlesTable( {
 	onToggleArticle,
 	onToggleAllOnPage,
 	disabled,
+	onViewDiff,
 } ) {
 	const allOnPageChecked =
 		items.length > 0 &&
@@ -197,6 +199,11 @@ export default function ArticlesTable( {
 								'100son-html-normalizer'
 							) }
 						</th>
+						<th scope="col" className="manage-column">
+							<span className="screen-reader-text">
+								{ __( 'Actions', '100son-html-normalizer' ) }
+							</span>
+						</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -243,6 +250,18 @@ export default function ArticlesTable( {
 								>
 									{ String( item.diagnosed_at ?? '—' ) }
 								</time>
+							</td>
+							<td>
+								<Button
+									variant="link"
+									onClick={ () => onViewDiff( item.post_id ) }
+									disabled={ disabled }
+								>
+									{ __(
+										'Voir le diff',
+										'100son-html-normalizer'
+									) }
+								</Button>
 							</td>
 						</tr>
 					) ) }
