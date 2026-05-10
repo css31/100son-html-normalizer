@@ -18,7 +18,9 @@ use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
+use Cent_Son\Html_Normalizer\Metrics\MetricsSnapshot;
 use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
+use Cent_Son\Html_Normalizer\Regression\RegressionReport;
 use Cent_Son\Html_Normalizer\Regression\RegressionThresholds;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use WP_Error;
@@ -54,11 +56,9 @@ use WP_Post;
  *       puis `wp_update_post()` puis recalcul `DiagnosticEngine` puis
  *       `DiagnosticsRepository::upsert()` puis persister `success`.
  *
- * Note V0 (Phase 4.1) : `confirm_article()` / `refuse_article()` /
- * `resume_progress()` / `finalize_step()` arriveront en Phases 4.2 et 4.3.
- * Cette première version couvre `start_step()` + `process_article()`
- * (happy path, dry_run, et la branche `regression_pending` pour ne pas
- * risquer d'écrire en cas de régression dès Phase 4.1).
+ * Note V0 : `resume_progress()` / `finalize_step()` arriveront en Phase 4.3.
+ * Cette version couvre `start_step()` + `process_article()` (happy path,
+ * dry_run, regression_pending, erreur) + `confirm_article()` + `refuse_article()`.
  */
 final class StepRunner {
 
@@ -118,60 +118,253 @@ final class StepRunner {
 	 */
 	public function process_article( string $uuid, int $post_id, bool $dry_run = false ): ArticleResult {
 		// 1. Vérifier que le pas existe et n'est pas déjà finalisé.
-		$step = $this->steps->find_by_uuid( $uuid );
-		if ( null === $step || $step->is_finished() ) {
-			// Cas d'erreur global — pas tenté de persister (le pas n'existe peut-être pas).
+		$step = $this->load_active_step( $uuid );
+		if ( null === $step ) {
+			// Pas tenté de persister (le pas n'existe peut-être pas).
 			return ArticleResult::error( 'Step ' . $uuid . ' not found or already finalized' );
 		}
 
 		// 2. Récupérer le post.
 		$post = get_post( $post_id );
 		if ( ! $post instanceof WP_Post ) {
-			$result = ArticleResult::error( 'Post ' . $post_id . ' not found' );
-			$this->steps->update_per_article_result( $uuid, $post_id, $result->to_persistence_array() );
-			return $result;
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::error( 'Post ' . $post_id . ' not found' )
+			);
 		}
 
-		// 3. Métriques avant + application des règles.
+		// 3. Métriques avant.
 		$html_before = (string) $post->post_content;
 		$before      = $this->metrics->compute( $html_before );
 
-		$rules    = $this->registry->get_enabled_rules();
-		$warnings = array();
-		$html_after = $this->pipeline->applySubset(
-			$rules,
-			$step->applied_rules,
-			$html_before,
-			array(
-				'post_id'  => $post_id,
-				'step_uuid' => $uuid,
-			),
-			$warnings
-		);
+		// 4. Application du sous-ensemble — try/catch global pour ne jamais propager
+		// une exception au caller REST/CLI (cf. §13 : le filtre htmln/normalize doit
+		// toujours retourner une string ; même esprit côté StepRunner).
+		try {
+			$warnings   = array();
+			$html_after = $this->pipeline->applySubset(
+				$this->registry->get_enabled_rules(),
+				$step->applied_rules,
+				$html_before,
+				array(
+					'post_id'   => $post_id,
+					'step_uuid' => $uuid,
+				),
+				$warnings
+			);
+		} catch ( \Throwable $e ) {
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::error( 'applySubset failed: ' . $e->getMessage(), $before, $before )
+			);
+		}
 
-		// 4. Métriques après.
+		// 5. Métriques après.
 		$after = $this->metrics->compute( $html_after );
 
-		// 5. Régression — seuils relus à chaud (un changement entre 2 articles
-		// d'un même pas est pris en compte volontairement).
+		// 6. Régression — seuils relus à chaud (un changement entre 2 articles
+		// d'un même pas est pris en compte volontairement). Cf. §13 : appel
+		// SYSTÉMATIQUE, jamais shortcircuité.
 		$thresholds = RegressionThresholds::from_settings( $this->settings );
 		$report     = $this->regression->analyze( $before, $after, $thresholds );
 
-		// 6a. Régression détectée → pas d'écriture, status pending.
+		// 7a. Régression détectée → pas d'écriture, status pending.
 		if ( null !== $report ) {
-			$result = ArticleResult::regression_pending( $before, $after, $report );
-			$this->steps->update_per_article_result( $uuid, $post_id, $result->to_persistence_array() );
-			return $result;
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::regression_pending( $before, $after, $report )
+			);
 		}
 
-		// 6b. Dry-run → pas d'écriture, status dry_run.
+		// 7b. Dry-run → pas d'écriture, status dry_run.
 		if ( $dry_run ) {
-			$result = ArticleResult::dry_run( $before, $after );
-			$this->steps->update_per_article_result( $uuid, $post_id, $result->to_persistence_array() );
-			return $result;
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::dry_run( $before, $after )
+			);
 		}
 
-		// 6c. Écriture validée — révision SYSTÉMATIQUE avant update (§13).
+		// 7c. Écriture validée — révision SYSTÉMATIQUE avant update (§13).
+		$write_error = $this->write_post_content( $post_id, $html_after );
+		if ( null !== $write_error ) {
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::error( $write_error, $before, $after )
+			);
+		}
+
+		// 8. Recalcul du diagnostic post-écriture.
+		$this->refresh_diagnostic_for( $post_id );
+
+		// 9. Persister le résultat success.
+		return $this->persist_and_return(
+			$uuid,
+			$post_id,
+			ArticleResult::success( $before, $after )
+		);
+	}
+
+	/**
+	 * Confirme une régression : force l'écriture du HTML normalisé après
+	 * que l'admin a accepté de passer outre le rapport de régression
+	 * remonté par `process_article()`.
+	 *
+	 * Le rapport est conservé dans la persistance et propagé dans le DTO
+	 * retour pour traçabilité (F16). Aucune re-vérification de régression
+	 * (l'admin a décidé en connaissance de cause).
+	 *
+	 * Note : on **réapplique** les règles sur le `post_content` actuel ;
+	 * si l'article a été modifié entre `process_article` et `confirm_article`,
+	 * on travaille sur la dernière version (la SPA n'envoie pas le HTML).
+	 *
+	 * @param string $uuid    UUID du pas.
+	 * @param int    $post_id Article concerné.
+	 * @return ArticleResult success / error.
+	 */
+	public function confirm_article( string $uuid, int $post_id ): ArticleResult {
+		$step = $this->load_active_step( $uuid );
+		if ( null === $step ) {
+			return ArticleResult::error( 'Step ' . $uuid . ' not found or already finalized' );
+		}
+
+		$entry = $step->per_article_results[ $post_id ] ?? null;
+		if ( ! $this->is_in_regression_pending( $entry ) ) {
+			return ArticleResult::error(
+				'Cannot confirm article ' . $post_id . ' : not in regression_pending state for step ' . $uuid
+			);
+		}
+
+		$preserved_report = $this->rebuild_report_from_entry( $entry );
+
+		$post = get_post( $post_id );
+		if ( ! $post instanceof WP_Post ) {
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::error( 'Post ' . $post_id . ' not found' ),
+				$entry
+			);
+		}
+
+		$html_before = (string) $post->post_content;
+		$before      = $this->metrics->compute( $html_before );
+
+		try {
+			$warnings   = array();
+			$html_after = $this->pipeline->applySubset(
+				$this->registry->get_enabled_rules(),
+				$step->applied_rules,
+				$html_before,
+				array(
+					'post_id'   => $post_id,
+					'step_uuid' => $uuid,
+					'mode'      => 'confirm',
+				),
+				$warnings
+			);
+		} catch ( \Throwable $e ) {
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::error( 'applySubset failed: ' . $e->getMessage(), $before, $before ),
+				$entry
+			);
+		}
+		$after = $this->metrics->compute( $html_after );
+
+		$write_error = $this->write_post_content( $post_id, $html_after );
+		if ( null !== $write_error ) {
+			return $this->persist_and_return(
+				$uuid,
+				$post_id,
+				ArticleResult::error( $write_error, $before, $after ),
+				$entry
+			);
+		}
+
+		$this->refresh_diagnostic_for( $post_id );
+
+		// Résultat success avec trace de la régression confirmée.
+		return $this->persist_and_return(
+			$uuid,
+			$post_id,
+			ArticleResult::success( $before, $after, $preserved_report ),
+			$entry
+		);
+	}
+
+	/**
+	 * Refuse une régression : pose la post_meta de relance manuelle
+	 * (`_son100_htmln_manual_check_required = 1`), aucune écriture sur
+	 * `post_content`. Le rapport reste persisté pour la trace F16.
+	 *
+	 * @param string $uuid    UUID du pas.
+	 * @param int    $post_id Article concerné.
+	 * @return ArticleResult refused / error.
+	 */
+	public function refuse_article( string $uuid, int $post_id ): ArticleResult {
+		$step = $this->load_active_step( $uuid );
+		if ( null === $step ) {
+			return ArticleResult::error( 'Step ' . $uuid . ' not found or already finalized' );
+		}
+
+		$entry = $step->per_article_results[ $post_id ] ?? null;
+		if ( ! $this->is_in_regression_pending( $entry ) ) {
+			return ArticleResult::error(
+				'Cannot refuse article ' . $post_id . ' : not in regression_pending state for step ' . $uuid
+			);
+		}
+
+		$preserved_report = $this->rebuild_report_from_entry( $entry );
+
+		// Pose la post_meta de relance manuelle (cf. cahier §3.1 F14).
+		update_post_meta( $post_id, '_son100_htmln_manual_check_required', 1 );
+
+		// Métriques sur le post_content actuel (intact, aucune écriture).
+		$post = get_post( $post_id );
+		$snapshot = $post instanceof WP_Post
+			? $this->metrics->compute( (string) $post->post_content )
+			: MetricsSnapshot::zero();
+
+		return $this->persist_and_return(
+			$uuid,
+			$post_id,
+			ArticleResult::refused( $snapshot, $snapshot, $preserved_report ),
+			$entry
+		);
+	}
+
+	// =========================================================================
+	//  Helpers privés
+	// =========================================================================
+
+	/**
+	 * Charge un pas et vérifie qu'il est encore en cours (`finished_at` null).
+	 *
+	 * @param string $uuid UUID du pas.
+	 * @return StepRecord|null `null` si introuvable ou déjà finalisé.
+	 */
+	private function load_active_step( string $uuid ): ?StepRecord {
+		$step = $this->steps->find_by_uuid( $uuid );
+		if ( null === $step || $step->is_finished() ) {
+			return null;
+		}
+		return $step;
+	}
+
+	/**
+	 * Écrit le HTML normalisé : révision systématique (§13) puis `wp_update_post`.
+	 *
+	 * @param int    $post_id    Article concerné.
+	 * @param string $html_after HTML normalisé à persister.
+	 * @return string|null `null` en cas de succès, message d'erreur sinon.
+	 */
+	private function write_post_content( int $post_id, string $html_after ): ?string {
 		wp_save_post_revision( $post_id );
 		$updated = wp_update_post(
 			array(
@@ -180,25 +373,85 @@ final class StepRunner {
 			),
 			true
 		);
-		if ( $updated instanceof WP_Error || 0 === $updated ) {
-			$message = $updated instanceof WP_Error
-				? 'wp_update_post: ' . $updated->get_error_message()
-				: 'wp_update_post returned 0 for post ' . $post_id;
-			$result  = ArticleResult::error( $message, $before, $after );
-			$this->steps->update_per_article_result( $uuid, $post_id, $result->to_persistence_array() );
-			return $result;
+		if ( $updated instanceof WP_Error ) {
+			return 'wp_update_post: ' . $updated->get_error_message();
 		}
+		if ( 0 === $updated ) {
+			return 'wp_update_post returned 0 for post ' . $post_id;
+		}
+		return null;
+	}
 
-		// 7. Recalcul du diagnostic post-écriture (sur le post fraîchement modifié).
+	/**
+	 * Recalcule et upsert le diagnostic d'un article fraîchement modifié.
+	 *
+	 * @param int $post_id Article concerné.
+	 */
+	private function refresh_diagnostic_for( int $post_id ): void {
 		$fresh_post = get_post( $post_id );
 		if ( $fresh_post instanceof WP_Post ) {
 			$diagnostic = $this->engine->diagnose( $fresh_post );
 			$this->diagnostics->upsert( $diagnostic );
 		}
+	}
 
-		// 8. Persister le résultat success dans per_article_results.
-		$result = ArticleResult::success( $before, $after );
-		$this->steps->update_per_article_result( $uuid, $post_id, $result->to_persistence_array() );
+	/**
+	 * Vrai ssi l'entrée per_article_results indique `regression_pending`.
+	 *
+	 * @param array<string, mixed>|null $entry Entrée potentielle.
+	 * @return bool
+	 */
+	private function is_in_regression_pending( ?array $entry ): bool {
+		if ( null === $entry ) {
+			return false;
+		}
+		return ArticleResult::STATUS_REGRESSION_PENDING === ( $entry['status'] ?? '' );
+	}
+
+	/**
+	 * Reconstruit un `RegressionReport` depuis l'entrée per_article_results
+	 * (issue d'un précédent `process_article` ayant déclenché la régression).
+	 *
+	 * @param array<string, mixed> $entry Entrée per_article_results.
+	 * @return RegressionReport|null
+	 */
+	private function rebuild_report_from_entry( array $entry ): ?RegressionReport {
+		if ( ! isset( $entry['regression'] ) || ! is_array( $entry['regression'] ) ) {
+			return null;
+		}
+		return RegressionReport::from_array( $entry['regression'] );
+	}
+
+	/**
+	 * Persiste le résultat dans `per_article_results` et le retourne tel quel.
+	 *
+	 * Lorsque `$previous_entry` est fourni, son champ `regression` est
+	 * réinjecté en fallback dans la persistance si le DTO n'en porte pas
+	 * (filet de sécurité pour ne jamais perdre la trace côté F16, même si
+	 * `from_array()` a échoué silencieusement).
+	 *
+	 * @param string                    $uuid           UUID du pas.
+	 * @param int                       $post_id        Article concerné.
+	 * @param ArticleResult             $result         Résultat à persister + retourner.
+	 * @param array<string, mixed>|null $previous_entry Entrée précédente, si rejouée.
+	 * @return ArticleResult
+	 */
+	private function persist_and_return(
+		string $uuid,
+		int $post_id,
+		ArticleResult $result,
+		?array $previous_entry = null
+	): ArticleResult {
+		$persistence = $result->to_persistence_array();
+		if (
+			null !== $previous_entry
+			&& ! isset( $persistence['regression'] )
+			&& isset( $previous_entry['regression'] )
+			&& is_array( $previous_entry['regression'] )
+		) {
+			$persistence['regression'] = $previous_entry['regression'];
+		}
+		$this->steps->update_per_article_result( $uuid, $post_id, $persistence );
 		return $result;
 	}
 }

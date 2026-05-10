@@ -86,6 +86,29 @@ final class StepRunnerTest extends TestCase {
 					'post_id' => $post_id,
 					'result'  => $result,
 				);
+				// Reconstruit le StepRecord avec les per_article_results à jour
+				// (sinon `confirm_article` qui relit le pas ne voit pas le
+				// `regression_pending` posé par `process_article`).
+				$existing = $this->records[ $uuid ] ?? null;
+				if ( null === $existing ) {
+					return true;
+				}
+				$merged                 = $existing->per_article_results;
+				$merged[ $post_id ]      = $result;
+				$this->records[ $uuid ] = new StepRecord(
+					id: $existing->id,
+					step_uuid: $existing->step_uuid,
+					applied_rules: $existing->applied_rules,
+					affected_post_ids: $existing->affected_post_ids,
+					total_articles: $existing->total_articles,
+					successful_articles: $existing->successful_articles,
+					refused_articles: $existing->refused_articles,
+					errored_articles: $existing->errored_articles,
+					per_article_results: $merged,
+					user_id: $existing->user_id,
+					started_at: $existing->started_at,
+					finished_at: $existing->finished_at,
+				);
 				return true;
 			}
 		};
@@ -486,5 +509,267 @@ final class StepRunnerTest extends TestCase {
 
 		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
 		$this->assertStringContainsString( 'not-a-real-uuid', (string) $result->error );
+	}
+
+	// =========================================================================
+	//  process_article — robustesse (Phase 4.2)
+	// =========================================================================
+
+	public function test_rule_exception_does_not_break_step(): void {
+		// Pipeline::run() catche les exceptions des règles individuelles (cf. §13).
+		// Le StepRunner profite donc d'un Pipeline robuste : une règle qui throw
+		// ne casse pas le pas, le HTML reste inchangé, et l'article est traité
+		// en success. Le try/catch global de process_article reste utile en
+		// défense en profondeur pour les exceptions imprévues hors-règle.
+		$this->seed_post( 100, '<p>Original</p>' );
+		$throwing = new class implements \Cent_Son\Html_Normalizer\Core\Rules\RuleInterface {
+			public function id(): string { return 'P_THROW'; }
+			public function label(): string { return 'P_THROW'; }
+			public function apply( string $html, array $context = array() ): string {
+				throw new \RuntimeException( 'rule exploded' );
+			}
+			public function countMatches( string $html, array $context = array() ): int { return 0; }
+		};
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $throwing ) );
+
+		$uuid   = $runner->start_step( array( 100 ), array( 'P_THROW' ), 1 );
+		$result = $runner->process_article( $uuid, 100 );
+
+		$this->assertSame(
+			ArticleResult::STATUS_SUCCESS,
+			$result->status,
+			'Pipeline catche l\'exception ; HTML inchangé → success'
+		);
+		$this->assertSame(
+			'<p>Original</p>',
+			Son100_Htmln_Test_Posts_Registry::$posts[100]->post_content,
+			'HTML inchangé puisque la règle a été skip'
+		);
+	}
+
+	// =========================================================================
+	//  confirm_article (Phase 4.2)
+	// =========================================================================
+
+	/**
+	 * Helper : amène un article en `regression_pending` puis renvoie l'uuid.
+	 *
+	 * @param int  $post_id Article concerné.
+	 * @param StepsRepository $steps  Stub réutilisé (la régression doit y être stockée).
+	 * @param DiagnosticsRepository $diags  Stub réutilisé.
+	 * @return array{uuid: string, runner: StepRunner, rule: RuleInterface}
+	 */
+	private function arrange_regression_pending(
+		int $post_id,
+		StepsRepository $steps,
+		DiagnosticsRepository $diags
+	): array {
+		$this->seed_post( $post_id, '<p>Phrase à effacer</p>' );
+		$destructive = $this->fake_rule( 'P_DESTROY', static fn(): string => '' );
+		$runner      = $this->make_runner( $steps, $diags, array( $destructive ) );
+		$uuid        = $runner->start_step( array( $post_id ), array( 'P_DESTROY' ), 1 );
+		$pre         = $runner->process_article( $uuid, $post_id );
+		$this->assertSame( ArticleResult::STATUS_REGRESSION_PENDING, $pre->status, 'précondition arrange' );
+		return array( 'uuid' => $uuid, 'runner' => $runner, 'rule' => $destructive );
+	}
+
+	public function test_confirm_article_writes_post_content(): void {
+		$steps  = $this->steps_stub();
+		$diags  = $this->diagnostics_stub();
+		$ctx    = $this->arrange_regression_pending( 100, $steps, $diags );
+		$result = $ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		$this->assertSame( ArticleResult::STATUS_SUCCESS, $result->status );
+		// La règle destructive a vraiment été appliquée → post_content vide.
+		$this->assertSame( '', Son100_Htmln_Test_Posts_Registry::$posts[100]->post_content );
+		$this->assertSame( '', Son100_Htmln_Test_Posts_Registry::$updates[100] ?? null );
+	}
+
+	public function test_confirm_article_creates_revision_before_write(): void {
+		$steps = $this->steps_stub();
+		$ctx   = $this->arrange_regression_pending( 100, $steps, $this->diagnostics_stub() );
+		// Reset le registre des révisions pour ne mesurer que celle créée par confirm_article.
+		Son100_Htmln_Test_Posts_Registry::$revisions_created = array();
+
+		$ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		$this->assertArrayHasKey(
+			100,
+			Son100_Htmln_Test_Posts_Registry::$revisions_created,
+			'wp_save_post_revision doit être appelée AVANT l\'écriture forcée'
+		);
+	}
+
+	public function test_confirm_article_recalculates_diagnostic(): void {
+		$steps = $this->steps_stub();
+		$diags = $this->diagnostics_stub();
+		$ctx   = $this->arrange_regression_pending( 100, $steps, $diags );
+
+		$ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		$this->assertCount( 1, $diags->upserted, 'Un upsert diagnostic attendu post-confirm' );
+		$this->assertSame( 100, $diags->upserted[0]->post_id );
+	}
+
+	public function test_confirm_article_preserves_regression_in_persistence(): void {
+		$steps = $this->steps_stub();
+		$ctx   = $this->arrange_regression_pending( 100, $steps, $this->diagnostics_stub() );
+
+		$ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		// Dernière entrée écrite par confirm_article.
+		$last = end( $steps->written_results );
+		$this->assertSame( 100, $last['post_id'] );
+		$this->assertSame( 'success', $last['result']['status'] );
+		$this->assertArrayHasKey( 'regression', $last['result'], 'trace régression doit être préservée' );
+		$this->assertArrayHasKey( 'failures', $last['result']['regression'] );
+		$this->assertNotEmpty( $last['result']['regression']['failures'] );
+	}
+
+	public function test_confirm_article_returns_dto_with_regression_report(): void {
+		$ctx    = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+		$result = $ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		$this->assertNotNull( $result->regression_report, 'DTO retour porte la trace pour la SPA' );
+		$this->assertGreaterThan( 0, $result->regression_report->failure_count() );
+	}
+
+	public function test_confirm_article_errors_when_no_regression_pending(): void {
+		// Article jamais traité — pas de regression_pending → confirm doit erreur.
+		$this->seed_post( 100, '<p>x</p>' );
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
+		$uuid   = $runner->start_step( array( 100 ), array(), 1 );
+
+		$result = $runner->confirm_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
+		$this->assertStringContainsString( 'regression_pending', (string) $result->error );
+		// Aucune écriture, aucune persistance modifiée pour cet article.
+		$this->assertArrayNotHasKey( 100, Son100_Htmln_Test_Posts_Registry::$updates );
+	}
+
+	public function test_confirm_article_errors_when_step_unknown(): void {
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$result = $runner->confirm_article( 'not-a-uuid', 100 );
+
+		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
+		$this->assertStringContainsString( 'not-a-uuid', (string) $result->error );
+	}
+
+	public function test_confirm_article_after_already_success_errors(): void {
+		// Si l'article est déjà success (pas regression_pending), confirm doit refuser.
+		$this->seed_post( 100, '<p>Hello</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
+		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 100 );
+
+		$result = $runner->confirm_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
+	}
+
+	// =========================================================================
+	//  refuse_article (Phase 4.2)
+	// =========================================================================
+
+	public function test_refuse_article_does_not_write_post_content(): void {
+		$steps = $this->steps_stub();
+		$ctx   = $this->arrange_regression_pending( 100, $steps, $this->diagnostics_stub() );
+		Son100_Htmln_Test_Posts_Registry::$revisions_created = array();
+		Son100_Htmln_Test_Posts_Registry::$updates           = array();
+
+		$result = $ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$this->assertSame( ArticleResult::STATUS_REFUSED, $result->status );
+		$this->assertSame(
+			'<p>Phrase à effacer</p>',
+			Son100_Htmln_Test_Posts_Registry::$posts[100]->post_content,
+			'post_content doit rester intact en cas de refus'
+		);
+		$this->assertArrayNotHasKey( 100, Son100_Htmln_Test_Posts_Registry::$updates );
+		$this->assertArrayNotHasKey(
+			100,
+			Son100_Htmln_Test_Posts_Registry::$revisions_created,
+			'aucune révision attendue (pas d\'écriture)'
+		);
+	}
+
+	public function test_refuse_article_sets_manual_check_post_meta(): void {
+		$ctx = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+
+		$ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$this->assertSame(
+			1,
+			Son100_Htmln_Test_Posts_Registry::$meta[100]['_son100_htmln_manual_check_required'] ?? null,
+			'post_meta de relance manuelle doit être posée'
+		);
+	}
+
+	public function test_refuse_article_does_not_recalculate_diagnostic(): void {
+		// Pas d'écriture = pas de raison de recalculer le diagnostic
+		// (le précédent reste valide tant que post_content n'a pas bougé).
+		$diags = $this->diagnostics_stub();
+		$ctx   = $this->arrange_regression_pending( 100, $this->steps_stub(), $diags );
+
+		$ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$this->assertCount( 0, $diags->upserted );
+	}
+
+	public function test_refuse_article_persists_refused_with_regression(): void {
+		$steps = $this->steps_stub();
+		$ctx   = $this->arrange_regression_pending( 100, $steps, $this->diagnostics_stub() );
+
+		$ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$last = end( $steps->written_results );
+		$this->assertSame( 'refused', $last['result']['status'] );
+		$this->assertArrayHasKey( 'regression', $last['result'] );
+		$this->assertArrayHasKey( 'failures', $last['result']['regression'] );
+	}
+
+	public function test_refuse_article_returns_dto_with_regression_report(): void {
+		$ctx    = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+		$result = $ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$this->assertNotNull( $result->regression_report );
+		$this->assertGreaterThan( 0, $result->regression_report->failure_count() );
+	}
+
+	public function test_refuse_article_errors_when_no_regression_pending(): void {
+		$this->seed_post( 100, '<p>x</p>' );
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$uuid   = $runner->start_step( array( 100 ), array(), 1 );
+
+		$result = $runner->refuse_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
+		$this->assertStringContainsString( 'regression_pending', (string) $result->error );
+		// Pas de post_meta posée (l'erreur arrive avant).
+		$this->assertArrayNotHasKey(
+			'_son100_htmln_manual_check_required',
+			Son100_Htmln_Test_Posts_Registry::$meta[100] ?? array()
+		);
+	}
+
+	public function test_refuse_article_errors_when_step_unknown(): void {
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$result = $runner->refuse_article( 'not-a-uuid', 100 );
+
+		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
+	}
+
+	public function test_refuse_then_confirm_is_blocked(): void {
+		// Une fois refusé, l'article n'est plus en regression_pending → confirm doit erreur.
+		$ctx = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+		$ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$confirm = $ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		$this->assertSame( ArticleResult::STATUS_ERROR, $confirm->status );
 	}
 }

@@ -91,4 +91,98 @@ final class RegressionReportTest extends TestCase {
 		$this->assertNull( $arr['loss_pct'] );
 		$this->assertTrue( $arr['exceeded'] );
 	}
+
+	// =========================================================================
+	//  from_array — Phase 4.2 (reconstruction depuis persistance)
+	// =========================================================================
+
+	public function test_failure_from_array_round_trips(): void {
+		$original = new RegressionFailure(
+			metric_key: 'chars',
+			before: 1000,
+			after: 800,
+			threshold: 5,
+			unit: RegressionFailure::UNIT_PCT,
+			loss: 200,
+			loss_pct: 20.0,
+		);
+		$rebuilt  = RegressionFailure::from_array( $original->to_array() );
+
+		$this->assertSame( $original->metric_key, $rebuilt->metric_key );
+		$this->assertSame( $original->before, $rebuilt->before );
+		$this->assertSame( $original->after, $rebuilt->after );
+		$this->assertSame( $original->threshold, $rebuilt->threshold );
+		$this->assertSame( $original->unit, $rebuilt->unit );
+		$this->assertSame( $original->loss, $rebuilt->loss );
+		$this->assertSame( $original->loss_pct, $rebuilt->loss_pct );
+	}
+
+	public function test_failure_from_array_with_absolute_unit(): void {
+		$rebuilt = RegressionFailure::from_array( array(
+			'metric_key' => 'images',
+			'before'     => 4,
+			'after'      => 2,
+			'threshold'  => 0,
+			'unit'       => 'absolute',
+			'loss'       => 2,
+			'loss_pct'   => null,
+		) );
+		$this->assertSame( 'absolute', $rebuilt->unit );
+		$this->assertNull( $rebuilt->loss_pct );
+	}
+
+	public function test_failure_from_array_unknown_unit_falls_back_to_absolute(): void {
+		$rebuilt = RegressionFailure::from_array( array(
+			'metric_key' => 'images',
+			'before'     => 4,
+			'after'      => 2,
+			'threshold'  => 0,
+			'unit'       => 'bogus',
+			'loss'       => 2,
+		) );
+		$this->assertSame( 'absolute', $rebuilt->unit );
+	}
+
+	public function test_failure_from_array_missing_fields_default_to_safe_values(): void {
+		$rebuilt = RegressionFailure::from_array( array() );
+		$this->assertSame( '', $rebuilt->metric_key );
+		$this->assertSame( 0, $rebuilt->before );
+		$this->assertSame( 0, $rebuilt->after );
+		$this->assertSame( 0, $rebuilt->threshold );
+		$this->assertSame( 'absolute', $rebuilt->unit );
+		$this->assertSame( 0, $rebuilt->loss );
+		$this->assertNull( $rebuilt->loss_pct );
+	}
+
+	public function test_report_from_array_round_trips(): void {
+		$original = new RegressionReport( array(
+			$this->failure( 'images', 1 ),
+			$this->failure( 'links', 2 ),
+		) );
+		$rebuilt  = RegressionReport::from_array( $original->to_array() );
+
+		$this->assertNotNull( $rebuilt );
+		$this->assertSame( 2, $rebuilt->failure_count() );
+		$this->assertTrue( $rebuilt->has_failure( 'images' ) );
+		$this->assertTrue( $rebuilt->has_failure( 'links' ) );
+	}
+
+	public function test_report_from_array_returns_null_when_failures_missing(): void {
+		$this->assertNull( RegressionReport::from_array( array() ) );
+		$this->assertNull( RegressionReport::from_array( array( 'failures' => array() ) ) );
+		$this->assertNull( RegressionReport::from_array( array( 'failures' => 'not-an-array' ) ) );
+	}
+
+	public function test_report_from_array_skips_non_array_entries(): void {
+		$rebuilt = RegressionReport::from_array( array(
+			'failures' => array(
+				array( 'metric_key' => 'images', 'before' => 4, 'after' => 2, 'loss' => 2, 'unit' => 'absolute', 'threshold' => 0 ),
+				'corrupted-entry',
+				42,
+			),
+		) );
+		$this->assertNotNull( $rebuilt );
+		$this->assertSame( 1, $rebuilt->failure_count() );
+		$this->assertTrue( $rebuilt->has_failure( 'images' ) );
+	}
 }

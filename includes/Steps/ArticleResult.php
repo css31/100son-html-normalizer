@@ -67,12 +67,22 @@ final class ArticleResult {
 	/**
 	 * Article traité avec succès, post_content mis à jour.
 	 *
-	 * @param MetricsSnapshot $before Snapshot avant.
-	 * @param MetricsSnapshot $after  Snapshot après.
+	 * `regression_report` est null en cas de succès direct (pas de régression
+	 * initiale) ; il est non-null lorsque l'admin vient de **confirmer** une
+	 * régression (`StepRunner::confirm_article()`) — la trace est conservée
+	 * pour l'historique F16 et la SPA.
+	 *
+	 * @param MetricsSnapshot       $before            Snapshot avant.
+	 * @param MetricsSnapshot       $after             Snapshot après.
+	 * @param RegressionReport|null $regression_report Report préservé en cas de confirm sur régression.
 	 * @return self
 	 */
-	public static function success( MetricsSnapshot $before, MetricsSnapshot $after ): self {
-		return new self( self::STATUS_SUCCESS, $before, $after, null, null );
+	public static function success(
+		MetricsSnapshot $before,
+		MetricsSnapshot $after,
+		?RegressionReport $regression_report = null
+	): self {
+		return new self( self::STATUS_SUCCESS, $before, $after, $regression_report, null );
 	}
 
 	/**
@@ -109,17 +119,21 @@ final class ArticleResult {
 	 * Admin a refusé la régression : post_meta `_son100_htmln_manual_check_required`
 	 * posée, aucune écriture sur post_content.
 	 *
-	 * @param MetricsSnapshot  $before Snapshot avant.
-	 * @param MetricsSnapshot  $after  Snapshot post-application (jeté).
-	 * @param RegressionReport $report Rapport conservé pour traçabilité.
+	 * `regression_report` est typiquement non-null (refus = il y avait régression)
+	 * mais reste optionnel pour permettre à `StepRunner::refuse_article()` de
+	 * dégrader gracieusement si la persistance ne contient plus le rapport.
+	 *
+	 * @param MetricsSnapshot       $before            Snapshot avant.
+	 * @param MetricsSnapshot       $after             Snapshot post-application (jeté).
+	 * @param RegressionReport|null $regression_report Rapport conservé pour traçabilité.
 	 * @return self
 	 */
 	public static function refused(
 		MetricsSnapshot $before,
 		MetricsSnapshot $after,
-		RegressionReport $report
+		?RegressionReport $regression_report = null
 	): self {
-		return new self( self::STATUS_REFUSED, $before, $after, $report, null );
+		return new self( self::STATUS_REFUSED, $before, $after, $regression_report, null );
 	}
 
 	/**

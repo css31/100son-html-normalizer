@@ -116,6 +116,23 @@ if ( ! function_exists( 'get_post_meta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'update_post_meta' ) ) {
+	function update_post_meta( int $post_id, string $key, mixed $value, mixed $prev_value = '' ): int|bool {
+		\Son100_Htmln_Test_Posts_Registry::$meta[ $post_id ][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_post_meta' ) ) {
+	function delete_post_meta( int $post_id, string $key, mixed $value = '' ): bool {
+		if ( isset( \Son100_Htmln_Test_Posts_Registry::$meta[ $post_id ][ $key ] ) ) {
+			unset( \Son100_Htmln_Test_Posts_Registry::$meta[ $post_id ][ $key ] );
+			return true;
+		}
+		return false;
+	}
+}
+
 if ( ! function_exists( 'wp_save_post_revision' ) ) {
 	function wp_save_post_revision( int $post_id ): int {
 		$rev_id                                                            = $post_id * 1000 + count( \Son100_Htmln_Test_Posts_Registry::$revisions_created ) + 1;

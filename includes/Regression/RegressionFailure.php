@@ -76,4 +76,35 @@ final class RegressionFailure {
 			'exceeded'   => true,
 		);
 	}
+
+	/**
+	 * Reconstruit une RegressionFailure depuis sa représentation `to_array()`.
+	 *
+	 * Tolérant : les champs manquants prennent des valeurs par défaut sûres
+	 * (`unit` invalide → `absolute`, `loss_pct` non numérique → null). Sert
+	 * notamment à `StepRunner::confirm_article()` et `refuse_article()` pour
+	 * rejouer un rapport persisté en base.
+	 *
+	 * @param array<string, mixed> $data Données issues de `to_array()` ou JSON décodé.
+	 * @return self
+	 */
+	public static function from_array( array $data ): self {
+		$unit_raw = isset( $data['unit'] ) ? (string) $data['unit'] : self::UNIT_ABSOLUTE;
+		$unit     = self::UNIT_PCT === $unit_raw ? self::UNIT_PCT : self::UNIT_ABSOLUTE;
+
+		$loss_pct = null;
+		if ( isset( $data['loss_pct'] ) && is_numeric( $data['loss_pct'] ) ) {
+			$loss_pct = (float) $data['loss_pct'];
+		}
+
+		return new self(
+			metric_key: isset( $data['metric_key'] ) ? (string) $data['metric_key'] : '',
+			before: isset( $data['before'] ) ? (int) $data['before'] : 0,
+			after: isset( $data['after'] ) ? (int) $data['after'] : 0,
+			threshold: isset( $data['threshold'] ) ? (int) $data['threshold'] : 0,
+			unit: $unit,
+			loss: isset( $data['loss'] ) ? (int) $data['loss'] : 0,
+			loss_pct: $loss_pct,
+		);
+	}
 }

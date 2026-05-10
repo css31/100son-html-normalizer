@@ -97,4 +97,35 @@ final class RegressionReport {
 			'failures' => $serialized,
 		);
 	}
+
+	/**
+	 * Reconstruit un RegressionReport depuis sa représentation `to_array()`.
+	 *
+	 * Convention : un report sans failures est invalide par construction
+	 * (cf. invariant `non-empty-list`). Cette méthode retourne donc `null`
+	 * si la liste reconstruite est vide — cohérent avec `RegressionDetector`
+	 * qui retourne `null` pour signaler "pas de régression".
+	 *
+	 * Sert à `StepRunner::confirm_article()` et `refuse_article()` pour
+	 * rejouer un rapport persisté en base et le propager dans le DTO de
+	 * retour `ArticleResult` (traçabilité côté SPA / Historique F16).
+	 *
+	 * @param array<string, mixed> $data Données issues de `to_array()` ou JSON décodé.
+	 * @return self|null `null` si aucune failure exploitable.
+	 */
+	public static function from_array( array $data ): ?self {
+		if ( ! isset( $data['failures'] ) || ! is_array( $data['failures'] ) ) {
+			return null;
+		}
+		$failures = array();
+		foreach ( $data['failures'] as $entry ) {
+			if ( is_array( $entry ) ) {
+				$failures[] = RegressionFailure::from_array( $entry );
+			}
+		}
+		if ( array() === $failures ) {
+			return null;
+		}
+		return new self( $failures );
+	}
 }
