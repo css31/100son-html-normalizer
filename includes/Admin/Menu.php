@@ -18,6 +18,7 @@ defined( 'ABSPATH' ) || exit;
 use Cent_Son\Html_Normalizer\Admin\Pages\LogsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
+use Cent_Son\Html_Normalizer\Admin\Pages\SpaPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 
 /**
@@ -25,19 +26,36 @@ use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
  */
 final class Menu {
 
-	public const CAPABILITY = 'manage_options';
-	public const SLUG       = '100son-html-normalizer';
+	public const CAPABILITY     = 'manage_options';
+	public const SLUG           = '100son-html-normalizer';
+
+	/**
+	 * Slug de la sous-page SPA V1.0 (Phase 6).
+	 *
+	 * Référencé aussi par `Admin\Assets` pour calculer le hook_suffix
+	 * attendu et restreindre l'enqueue du bundle React à cette page
+	 * uniquement (cf. cahier §13).
+	 */
+	public const SPA_PAGE_SLUG = '100son-html-normalizer-spa';
 
 	private PresetsPage $presets_page;
 	private TesterPage $tester_page;
 	private PostsPage $posts_page;
 	private LogsPage $logs_page;
+	private SpaPage $spa_page;
 
-	public function __construct( PresetsPage $presets_page, TesterPage $tester_page, PostsPage $posts_page, LogsPage $logs_page ) {
+	public function __construct(
+		PresetsPage $presets_page,
+		TesterPage $tester_page,
+		PostsPage $posts_page,
+		LogsPage $logs_page,
+		SpaPage $spa_page
+	) {
 		$this->presets_page = $presets_page;
 		$this->tester_page  = $tester_page;
 		$this->posts_page   = $posts_page;
 		$this->logs_page    = $logs_page;
+		$this->spa_page     = $spa_page;
 	}
 
 	/**
@@ -110,6 +128,18 @@ final class Menu {
 			self::CAPABILITY,
 			self::SLUG . '-logs',
 			array( $this->logs_page, 'render' )
+		);
+
+		// Sous-page SPA V1.0 (Phase 6) — interface React de normalisation
+		// par pas. Cohabite avec les pages V0.1 PHP en V1.0 ; la migration
+		// complète vers la SPA est différée V1.1.
+		add_submenu_page(
+			self::SLUG,
+			__( 'Normaliser V1', '100son-html-normalizer' ),
+			__( 'Normaliser V1', '100son-html-normalizer' ),
+			self::CAPABILITY,
+			self::SPA_PAGE_SLUG,
+			array( $this->spa_page, 'render' )
 		);
 	}
 }

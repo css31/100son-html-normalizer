@@ -14,10 +14,12 @@ namespace Cent_Son\Html_Normalizer;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Admin\Assets;
 use Cent_Son\Html_Normalizer\Admin\Menu;
 use Cent_Son\Html_Normalizer\Admin\Pages\LogsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
+use Cent_Son\Html_Normalizer\Admin\Pages\SpaPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 use Cent_Son\Html_Normalizer\Api\PublicApi;
 use Cent_Son\Html_Normalizer\Cli\CliServiceProvider;
@@ -128,7 +130,9 @@ final class Plugin {
 		$cli_provider = new CliServiceProvider( $this->build_cli_commands() );
 		$cli_provider->register();
 
-		// UI admin minimale V0.1 (PHP classique, pas SPA — phase 15 §11 ultérieure).
+		// UI admin V0.1 (pages PHP classiques) + SPA V1.0 (Phase 6.1) en
+		// cohabitation. La SPA est ajoutée comme sous-page « Normaliser V1 »
+		// — la migration complète des pages V0.1 vers la SPA est différée V1.1.
 		if ( is_admin() ) {
 			$log_repo        = new LogRepository();
 			$notes_repo      = new NotesRepository();
@@ -140,15 +144,17 @@ final class Plugin {
 			$tester_page  = new TesterPage( $normalizer );
 			$posts_page   = new PostsPage( $settings, $so_detector, $post_normalizer );
 			$logs_page    = new LogsPage( $log_repo, $notes_repo );
+			$spa_page     = new SpaPage();
 
-			$menu = new Menu( $presets_page, $tester_page, $posts_page, $logs_page );
+			$menu = new Menu( $presets_page, $tester_page, $posts_page, $logs_page, $spa_page );
 			$menu->register();
-		}
 
-		// (Phases ultérieures cf. cahier §11 :
-		// - étapes 8+ : REST, CLI, F4 (UserRules + Validator + Preview),
-		// F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController),
-		// 15 (SPA React).)
+			// Enqueue scope-restreint du bundle SPA — uniquement sur la page
+			// `Normaliser V1` (cf. §13 « ne pas charger d'assets globalement
+			// sur toutes les pages admin »).
+			$assets = new Assets();
+			$assets->register();
+		}
 	}
 
 	/**
