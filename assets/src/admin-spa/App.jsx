@@ -1,23 +1,17 @@
 /**
  * App — composant racine de la SPA V1.0.
  *
- * Phase 6.1 : version d'amorçage minimale (« Bonjour » localisé). Les
- * vues métier (Normalize F13/F14, modales F14.3/F15, StepsHistory F16,
- * Settings γ) arrivent en Phases 6.3 à 6.7.
+ * V1.0 ne sert qu'une seule vue (Normalize F13/F14) — pas de router pour
+ * l'instant. Si la SPA grandit en V1.1 (Dashboard, Presets SPA, Settings
+ * onglet à part, Journal SPA), un router minimaliste type `useState` +
+ * switch pourra être introduit ici sans toucher aux vues elles-mêmes.
  */
 
-import { __ } from '@wordpress/i18n';
+import Normalize from './views/Normalize';
 
+/**
+ * @return {JSX.Element} Vue active.
+ */
 export default function App() {
-	return (
-		<div className="htmln-spa-root">
-			<h2>{ __( 'Interface V1.0', '100son-html-normalizer' ) }</h2>
-			<p>
-				{ __(
-					"L'interface de normalisation par pas est en cours de construction. Les vues métier seront livrées dans les sous-phases suivantes.",
-					'100son-html-normalizer'
-				) }
-			</p>
-		</div>
-	);
+	return <Normalize />;
 }
