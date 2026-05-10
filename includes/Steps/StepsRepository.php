@@ -98,12 +98,62 @@ class StepsRepository {
 	}
 
 	/**
+	 * Liste paginée filtrée par fenêtre temporelle (F16). Sert
+	 * `GET /steps?from&to` (Phase 5.2 — StepsController).
+	 *
+	 * Les bornes `$from` et `$to` s'appliquent à `started_at` (datetime
+	 * MySQL UTC `Y-m-d H:i:s`). Bornes optionnelles, inclusives. Le
+	 * caller (BaseController::sanitize_*) est censé avoir validé les
+	 * formats — ici on délègue à `wpdb->prepare()`.
+	 *
+	 * @param string|null $from   Datetime MySQL inclusif, ou null.
+	 * @param string|null $to     Datetime MySQL inclusif, ou null.
+	 * @param int         $limit  Nombre max.
+	 * @param int         $offset Décalage.
+	 * @return list<StepRecord>
+	 */
+	public function list_filtered(
+		?string $from,
+		?string $to,
+		int $limit = 50,
+		int $offset = 0
+	): array {
+		$sql = $this->build_filtered_query(
+			"SELECT * FROM `{$this->table}`",
+			$from,
+			$to,
+			" ORDER BY started_at DESC LIMIT %d OFFSET %d",
+			array( max( 1, $limit ), max( 0, $offset ) )
+		);
+		return $this->fetch_records( $sql );
+	}
+
+	/**
 	 * Nombre total de pas enregistrés.
 	 *
 	 * @return int
 	 */
 	public function count_total(): int {
 		return (int) $this->wpdb->get_var( "SELECT COUNT(*) FROM `{$this->table}`" );
+	}
+
+	/**
+	 * Nombre de pas dans une fenêtre temporelle. Sert au calcul de
+	 * `total_pages` côté SPA (F16).
+	 *
+	 * @param string|null $from Datetime MySQL inclusif, ou null.
+	 * @param string|null $to   Datetime MySQL inclusif, ou null.
+	 * @return int
+	 */
+	public function count_filtered( ?string $from, ?string $to ): int {
+		$sql = $this->build_filtered_query(
+			"SELECT COUNT(*) FROM `{$this->table}`",
+			$from,
+			$to,
+			'',
+			array()
+		);
+		return (int) $this->wpdb->get_var( $sql );
 	}
 
 	// =========================================================================
@@ -217,6 +267,47 @@ class StepsRepository {
 	// =========================================================================
 	//  Helpers privés
 	// =========================================================================
+
+	/**
+	 * Construit dynamiquement une requête SELECT/COUNT avec clause WHERE
+	 * temporelle optionnelle. Les bornes sont passées via `prepare()` —
+	 * jamais de concaténation directe.
+	 *
+	 * @param string             $base_select Préfixe SQL (ex. `SELECT * FROM …`).
+	 * @param string|null        $from        Borne basse `started_at >=`.
+	 * @param string|null        $to          Borne haute `started_at <=`.
+	 * @param string             $suffix      Suffixe SQL (ex. ORDER BY + LIMIT).
+	 * @param list<int|string>   $suffix_args Arguments du suffixe.
+	 * @return string
+	 */
+	private function build_filtered_query(
+		string $base_select,
+		?string $from,
+		?string $to,
+		string $suffix,
+		array $suffix_args
+	): string {
+		$where  = array();
+		$args   = array();
+		if ( null !== $from && '' !== $from ) {
+			$where[] = 'started_at >= %s';
+			$args[]  = $from;
+		}
+		if ( null !== $to && '' !== $to ) {
+			$where[] = 'started_at <= %s';
+			$args[]  = $to;
+		}
+		$sql = $base_select;
+		if ( array() !== $where ) {
+			$sql .= ' WHERE ' . implode( ' AND ', $where );
+		}
+		$sql .= $suffix;
+		$all_args = array_merge( $args, $suffix_args );
+		if ( array() === $all_args ) {
+			return $sql;
+		}
+		return $this->wpdb->prepare( $sql, $all_args );
+	}
 
 	/**
 	 * @param string $sql SQL préparé.

@@ -16,8 +16,11 @@ use PHPUnit\Framework\TestCase;
 final class RestServiceProviderTest extends TestCase {
 
 	protected function setUp(): void {
-		// Reset le registre `add_action` du bootstrap entre tests.
-		$GLOBALS['son100_htmln_test_actions'] = array();
+		// Reset les registres globals du bootstrap entre tests : actions
+		// (provider register) ET routes REST (autres tests Rest peuvent
+		// y avoir écrit en exécution random).
+		$GLOBALS['son100_htmln_test_actions']     = array();
+		$GLOBALS['son100_htmln_test_rest_routes'] = array();
 	}
 
 	/**

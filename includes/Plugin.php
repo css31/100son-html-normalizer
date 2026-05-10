@@ -34,6 +34,7 @@ use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
 use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
+use Cent_Son\Html_Normalizer\Rest\StepsController;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
 use Cent_Son\Html_Normalizer\Steps\StepsRepository;
@@ -143,13 +144,18 @@ final class Plugin {
 	 * chaque sous-commit (5.2 Steps, 5.3 Diagnostics, 5.4 Posts/Diff)
 	 * injecte ses contrôleurs ici sans toucher au cycle de boot.
 	 *
-	 * Phase 5.1 : liste vide (infra REST en place, pas de contrôleur métier
-	 * encore — ils arrivent en 5.2-5.4).
+	 * Phase 5.2 : StepsController câblé. Phases 5.3 (DiagnosticsController) et
+	 * 5.4 (PostsController + DiffController) viendront s'ajouter ci-dessous.
 	 *
 	 * @return list<\Cent_Son\Html_Normalizer\Rest\BaseController>
 	 */
 	private function build_rest_controllers(): array {
-		return array();
+		return array(
+			new StepsController(
+				self::make_step_runner(),
+				new StepsRepository(),
+			),
+		);
 	}
 
 	/**

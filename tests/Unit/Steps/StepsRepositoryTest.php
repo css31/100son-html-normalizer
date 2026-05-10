@@ -177,4 +177,62 @@ final class StepsRepositoryTest extends TestCase {
 		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
 		$this->assertStringContainsString( 'ORDER BY started_at DESC', $last_sql );
 	}
+
+	// =========================================================================
+	//  list_filtered / count_filtered (Phase 5.2 — REST historique avec from/to)
+	// =========================================================================
+
+	public function test_list_filtered_without_bounds_omits_where_clause(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_filtered( null, null, 10, 0 );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringNotContainsString( 'WHERE', $last_sql );
+		$this->assertStringContainsString( 'ORDER BY started_at DESC', $last_sql );
+	}
+
+	public function test_list_filtered_applies_from_bound(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_filtered( '2026-05-01 00:00:00', null, 10, 0 );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'started_at >= ', $last_sql );
+		$this->assertStringContainsString( '2026-05-01 00:00:00', $last_sql );
+	}
+
+	public function test_list_filtered_applies_to_bound(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_filtered( null, '2026-05-31 23:59:59', 10, 0 );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'started_at <= ', $last_sql );
+		$this->assertStringContainsString( '2026-05-31 23:59:59', $last_sql );
+	}
+
+	public function test_list_filtered_applies_both_bounds_with_AND(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_filtered( '2026-05-01 00:00:00', '2026-05-31 23:59:59', 10, 0 );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'started_at >= ', $last_sql );
+		$this->assertStringContainsString( ' AND ', $last_sql );
+		$this->assertStringContainsString( 'started_at <= ', $last_sql );
+	}
+
+	public function test_list_filtered_treats_empty_string_as_null(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_filtered( '', '', 10, 0 );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringNotContainsString( 'WHERE', $last_sql );
+	}
+
+	public function test_count_filtered_without_bounds_returns_total(): void {
+		$this->wpdb->get_var_queue[] = '17';
+		$this->assertSame( 17, $this->repo->count_filtered( null, null ) );
+	}
+
+	public function test_count_filtered_with_bounds_includes_where(): void {
+		$this->wpdb->get_var_queue[] = '5';
+		$this->repo->count_filtered( '2026-05-01 00:00:00', '2026-05-31 23:59:59' );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'COUNT(*)', $last_sql );
+		$this->assertStringContainsString( 'started_at >= ', $last_sql );
+		$this->assertStringContainsString( 'started_at <= ', $last_sql );
+	}
 }

@@ -68,7 +68,7 @@ use WP_Post;
  *                                Idempotent : ré-appel sur pas finalisé renvoie
  *                                le record tel quel.
  */
-final class StepRunner {
+class StepRunner {
 
 	/**
 	 * @param StepsRepository       $steps       Persistance des pas.
