@@ -77,15 +77,19 @@ function StatusBadge( { item } ) {
 }
 
 /**
- * @param {Object}              props
- * @param {Array}               props.items        Diagnostics paginés.
- * @param {number}              props.total        Total non paginé.
- * @param {number}              props.page         Page courante (≥ 1).
- * @param {number}              props.perPage      Articles par page.
- * @param {number}              props.totalPages   Nombre de pages.
- * @param {boolean}             props.isLoading    Vrai durant le fetch.
- * @param {?string}             props.error        Message d'erreur ou null.
- * @param {(p: number) => void} props.onChangePage Callback changement de page.
+ * @param {Object}                                 props
+ * @param {Array}                                  props.items             Diagnostics paginés.
+ * @param {number}                                 props.total             Total non paginé.
+ * @param {number}                                 props.page              Page courante (≥ 1).
+ * @param {number}                                 props.perPage           Articles par page.
+ * @param {number}                                 props.totalPages        Nombre de pages.
+ * @param {boolean}                                props.isLoading         Vrai durant le fetch.
+ * @param {?string}                                props.error             Message d'erreur ou null.
+ * @param {(p: number) => void}                    props.onChangePage      Callback changement de page.
+ * @param {Set<number>}                            props.selectedIds       IDs sélectionnés (F14.1).
+ * @param {(id: number, checked: boolean) => void} props.onToggleArticle   Toggle d'un article.
+ * @param {(checked: boolean) => void}             props.onToggleAllOnPage Toggle de tous les articles de la page.
+ * @param {boolean}                                props.disabled          Désactive les checkboxes (pas en cours).
  * @return {JSX.Element} Tableau + pagination.
  */
 export default function ArticlesTable( {
@@ -97,7 +101,17 @@ export default function ArticlesTable( {
 	isLoading,
 	error,
 	onChangePage,
+	selectedIds,
+	onToggleArticle,
+	onToggleAllOnPage,
+	disabled,
 } ) {
+	const allOnPageChecked =
+		items.length > 0 &&
+		items.every( ( item ) => selectedIds.has( item.post_id ) );
+	const someOnPageChecked =
+		! allOnPageChecked &&
+		items.some( ( item ) => selectedIds.has( item.post_id ) );
 	if ( error ) {
 		return (
 			<div className="htmln-error notice notice-error">
@@ -140,6 +154,25 @@ export default function ArticlesTable( {
 			<table className="wp-list-table widefat striped htmln-articles-table">
 				<thead>
 					<tr>
+						<th scope="col" className="manage-column check-column">
+							<input
+								type="checkbox"
+								aria-label={ __(
+									'Tout sélectionner sur la page',
+									'100son-html-normalizer'
+								) }
+								checked={ allOnPageChecked }
+								ref={ ( node ) => {
+									if ( node ) {
+										node.indeterminate = someOnPageChecked;
+									}
+								} }
+								disabled={ disabled }
+								onChange={ ( e ) =>
+									onToggleAllOnPage( e.target.checked )
+								}
+							/>
+						</th>
 						<th scope="col" className="manage-column">
 							{ __( 'ID', '100son-html-normalizer' ) }
 						</th>
@@ -169,6 +202,27 @@ export default function ArticlesTable( {
 				<tbody>
 					{ items.map( ( item ) => (
 						<tr key={ item.post_id }>
+							<th scope="row" className="check-column">
+								<input
+									type="checkbox"
+									aria-label={ sprintf(
+										// translators: %d = post_id.
+										__(
+											"Sélectionner l'article %d",
+											'100son-html-normalizer'
+										),
+										item.post_id
+									) }
+									checked={ selectedIds.has( item.post_id ) }
+									disabled={ disabled }
+									onChange={ ( e ) =>
+										onToggleArticle(
+											item.post_id,
+											e.target.checked
+										)
+									}
+								/>
+							</th>
 							<td>{ item.post_id }</td>
 							<td>
 								<StatusBadge item={ item } />
