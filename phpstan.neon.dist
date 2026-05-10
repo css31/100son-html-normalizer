@@ -12,6 +12,10 @@ parameters:
         - node_modules/*
         - assets/build/*
         - tests/*
+        # Glue code CLI : WP_CLI n'est pas dans les stubs WP de szepeviktor.
+        # Cohérent avec l'exclusion PHPUnit <source> de includes/Cli/.
+        # Le code est couvert par les tests d'intégration unitaires.
+        - includes/Cli/*
     bootstrapFiles:
         - vendor/autoload.php
     treatPhpDocTypesAsCertain: false

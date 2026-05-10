@@ -20,6 +20,9 @@ use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 use Cent_Son\Html_Normalizer\Api\PublicApi;
+use Cent_Son\Html_Normalizer\Cli\CliServiceProvider;
+use Cent_Son\Html_Normalizer\Cli\DiagnoseCommand;
+use Cent_Son\Html_Normalizer\Cli\StepsCommand;
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticInvalidator;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
@@ -118,6 +121,13 @@ final class Plugin {
 		$rest_provider = new RestServiceProvider( $this->build_rest_controllers() );
 		$rest_provider->register();
 
+		// V1.0 — Couche WP-CLI (Phase 5.5). Le provider est no-op si la
+		// classe `WP_CLI` n'existe pas (contexte non-CLI), donc on appelle
+		// register() inconditionnellement plutôt que de tester
+		// `defined('WP_CLI')` ici — délègue la responsabilité au provider.
+		$cli_provider = new CliServiceProvider( $this->build_cli_commands() );
+		$cli_provider->register();
+
 		// UI admin minimale V0.1 (PHP classique, pas SPA — phase 15 §11 ultérieure).
 		if ( is_admin() ) {
 			$log_repo        = new LogRepository();
@@ -174,6 +184,37 @@ final class Plugin {
 			new DiagnosticsController( $batch_runner, $diag_repo ),
 			new PostsController( $settings, $post_normalizer, $so_detector ),
 			new DiffController( $preset_registry, $pipeline, $metrics ),
+		);
+	}
+
+	/**
+	 * Construit la liste des commandes WP-CLI V1.0.
+	 *
+	 * Phase 5.5 : StepsCommand (`htmln steps {list, show, export}`) +
+	 * DiagnoseCommand (`htmln scan`).
+	 *
+	 * Pour `steps list`, on ne peut pas utiliser une méthode `list()`
+	 * directement car `list` est un mot réservé en PHP — on enregistre
+	 * `list_steps` sous le nom WP-CLI `htmln steps list`.
+	 *
+	 * @return list<array{name: string, callable: callable}>
+	 */
+	private function build_cli_commands(): array {
+		$settings        = new SettingsRepository();
+		$preset_registry = new PresetRegistry( $settings );
+		$metrics         = new MetricsCalculator();
+		$engine          = new DiagnosticEngine( $preset_registry, $metrics );
+		$diag_repo       = new DiagnosticsRepository();
+		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
+
+		$steps_cmd     = new StepsCommand( self::make_step_runner(), new StepsRepository() );
+		$diagnose_cmd  = new DiagnoseCommand( $batch_runner, $engine, $diag_repo );
+
+		return array(
+			array( 'name' => 'htmln steps list',   'callable' => array( $steps_cmd, 'list_steps' ) ),
+			array( 'name' => 'htmln steps show',   'callable' => array( $steps_cmd, 'show' ) ),
+			array( 'name' => 'htmln steps export', 'callable' => array( $steps_cmd, 'export' ) ),
+			array( 'name' => 'htmln scan',          'callable' => $diagnose_cmd ),
 		);
 	}
 

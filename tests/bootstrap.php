@@ -437,6 +437,93 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 	}
 }
 
+// ===================================================================
+// Stubs WP-CLI (Phase 5.5).
+// ===================================================================
+
+if ( ! class_exists( 'Son100_Htmln_Test_Cli_Exit_Exception' ) ) {
+	/**
+	 * Exception levée par le stub `WP_CLI::error()` pour simuler l'exit
+	 * non-zero qu'opèrerait la vraie WP-CLI. Les tests `try/catch` cette
+	 * exception pour vérifier les chemins d'erreur.
+	 */
+	final class Son100_Htmln_Test_Cli_Exit_Exception extends \RuntimeException {}
+}
+
+if ( ! class_exists( 'WP_CLI' ) ) {
+	/**
+	 * Stub minimal de la façade `WP_CLI` (couvre les méthodes que nos
+	 * commandes V1.0 utilisent : add_command + log/success/warning/error).
+	 *
+	 * Les sorties s'accumulent dans `$logs` et `$success`/`$warnings` ;
+	 * `error()` lève `Son100_Htmln_Test_Cli_Exit_Exception` (vraie WP-CLI
+	 * fait un exit). Les tests assertent sur ces buffers ou catchent
+	 * l'exception.
+	 */
+	final class WP_CLI {
+		/** @var list<array{name: string, callable: mixed, args: array}> */
+		public static array $commands = array();
+		/** @var list<string> */
+		public static array $logs = array();
+		/** @var list<string> */
+		public static array $success = array();
+		/** @var list<string> */
+		public static array $warnings = array();
+
+		public static function reset(): void {
+			self::$commands = array();
+			self::$logs     = array();
+			self::$success  = array();
+			self::$warnings = array();
+		}
+
+		/**
+		 * @param string                       $name
+		 * @param callable|class-string        $callable
+		 * @param array<string, mixed>         $args
+		 */
+		public static function add_command( string $name, mixed $callable, array $args = array() ): bool {
+			self::$commands[] = array(
+				'name'     => $name,
+				'callable' => $callable,
+				'args'     => $args,
+			);
+			return true;
+		}
+
+		public static function log( string $message ): void {
+			self::$logs[] = $message;
+		}
+
+		public static function success( string $message ): void {
+			self::$success[] = $message;
+		}
+
+		public static function warning( string $message ): void {
+			self::$warnings[] = $message;
+		}
+
+		/**
+		 * Simule l'exit non-zero de la vraie WP-CLI en levant une exception
+		 * que les tests peuvent catcher.
+		 */
+		public static function error( string $message ): void {
+			throw new \Son100_Htmln_Test_Cli_Exit_Exception( $message );
+		}
+
+		/** @param list<array<string, mixed>> $rows */
+		public static function colorize( string $message ): string { return $message; }
+	}
+}
+
+if ( ! class_exists( 'WP_CLI_Command' ) ) {
+	/**
+	 * Stub minimaliste — la vraie classe WP-CLI n'expose qu'une API vide,
+	 * les sous-commandes héritent juste pour la sémantique.
+	 */
+	abstract class WP_CLI_Command {}
+}
+
 if ( ! function_exists( 'delete_option' ) ) {
 	function delete_option( string $name ): bool {
 		if ( isset( $GLOBALS['son100_htmln_options'][ $name ] ) ) {

@@ -34,7 +34,7 @@ use WP_Post;
  * Aucune persistance : le caller (DiagnosticBatchRunner ou la couche REST)
  * passe le record à `DiagnosticsRepository::upsert()`.
  */
-final class DiagnosticEngine {
+class DiagnosticEngine {
 
 	/**
 	 * @param PresetRegistry    $registry Source des règles activées.
