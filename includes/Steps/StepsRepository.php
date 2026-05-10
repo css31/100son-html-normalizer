@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
  * résultats par article, la finalisation, et les requêtes de lecture
  * pour la vue Historique (F16) et le bandeau de reprise (cf. §3.1 F14).
  */
-final class StepsRepository {
+class StepsRepository {
 
 	/**
 	 * Adapter `$wpdb`.
