@@ -204,6 +204,18 @@ if ( ! function_exists( 'get_post_types' ) ) {
 	function get_post_types( array $args = [], string $output = 'names' ): array {
 		// Stub minimal : retourne par défaut post + page comme types publics.
 		$types = array( 'post' => 'post', 'page' => 'page' );
+		if ( 'objects' === $output ) {
+			$out = array();
+			foreach ( $types as $slug => $name ) {
+				$obj         = new \stdClass();
+				$obj->name   = $slug;
+				$obj->labels = (object) array(
+					'singular_name' => ucfirst( $slug ),
+				);
+				$out[ $slug ] = $obj;
+			}
+			return $out;
+		}
 		return $types;
 	}
 }

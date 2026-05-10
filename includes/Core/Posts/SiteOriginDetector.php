@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Détection des articles SiteOrigin.
  */
-final class SiteOriginDetector {
+class SiteOriginDetector {
 
 	/**
 	 * Indique si un article a une structure SiteOrigin Page Builder.

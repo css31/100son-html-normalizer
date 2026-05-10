@@ -35,6 +35,8 @@ use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
 use Cent_Son\Html_Normalizer\Rest\DiagnosticsController;
+use Cent_Son\Html_Normalizer\Rest\DiffController;
+use Cent_Son\Html_Normalizer\Rest\PostsController;
 use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
 use Cent_Son\Html_Normalizer\Rest\StepsController;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
@@ -146,16 +148,20 @@ final class Plugin {
 	 * chaque sous-commit (5.2 Steps, 5.3 Diagnostics, 5.4 Posts/Diff)
 	 * injecte ses contrôleurs ici sans toucher au cycle de boot.
 	 *
-	 * Phase 5.2 : StepsController câblé.
-	 * Phase 5.3 : DiagnosticsController câblé.
-	 * Phase 5.4 (PostsController + DiffController) viendra s'ajouter ci-dessous.
+	 * Phase 5.2 : StepsController.
+	 * Phase 5.3 : DiagnosticsController.
+	 * Phase 5.4 : PostsController + DiffController.
 	 *
 	 * @return list<\Cent_Son\Html_Normalizer\Rest\BaseController>
 	 */
 	private function build_rest_controllers(): array {
 		$settings        = new SettingsRepository();
 		$preset_registry = new PresetRegistry( $settings );
+		$pipeline        = new Pipeline();
 		$metrics         = new MetricsCalculator();
+		$normalizer      = new HtmlNormalizer( $preset_registry, $pipeline );
+		$so_detector     = new SiteOriginDetector();
+		$post_normalizer = new PostNormalizer( $normalizer, $so_detector );
 		$engine          = new DiagnosticEngine( $preset_registry, $metrics );
 		$diag_repo       = new DiagnosticsRepository();
 		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
@@ -166,6 +172,8 @@ final class Plugin {
 				new StepsRepository(),
 			),
 			new DiagnosticsController( $batch_runner, $diag_repo ),
+			new PostsController( $settings, $post_normalizer, $so_detector ),
+			new DiffController( $preset_registry, $pipeline, $metrics ),
 		);
 	}
 

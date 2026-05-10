@@ -23,7 +23,7 @@ use Cent_Son\Html_Normalizer\Core\Metrics\HtmlMetrics;
 /**
  * Service de normalisation au niveau article WP.
  */
-final class PostNormalizer {
+class PostNormalizer {
 
 	public const STATUS_MODIFIED         = 'modified';
 	public const STATUS_UNCHANGED        = 'unchanged';
