@@ -106,17 +106,29 @@ final class Assets {
 	}
 
 	/**
-	 * Indique si le hook_suffix courant correspond à la page SPA.
+	 * Indique si la page admin courante correspond à la page SPA.
 	 *
-	 * Le hook_suffix WordPress pour une sous-page d'un top-level menu suit
-	 * la formule `<top-level-slug>_page_<sub-slug>`. On compare exactement
-	 * pour éviter les faux-positifs sur d'autres pages contenant le slug.
+	 * Pourquoi pas un test sur `$hook_suffix` direct : WordPress calcule le
+	 * hook_suffix d'une sous-page comme `sanitize_title($menu_title)_page_<sub-slug>`
+	 * — c'est le **titre** du top-level, pas son slug, qui sert de préfixe.
+	 * Reproduire cette formule côté Assets serait fragile (changement du
+	 * menu_title localisé = hook_suffix différent → mismatch silencieux).
 	 *
-	 * @param string $hook_suffix Hook suffix fourni par WordPress.
+	 * `$_GET['page']` est stable, exposé par WordPress sur toute requête
+	 * `wp-admin/admin.php?page=<sub-slug>`, et on contrôle directement la
+	 * constante `Menu::SPA_PAGE_SLUG` pour la comparaison stricte. Pas de
+	 * sanitize nécessaire : on compare à une constante littérale.
+	 *
+	 * Le paramètre `$hook_suffix` reste dans la signature pour cohérence
+	 * avec la callback `admin_enqueue_scripts` (et future télémétrie
+	 * éventuelle), mais n'est plus utilisé.
+	 *
+	 * @param string $hook_suffix Hook suffix fourni par WordPress (ignoré).
 	 * @return bool
 	 */
 	private function is_spa_page( string $hook_suffix ): bool {
-		$expected = Menu::SLUG . '_page_' . Menu::SPA_PAGE_SLUG;
-		return $hook_suffix === $expected;
+		unset( $hook_suffix );
+		return isset( $_GET['page'] )
+			&& Menu::SPA_PAGE_SLUG === $_GET['page']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	}
 }
