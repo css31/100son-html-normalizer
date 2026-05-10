@@ -111,6 +111,34 @@ final class StepRunnerTest extends TestCase {
 				);
 				return true;
 			}
+
+			public function finalize(
+				string $uuid,
+				int $successful_articles,
+				int $refused_articles,
+				int $errored_articles,
+				?string $finished_at = null
+			): bool {
+				$existing = $this->records[ $uuid ] ?? null;
+				if ( null === $existing ) {
+					return false;
+				}
+				$this->records[ $uuid ] = new StepRecord(
+					id: $existing->id,
+					step_uuid: $existing->step_uuid,
+					applied_rules: $existing->applied_rules,
+					affected_post_ids: $existing->affected_post_ids,
+					total_articles: $existing->total_articles,
+					successful_articles: $successful_articles,
+					refused_articles: $refused_articles,
+					errored_articles: $errored_articles,
+					per_article_results: $existing->per_article_results,
+					user_id: $existing->user_id,
+					started_at: $existing->started_at,
+					finished_at: $finished_at ?? '2026-05-10 12:00:00',
+				);
+				return true;
+			}
 		};
 	}
 
@@ -771,5 +799,250 @@ final class StepRunnerTest extends TestCase {
 		$confirm = $ctx['runner']->confirm_article( $ctx['uuid'], 100 );
 
 		$this->assertSame( ArticleResult::STATUS_ERROR, $confirm->status );
+	}
+
+	// =========================================================================
+	//  resume_progress (Phase 4.3)
+	// =========================================================================
+
+	public function test_resume_progress_returns_null_for_unknown_step(): void {
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$this->assertNull( $runner->resume_progress( 'not-a-uuid' ) );
+	}
+
+	public function test_resume_progress_lists_all_pending_when_no_article_processed(): void {
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
+		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'P1' ), 1 );
+
+		$progress = $runner->resume_progress( $uuid );
+
+		$this->assertNotNull( $progress );
+		$this->assertSame( $uuid, $progress['uuid'] );
+		$this->assertSame( 3, $progress['total_articles'] );
+		$this->assertSame( array( 100, 101, 102 ), $progress['pending'] );
+		$this->assertSame( array(), $progress['processed'] );
+		$this->assertSame( array(), $progress['regression_pending'] );
+	}
+
+	public function test_resume_progress_categorizes_three_buckets(): void {
+		// Un pas de 4 articles : 1 success, 1 refused, 1 regression_pending, 1 jamais traité.
+		$this->seed_post( 100, '<p>Hello</p>' );
+		$this->seed_post( 101, '<p>Phrase à effacer</p>' );
+		$this->seed_post( 102, '<p>Phrase à effacer</p>' );
+		// 103 jamais traité.
+		$noop  = $this->fake_rule( 'P_OK', static fn( string $h ): string => $h );
+		$kill  = $this->fake_rule( 'P_KILL', static fn(): string => '' );
+		$steps = $this->steps_stub();
+
+		// On a besoin d'avoir LES DEUX règles disponibles dans le registry pour
+		// que process_article puisse appliquer la bonne. start_step prend juste
+		// les rule_ids sélectionnés, et le pas appliquera les deux à chaque article.
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $noop, $kill ) );
+
+		// Pas 1 : règle P_OK seulement → article 100 success (pas de régression).
+		$uuid_a = $runner->start_step( array( 100 ), array( 'P_OK' ), 1 );
+		$runner->process_article( $uuid_a, 100 );
+
+		// Pas 2 : règle P_KILL → 101 et 102 régression_pending, puis 101 refused, 102 reste pending.
+		$uuid_b = $runner->start_step( array( 101, 102, 103 ), array( 'P_KILL' ), 1 );
+		$runner->process_article( $uuid_b, 101 );
+		$runner->refuse_article( $uuid_b, 101 );
+		$runner->process_article( $uuid_b, 102 );
+		// 103 jamais traité.
+
+		$progress = $runner->resume_progress( $uuid_b );
+
+		$this->assertNotNull( $progress );
+		$this->assertSame( 3, $progress['total_articles'] );
+		$this->assertSame( array( 101 ), $progress['processed'] ); // refused = état terminal
+		$this->assertSame( array( 102 ), $progress['regression_pending'] );
+		$this->assertSame( array( 103 ), $progress['pending'] );
+	}
+
+	public function test_resume_progress_treats_error_status_as_processed(): void {
+		// Un article en error a un status terminal → catégorie `processed`.
+		$this->seed_post( 100, '<p>x</p>' );
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
+		$uuid   = $runner->start_step( array( 100, 999 ), array(), 1 );
+		$runner->process_article( $uuid, 999 ); // post inconnu → error
+
+		$progress = $runner->resume_progress( $uuid );
+
+		$this->assertNotNull( $progress );
+		$this->assertSame( array( 999 ), $progress['processed'] );
+		$this->assertSame( array( 100 ), $progress['pending'] );
+	}
+
+	public function test_resume_progress_treats_dry_run_as_processed(): void {
+		$this->seed_post( 100, '<p>x</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
+		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 100, dry_run: true );
+
+		$progress = $runner->resume_progress( $uuid );
+
+		$this->assertNotNull( $progress );
+		$this->assertSame( array( 100 ), $progress['processed'] );
+	}
+
+	public function test_resume_progress_preserves_affected_post_ids_order(): void {
+		$this->seed_post( 5, '<p>x</p>' );
+		$this->seed_post( 10, '<p>x</p>' );
+		$this->seed_post( 1, '<p>x</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
+
+		// Ordre volontairement non-trié pour vérifier que resume_progress respecte affected_post_ids.
+		$uuid = $runner->start_step( array( 10, 1, 5 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 5 ); // un seul traité
+
+		$progress = $runner->resume_progress( $uuid );
+
+		$this->assertNotNull( $progress );
+		$this->assertSame( array( 5 ), $progress['processed'] );
+		$this->assertSame( array( 10, 1 ), $progress['pending'], 'ordre du start_step doit être préservé' );
+	}
+
+	// =========================================================================
+	//  finalize_step (Phase 4.3)
+	// =========================================================================
+
+	public function test_finalize_returns_null_for_unknown_step(): void {
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$this->assertNull( $runner->finalize_step( 'not-a-uuid' ) );
+	}
+
+	public function test_finalize_with_no_processing_counts_all_as_errored(): void {
+		// Pas créé puis finalisé sans process_article : tous les articles affectés
+		// sont comptés errored (équivalent d'un abandon immédiat).
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$uuid   = $runner->start_step( array( 100, 101 ), array(), 1 );
+
+		$finalized = $runner->finalize_step( $uuid );
+
+		$this->assertNotNull( $finalized );
+		$this->assertSame( 0, $finalized->successful_articles );
+		$this->assertSame( 0, $finalized->refused_articles );
+		$this->assertSame( 2, $finalized->errored_articles );
+	}
+
+	public function test_finalize_counts_pending_as_errored(): void {
+		$this->seed_post( 100, '<p>x</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
+		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 100 );
+		// 101 et 102 jamais traités.
+
+		$finalized = $runner->finalize_step( $uuid );
+
+		$this->assertNotNull( $finalized );
+		$this->assertSame( 1, $finalized->successful_articles );
+		$this->assertSame( 0, $finalized->refused_articles );
+		$this->assertSame( 2, $finalized->errored_articles, '101 + 102 jamais traités → errored' );
+	}
+
+	public function test_finalize_counts_regression_pending_as_errored(): void {
+		// Un article laissé en regression_pending au moment du finalize doit être compté errored.
+		$ctx       = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+		$finalized = $ctx['runner']->finalize_step( $ctx['uuid'] );
+
+		$this->assertNotNull( $finalized );
+		$this->assertSame( 0, $finalized->successful_articles );
+		$this->assertSame( 0, $finalized->refused_articles );
+		$this->assertSame( 1, $finalized->errored_articles );
+	}
+
+	public function test_finalize_counts_refused_correctly(): void {
+		$ctx = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+		$ctx['runner']->refuse_article( $ctx['uuid'], 100 );
+
+		$finalized = $ctx['runner']->finalize_step( $ctx['uuid'] );
+
+		$this->assertNotNull( $finalized );
+		$this->assertSame( 0, $finalized->successful_articles );
+		$this->assertSame( 1, $finalized->refused_articles );
+		$this->assertSame( 0, $finalized->errored_articles );
+	}
+
+	public function test_finalize_counts_confirm_as_success(): void {
+		$ctx = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
+		$ctx['runner']->confirm_article( $ctx['uuid'], 100 );
+
+		$finalized = $ctx['runner']->finalize_step( $ctx['uuid'] );
+
+		$this->assertNotNull( $finalized );
+		$this->assertSame( 1, $finalized->successful_articles );
+		$this->assertSame( 0, $finalized->refused_articles );
+		$this->assertSame( 0, $finalized->errored_articles );
+	}
+
+	public function test_finalize_counts_dry_run_as_errored(): void {
+		// dry_run n'est pas un état terminal "comptable" pour la finalisation
+		// d'un pas live. Si on finalise un pas avec un article dry_run, on
+		// considère qu'il n'a pas vraiment été traité côté écriture.
+		$this->seed_post( 100, '<p>x</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
+		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 100, dry_run: true );
+
+		$finalized = $runner->finalize_step( $uuid );
+
+		$this->assertNotNull( $finalized );
+		$this->assertSame( 0, $finalized->successful_articles );
+		$this->assertSame( 0, $finalized->refused_articles );
+		$this->assertSame( 1, $finalized->errored_articles );
+	}
+
+	public function test_finalize_marks_finished_at(): void {
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
+		$uuid   = $runner->start_step( array( 100 ), array(), 1 );
+
+		$finalized = $runner->finalize_step( $uuid );
+
+		$this->assertNotNull( $finalized );
+		$this->assertNotNull( $finalized->finished_at );
+		$this->assertTrue( $finalized->is_finished() );
+	}
+
+	public function test_finalize_is_idempotent_on_already_finalized(): void {
+		// Double-clic SPA : le 2e appel doit retourner le record existant sans rien recompter.
+		$this->seed_post( 100, '<p>x</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
+		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 100 );
+
+		$first  = $runner->finalize_step( $uuid );
+		$second = $runner->finalize_step( $uuid );
+
+		$this->assertNotNull( $first );
+		$this->assertNotNull( $second );
+		$this->assertSame( 1, $first->successful_articles );
+		$this->assertSame( $first->successful_articles, $second->successful_articles );
+		$this->assertSame( $first->finished_at, $second->finished_at, 'finished_at ne doit pas être ré-écrasé' );
+	}
+
+	public function test_finalize_after_resume_progress_no_pending(): void {
+		// Après un finalize, resume_progress reflète le pas finalisé : tous traités.
+		$this->seed_post( 100, '<p>x</p>' );
+		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
+		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$runner->process_article( $uuid, 100 );
+		$runner->finalize_step( $uuid );
+
+		$progress = $runner->resume_progress( $uuid );
+
+		$this->assertNotNull( $progress );
+		$this->assertSame( array( 100 ), $progress['processed'] );
+		$this->assertSame( array(), $progress['pending'] );
+		$this->assertSame( array(), $progress['regression_pending'] );
 	}
 }

@@ -56,9 +56,17 @@ use WP_Post;
  *       puis `wp_update_post()` puis recalcul `DiagnosticEngine` puis
  *       `DiagnosticsRepository::upsert()` puis persister `success`.
  *
- * Note V0 : `resume_progress()` / `finalize_step()` arriveront en Phase 4.3.
- * Cette version couvre `start_step()` + `process_article()` (happy path,
- * dry_run, regression_pending, erreur) + `confirm_article()` + `refuse_article()`.
+ * Surface publique V1.0 :
+ *  - `start_step()`            — création initiale du pas (UUID v4 serveur).
+ *  - `process_article()`       — pipeline §4.4.2 par article (happy / dry_run
+ *                                / regression_pending / erreur).
+ *  - `confirm_article()`       — admin confirme une régression : écriture forcée.
+ *  - `refuse_article()`        — admin refuse : post_meta de relance + status refused.
+ *  - `resume_progress()`       — énumération des articles par catégorie de
+ *                                progression (alimente `StepResumeBanner` côté SPA).
+ *  - `finalize_step()`         — comptage final + écriture `finished_at`.
+ *                                Idempotent : ré-appel sur pas finalisé renvoie
+ *                                le record tel quel.
  */
 final class StepRunner {
 
@@ -339,6 +347,105 @@ final class StepRunner {
 		);
 	}
 
+	/**
+	 * Énumère les articles d'un pas par catégorie de progression. Alimente
+	 * le `StepResumeBanner` côté SPA (cf. cahier §3.1 F14, hyp. 31) et la
+	 * vue Historique (F16).
+	 *
+	 * Catégorisation à partir de `per_article_results` :
+	 *  - `processed`          : status `success`, `refused`, `error` ou `dry_run`
+	 *                           (état terminal du point de vue du pas — l'article
+	 *                           ne sera plus retraité).
+	 *  - `regression_pending` : article en attente d'une décision admin via
+	 *                           `confirm_article()` ou `refuse_article()`.
+	 *  - `pending`            : article jamais traité (pas dans `per_article_results`).
+	 *
+	 * L'ordre des listes respecte celui de `affected_post_ids`, snapshot au
+	 * démarrage du pas, ce qui permet à la SPA de reprendre exactement où elle
+	 * s'était arrêtée.
+	 *
+	 * @param string $uuid UUID du pas.
+	 * @return array{
+	 *   uuid: string,
+	 *   total_articles: int,
+	 *   processed: list<int>,
+	 *   regression_pending: list<int>,
+	 *   pending: list<int>,
+	 * }|null `null` si le pas est inconnu.
+	 */
+	public function resume_progress( string $uuid ): ?array {
+		$step = $this->steps->find_by_uuid( $uuid );
+		if ( null === $step ) {
+			return null;
+		}
+
+		$processed          = array();
+		$regression_pending = array();
+		$pending            = array();
+
+		foreach ( $step->affected_post_ids as $post_id ) {
+			$entry = $step->per_article_results[ $post_id ] ?? null;
+			if ( null === $entry ) {
+				$pending[] = $post_id;
+				continue;
+			}
+			$status = (string) ( $entry['status'] ?? '' );
+			if ( ArticleResult::STATUS_REGRESSION_PENDING === $status ) {
+				$regression_pending[] = $post_id;
+				continue;
+			}
+			$processed[] = $post_id;
+		}
+
+		return array(
+			'uuid'               => $uuid,
+			'total_articles'     => $step->total_articles,
+			'processed'          => $processed,
+			'regression_pending' => $regression_pending,
+			'pending'            => $pending,
+		);
+	}
+
+	/**
+	 * Finalise un pas : compte les statuts depuis `per_article_results` et
+	 * délègue à `StepsRepository::finalize()` pour poser `finished_at`.
+	 *
+	 * Règle de comptage :
+	 *  - `successful_articles` = entrées `success`.
+	 *  - `refused_articles`    = entrées `refused`.
+	 *  - `errored_articles`    = entrées `error`, `regression_pending`, `dry_run`,
+	 *                            statut inconnu, **et** articles affectés non
+	 *                            présents dans `per_article_results` (la SPA
+	 *                            n'est pas allée jusqu'au bout — équivalent
+	 *                            sémantique d'un abandon).
+	 *
+	 * Idempotent : si le pas est déjà finalisé (`finished_at` non null), retourne
+	 * le record tel quel sans recompter — tolère les double-clics SPA.
+	 *
+	 * @param string $uuid UUID du pas.
+	 * @return StepRecord|null Record finalisé, ou `null` si le pas est inconnu.
+	 */
+	public function finalize_step( string $uuid ): ?StepRecord {
+		$step = $this->steps->find_by_uuid( $uuid );
+		if ( null === $step ) {
+			return null;
+		}
+		if ( $step->is_finished() ) {
+			return $step;
+		}
+
+		$counts = $this->count_terminal_statuses( $step );
+
+		$this->steps->finalize(
+			$uuid,
+			$counts['success'],
+			$counts['refused'],
+			$counts['errored'],
+		);
+
+		return $this->steps->find_by_uuid( $uuid );
+	}
+
 	// =========================================================================
 	//  Helpers privés
 	// =========================================================================
@@ -453,5 +560,54 @@ final class StepRunner {
 		}
 		$this->steps->update_per_article_result( $uuid, $post_id, $persistence );
 		return $result;
+	}
+
+	/**
+	 * Compte les statuts terminaux d'un pas pour `finalize_step()`.
+	 *
+	 * Tout ce qui n'est pas `success` ou `refused` est compté `errored` :
+	 * `regression_pending` (la SPA n'a pas demandé de décision finale),
+	 * `error`, `dry_run` (pas de pas dry-run partiel attendu en V1.0),
+	 * statut inconnu, et articles affectés mais absents de
+	 * `per_article_results` (jamais traités).
+	 *
+	 * @param StepRecord $step Record à analyser.
+	 * @return array{success: int, refused: int, errored: int}
+	 */
+	private function count_terminal_statuses( StepRecord $step ): array {
+		$success = 0;
+		$refused = 0;
+		$errored = 0;
+		$seen    = array();
+
+		foreach ( $step->per_article_results as $post_id => $entry ) {
+			$seen[ (int) $post_id ] = true;
+			$status                  = (string) ( $entry['status'] ?? '' );
+			switch ( $status ) {
+				case ArticleResult::STATUS_SUCCESS:
+					++$success;
+					break;
+				case ArticleResult::STATUS_REFUSED:
+					++$refused;
+					break;
+				default:
+					// regression_pending, error, dry_run, statut inconnu.
+					++$errored;
+					break;
+			}
+		}
+
+		// Articles affectés non présents dans per_article_results : non traités.
+		foreach ( $step->affected_post_ids as $post_id ) {
+			if ( ! isset( $seen[ $post_id ] ) ) {
+				++$errored;
+			}
+		}
+
+		return array(
+			'success' => $success,
+			'refused' => $refused,
+			'errored' => $errored,
+		);
 	}
 }
