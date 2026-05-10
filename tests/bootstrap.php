@@ -66,12 +66,25 @@ if ( ! class_exists( 'WP_Post' ) ) {
 
 if ( ! class_exists( 'WP_Error' ) ) {
 	final class WP_Error {
+		private string $code;
 		private string $message;
-		public function __construct( string $code = '', string $message = '' ) {
+		/** @var array<string, mixed> */
+		private array $data;
+
+		public function __construct( string $code = '', string $message = '', array $data = array() ) {
+			$this->code    = $code;
 			$this->message = $message;
+			$this->data    = $data;
+		}
+		public function get_error_code(): string {
+			return $this->code;
 		}
 		public function get_error_message(): string {
 			return $this->message;
+		}
+		/** @return array<string, mixed> */
+		public function get_error_data(): array {
+			return $this->data;
 		}
 	}
 }
@@ -266,6 +279,149 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 			random_int( 0, 0x3fff ) | 0x8000,
 			random_int( 0, 0xffff ), random_int( 0, 0xffff ), random_int( 0, 0xffff )
 		);
+	}
+}
+
+// ===================================================================
+// Stubs REST (Phase 5).
+// ===================================================================
+
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	/**
+	 * Stub minimal de `WP_REST_Request` — porte des params + métadonnées route.
+	 */
+	final class WP_REST_Request {
+		/** @var array<string, mixed> */
+		private array $params = array();
+		private string $method;
+		private string $route;
+
+		public function __construct( string $method = 'GET', string $route = '' ) {
+			$this->method = $method;
+			$this->route  = $route;
+		}
+
+		public function get_method(): string { return $this->method; }
+		public function get_route(): string { return $this->route; }
+
+		/** @return array<string, mixed> */
+		public function get_params(): array { return $this->params; }
+
+		public function get_param( string $key ): mixed {
+			return $this->params[ $key ] ?? null;
+		}
+
+		public function set_param( string $key, mixed $value ): void {
+			$this->params[ $key ] = $value;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	/**
+	 * Stub minimal de `WP_REST_Response`.
+	 */
+	final class WP_REST_Response {
+		private mixed $data;
+		private int $status;
+		/** @var array<string, string> */
+		private array $headers;
+
+		/**
+		 * @param mixed                 $data    Payload.
+		 * @param int                   $status  Code HTTP.
+		 * @param array<string, string> $headers En-têtes.
+		 */
+		public function __construct( mixed $data = null, int $status = 200, array $headers = array() ) {
+			$this->data    = $data;
+			$this->status  = $status;
+			$this->headers = $headers;
+		}
+
+		public function get_data(): mixed { return $this->data; }
+		public function get_status(): int { return $this->status; }
+		public function set_status( int $status ): void { $this->status = $status; }
+
+		/** @return array<string, string> */
+		public function get_headers(): array { return $this->headers; }
+
+		public function header( string $key, string $value ): void {
+			$this->headers[ $key ] = $value;
+		}
+	}
+}
+
+if ( ! function_exists( 'register_rest_route' ) ) {
+	$GLOBALS['son100_htmln_test_rest_routes'] = $GLOBALS['son100_htmln_test_rest_routes'] ?? array();
+	/**
+	 * Stub `register_rest_route` — stocke chaque route enregistrée dans un
+	 * registre global utilisable en assertion par les tests.
+	 *
+	 * @param string                                                  $namespace  Namespace REST (ex. `htmln/v1`).
+	 * @param string                                                  $route      Pattern route (ex. `/steps/(?P<uuid>[a-f0-9-]+)`).
+	 * @param array<string, mixed>|list<array<string, mixed>>         $args       Méthodes/args.
+	 * @param bool                                                    $override   Réservé.
+	 * @return bool
+	 */
+	function register_rest_route( string $namespace, string $route, array $args = array(), bool $override = false ): bool {
+		$GLOBALS['son100_htmln_test_rest_routes'][] = array(
+			'namespace' => $namespace,
+			'route'     => $route,
+			'args'      => $args,
+			'override'  => $override,
+		);
+		return true;
+	}
+}
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	$GLOBALS['son100_htmln_test_can_default'] = true;
+	/** @var array<string, bool> Capabilities par-clé pour overrides ciblés. */
+	$GLOBALS['son100_htmln_test_caps'] = array();
+	function current_user_can( string $capability ): bool {
+		return $GLOBALS['son100_htmln_test_caps'][ $capability ]
+			?? $GLOBALS['son100_htmln_test_can_default']
+			?? true;
+	}
+}
+
+if ( ! function_exists( 'wp_verify_nonce' ) ) {
+	$GLOBALS['son100_htmln_test_nonce_valid'] = true;
+	function wp_verify_nonce( string $nonce, string $action ): int|false {
+		return $GLOBALS['son100_htmln_test_nonce_valid'] ? 1 : false;
+	}
+}
+
+if ( ! function_exists( 'is_admin' ) ) {
+	$GLOBALS['son100_htmln_test_is_admin'] = false;
+	function is_admin(): bool {
+		return (bool) $GLOBALS['son100_htmln_test_is_admin'];
+	}
+}
+
+if ( ! function_exists( 'rest_url' ) ) {
+	function rest_url( string $path = '' ): string {
+		return 'http://example.test/wp-json/' . ltrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'absint' ) ) {
+	function absint( mixed $value ): int {
+		return abs( (int) $value );
+	}
+}
+
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( mixed $value ): string {
+		return is_scalar( $value ) ? trim( strip_tags( (string) $value ) ) : '';
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( mixed $value ): string {
+		return is_scalar( $value )
+			? preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $value ) ) ?? ''
+			: '';
 	}
 }
 

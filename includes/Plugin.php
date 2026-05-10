@@ -33,6 +33,7 @@ use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
+use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
 use Cent_Son\Html_Normalizer\Steps\StepsRepository;
@@ -104,6 +105,14 @@ final class Plugin {
 		$diagnostic_invalida = new DiagnosticInvalidator( $diagnostics_repo, $settings );
 		$diagnostic_invalida->register();
 
+		// V1.0 — Couche REST (Phase 5+). La liste des contrôleurs s'étoffe
+		// au fil des sous-commits Phase 5 (Steps, Diagnostics, Posts/Diff).
+		// Le provider branche un seul hook `rest_api_init` qui itérera sur
+		// la liste, donc ajouter un contrôleur en Phase 5.x = simple
+		// extension du tableau ci-dessous, sans modification du provider.
+		$rest_provider = new RestServiceProvider( $this->build_rest_controllers() );
+		$rest_provider->register();
+
 		// UI admin minimale V0.1 (PHP classique, pas SPA — phase 15 §11 ultérieure).
 		if ( is_admin() ) {
 			$log_repo        = new LogRepository();
@@ -125,6 +134,22 @@ final class Plugin {
 		// - étapes 8+ : REST, CLI, F4 (UserRules + Validator + Preview),
 		// F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController),
 		// 15 (SPA React).)
+	}
+
+	/**
+	 * Construit la liste des contrôleurs REST V1.0 actifs.
+	 *
+	 * Méthode séparée de `boot()` pour faciliter l'extension Phase 5.x :
+	 * chaque sous-commit (5.2 Steps, 5.3 Diagnostics, 5.4 Posts/Diff)
+	 * injecte ses contrôleurs ici sans toucher au cycle de boot.
+	 *
+	 * Phase 5.1 : liste vide (infra REST en place, pas de contrôleur métier
+	 * encore — ils arrivent en 5.2-5.4).
+	 *
+	 * @return list<\Cent_Son\Html_Normalizer\Rest\BaseController>
+	 */
+	private function build_rest_controllers(): array {
+		return array();
 	}
 
 	/**
