@@ -156,13 +156,77 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$this->assertSame( 101, $records[1]->post_id );
 	}
 
-	public function test_count_by_status_returns_three_counts(): void {
+	// =========================================================================
+	//  list_paginated / count_paginated (Phase 5.3 — REST F13 unifié)
+	// =========================================================================
+
+	public function test_list_paginated_with_null_status_omits_where(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( null, 10, 0 );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringNotContainsString( 'WHERE', $last_sql );
+		$this->assertStringContainsString( 'ORDER BY diagnosed_at DESC', $last_sql );
+	}
+
+	public function test_list_paginated_with_normal_status_excludes_stale(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( 'normal', 10, 0 );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringContainsString( "status = 'normal'", $last_sql );
+		$this->assertStringContainsString( 'is_stale = 0', $last_sql );
+	}
+
+	public function test_list_paginated_with_to_improve_status(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( 'to_improve', 10, 0 );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringContainsString( "status = 'to_improve'", $last_sql );
+		$this->assertStringContainsString( 'is_stale = 0', $last_sql );
+	}
+
+	public function test_list_paginated_with_stale_status_only_filters_stale_flag(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( 'stale', 10, 0 );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringContainsString( 'is_stale = 1', $last_sql );
+		$this->assertStringNotContainsString( "status = 'normal'", $last_sql );
+	}
+
+	public function test_list_paginated_with_unknown_status_returns_empty_without_query(): void {
+		// Défense en profondeur : status inconnu → pas d'appel BDD du tout.
+		$initial_count = count( $this->wpdb->query_log );
+		$result        = $this->repo->list_paginated( 'bogus', 10, 0 );
+		$this->assertSame( array(), $result );
+		$this->assertCount( $initial_count, $this->wpdb->query_log, 'Aucune requête ne doit être envoyée pour un status inconnu' );
+	}
+
+	public function test_count_paginated_with_null_status_returns_total(): void {
+		$this->wpdb->get_var_queue[] = '42';
+		$this->assertSame( 42, $this->repo->count_paginated( null ) );
+	}
+
+	public function test_count_paginated_with_status_includes_where(): void {
+		$this->wpdb->get_var_queue[] = '17';
+		$this->repo->count_paginated( 'to_improve' );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringContainsString( 'COUNT(*)', $last_sql );
+		$this->assertStringContainsString( "status = 'to_improve'", $last_sql );
+	}
+
+	public function test_count_paginated_with_unknown_status_returns_zero_without_query(): void {
+		$initial_count = count( $this->wpdb->query_log );
+		$this->assertSame( 0, $this->repo->count_paginated( 'bogus' ) );
+		$this->assertCount( $initial_count, $this->wpdb->query_log );
+	}
+
+	public function test_count_by_status_returns_four_counts(): void {
 		$this->wpdb->get_var_queue[] = '12';   // normal
 		$this->wpdb->get_var_queue[] = '34';   // to_improve
 		$this->wpdb->get_var_queue[] = '5';    // stale
+		$this->wpdb->get_var_queue[] = '55';   // total (Phase 5.3 — F13 stats)
 		$counts = $this->repo->count_by_status();
 		$this->assertSame(
-			array( 'normal' => 12, 'to_improve' => 34, 'stale' => 5 ),
+			array( 'normal' => 12, 'to_improve' => 34, 'stale' => 5, 'total' => 55 ),
 			$counts
 		);
 	}

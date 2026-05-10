@@ -33,7 +33,7 @@ use WP_Post;
  * Scope du scan : `post_status='publish'` + post_types issus du setting
  * F8 (`f8_post_types_selection`). Cohérent avec §3.1 F12 et hyp. 20 du cahier.
  */
-final class DiagnosticBatchRunner {
+class DiagnosticBatchRunner {
 
 	/**
 	 * Taille de chunk par défaut (cf. §11.18 — 20 articles).
@@ -54,12 +54,18 @@ final class DiagnosticBatchRunner {
 	/**
 	 * Énumère les articles éligibles et retourne les méta-données du batch.
 	 *
-	 * @param int|null $chunk_size Taille de chunk (≥ 1). Défaut : `DEFAULT_CHUNK_SIZE`.
+	 * `$post_types_override` permet à un caller (typiquement
+	 * `DiagnosticsController::run_batch()`) de scanner un sous-ensemble
+	 * différent du défaut F8 sans persister la sélection. Si `null`, on
+	 * retombe sur la sélection F8 stockée en `Settings`.
+	 *
+	 * @param int|null            $chunk_size           Taille de chunk (≥ 1). Défaut : `DEFAULT_CHUNK_SIZE`.
+	 * @param list<string>|null   $post_types_override  Override ad-hoc des post_types ; `null` = défauts F8.
 	 * @return array{batch_id: string, total_articles: int, post_ids: list<int>, chunk_size: int}
 	 */
-	public function start_batch( ?int $chunk_size = null ): array {
+	public function start_batch( ?int $chunk_size = null, ?array $post_types_override = null ): array {
 		$resolved_chunk = max( 1, $chunk_size ?? self::DEFAULT_CHUNK_SIZE );
-		$post_types     = $this->settings->get_f8_post_types_selection();
+		$post_types     = $post_types_override ?? $this->settings->get_f8_post_types_selection();
 		$raw            = get_posts(
 			array(
 				'post_type'      => $post_types,

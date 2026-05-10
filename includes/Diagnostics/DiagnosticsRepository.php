@@ -114,18 +114,74 @@ class DiagnosticsRepository {
 	/**
 	 * Compte des diagnostics par status, utile pour les badges des onglets F13.
 	 *
-	 * @return array{normal: int, to_improve: int, stale: int}
+	 * `total` : nombre total de lignes dans la table, peu importe is_stale ou
+	 * status. Utile pour `GET /diagnostics/stats` (F13) et la SPA pour calculer
+	 * la part de stale dans l'ensemble.
+	 *
+	 * @return array{normal: int, to_improve: int, stale: int, total: int}
 	 */
 	public function count_by_status(): array {
 		$sql_normal   = "SELECT COUNT(*) FROM `{$this->table}` WHERE status = 'normal' AND is_stale = 0";
 		$sql_improve  = "SELECT COUNT(*) FROM `{$this->table}` WHERE status = 'to_improve' AND is_stale = 0";
 		$sql_stale    = "SELECT COUNT(*) FROM `{$this->table}` WHERE is_stale = 1";
+		$sql_total    = "SELECT COUNT(*) FROM `{$this->table}`";
 
 		return array(
 			'normal'     => (int) $this->wpdb->get_var( $sql_normal ),
 			'to_improve' => (int) $this->wpdb->get_var( $sql_improve ),
 			'stale'      => (int) $this->wpdb->get_var( $sql_stale ),
+			'total'      => (int) $this->wpdb->get_var( $sql_total ),
 		);
+	}
+
+	/**
+	 * Liste paginée unifiée pour `GET /diagnostics` (F13). Filtre par status
+	 * optionnel : `null` retourne tous les diagnostics.
+	 *
+	 * Sémantique du filtre `status` :
+	 *  - `'normal'`     : `status = 'normal'` ET `is_stale = 0`.
+	 *  - `'to_improve'` : `status = 'to_improve'` ET `is_stale = 0`.
+	 *  - `'stale'`      : `is_stale = 1` (peu importe `status`).
+	 *  - `null`         : pas de filtre, tous les diagnostics.
+	 *  - autre valeur   : liste vide (status inconnu — défense en profondeur).
+	 *
+	 * @param string|null $status Filtre status, ou null pour tous.
+	 * @param int         $limit  Nombre max.
+	 * @param int         $offset Décalage.
+	 * @return list<DiagnosticRecord>
+	 */
+	public function list_paginated( ?string $status, int $limit = 50, int $offset = 0 ): array {
+		$where = $this->build_status_clause( $status );
+		if ( null === $where ) {
+			return array();
+		}
+		$sql = "SELECT * FROM `{$this->table}`";
+		if ( '' !== $where ) {
+			$sql .= ' WHERE ' . $where;
+		}
+		$sql .= ' ORDER BY diagnosed_at DESC LIMIT %d OFFSET %d';
+		return $this->fetch_records(
+			$this->wpdb->prepare( $sql, max( 1, $limit ), max( 0, $offset ) )
+		);
+	}
+
+	/**
+	 * Comptage paginé compagnon de `list_paginated()` — sert au calcul de
+	 * `total_pages` côté contrôleur REST.
+	 *
+	 * @param string|null $status Filtre status, ou null pour tous.
+	 * @return int
+	 */
+	public function count_paginated( ?string $status ): int {
+		$where = $this->build_status_clause( $status );
+		if ( null === $where ) {
+			return 0;
+		}
+		$sql = "SELECT COUNT(*) FROM `{$this->table}`";
+		if ( '' !== $where ) {
+			$sql .= ' WHERE ' . $where;
+		}
+		return (int) $this->wpdb->get_var( $sql );
 	}
 
 	// =========================================================================
@@ -194,6 +250,25 @@ class DiagnosticsRepository {
 	// =========================================================================
 	//  Helpers privés
 	// =========================================================================
+
+	/**
+	 * Construit la clause WHERE pour le filtrage par status. Hardcodé car
+	 * limité à 4 valeurs whitelistées — pas de prepare() nécessaire.
+	 *
+	 * @param string|null $status Statut ou null.
+	 * @return string|null Clause WHERE (ou chaîne vide pour pas de filtre),
+	 *                     ou `null` pour signaler un status inconnu (le
+	 *                     caller retourne array vide / 0 sans frapper la BDD).
+	 */
+	private function build_status_clause( ?string $status ): ?string {
+		return match ( $status ) {
+			null         => '',
+			'normal'     => "status = 'normal' AND is_stale = 0",
+			'to_improve' => "status = 'to_improve' AND is_stale = 0",
+			'stale'      => 'is_stale = 1',
+			default      => null,
+		};
+	}
 
 	/**
 	 * @param string $sql SQL préparé.
