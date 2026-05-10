@@ -30,7 +30,12 @@ use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 use Cent_Son\Html_Normalizer\Core\Posts\SiteOriginDetector;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
+use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
+use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
+use Cent_Son\Html_Normalizer\Steps\StepRunner;
+use Cent_Son\Html_Normalizer\Steps\StepsRepository;
 
 /**
  * Plugin singleton.
@@ -120,5 +125,41 @@ final class Plugin {
 		// - étapes 8+ : REST, CLI, F4 (UserRules + Validator + Preview),
 		// F5 (HeadingStrategist), F7 (RulesIo), F8 (PostsController),
 		// 15 (SPA React).)
+	}
+
+	/**
+	 * Construit un `StepRunner` câblé avec ses 8 dépendances (composition root
+	 * de F14 — application par pas).
+	 *
+	 * Volontairement statique et stateless : chaque appel instancie une nouvelle
+	 * grappe complète. Les services injectés sont tous stateless (pas d'état
+	 * partagé entre requêtes), donc ré-instancier à chaque request REST/CLI
+	 * (Phase 5) ne pose aucun problème de cohérence et simplifie les tests.
+	 *
+	 * Utilisé par :
+	 *  - les futurs `StepsController` (REST) et `StepsCommand` (CLI) en Phase 5 ;
+	 *  - les tests d'intégration `StepRunnerIntegrationTest` qui valident
+	 *    l'assemblage bout-en-bout sur un mini pas réel.
+	 *
+	 * @return StepRunner StepRunner prêt à recevoir start_step / process_article /
+	 *                    confirm_article / refuse_article / resume_progress /
+	 *                    finalize_step.
+	 */
+	public static function make_step_runner(): StepRunner {
+		$settings        = new SettingsRepository();
+		$preset_registry = new PresetRegistry( $settings );
+		$pipeline        = new Pipeline();
+		$metrics         = new MetricsCalculator();
+
+		return new StepRunner(
+			new StepsRepository(),
+			new DiagnosticsRepository(),
+			$preset_registry,
+			$pipeline,
+			$metrics,
+			new RegressionDetector(),
+			new DiagnosticEngine( $preset_registry, $metrics ),
+			$settings,
+		);
 	}
 }
