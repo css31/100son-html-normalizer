@@ -1,11 +1,16 @@
 /**
  * App — composant racine de la SPA V1.0.
  *
- * Router hash minimaliste :
+ * Router hash minimaliste. Ordre d'affichage des onglets dans la barre :
+ *  - `#/rules`              → vue Rules (configuration des 8 préréglages).
  *  - `#/normalize` (défaut) → vue Normalize (F13/F14/F14.3/F15).
  *  - `#/history`            → vue History (F16).
- *  - `#/rules`              → vue Rules (configuration des 8 préréglages).
  *  - `#/settings`           → vue Settings (F15 — seuils γ).
+ *
+ * Note : l'ordre du `nav` est purement visuel. La route par défaut (au
+ * mount sans hash) reste `normalize` — c'est le point d'entrée
+ * fonctionnel de la SPA, l'onglet « Règles » à gauche fait office de
+ * configuration en amont (relue à chaque pas).
  *
  * Pas de dépendance externe (pas de @wordpress/router qui n'existe pas en
  * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour ces 4
@@ -105,6 +110,14 @@ export default function App() {
 				) }
 			>
 				<a
+					href="#/rules"
+					aria-current={ ROUTE_RULES === route ? 'page' : undefined }
+					className={ tabClass( ROUTE_RULES ) }
+					onClick={ ( event ) => navigate( event, ROUTE_RULES ) }
+				>
+					{ __( 'Règles', '100son-html-normalizer' ) }
+				</a>
+				<a
 					href="#/normalize"
 					aria-current={
 						ROUTE_NORMALIZE === route ? 'page' : undefined
@@ -123,14 +136,6 @@ export default function App() {
 					onClick={ ( event ) => navigate( event, ROUTE_HISTORY ) }
 				>
 					{ __( 'Historique', '100son-html-normalizer' ) }
-				</a>
-				<a
-					href="#/rules"
-					aria-current={ ROUTE_RULES === route ? 'page' : undefined }
-					className={ tabClass( ROUTE_RULES ) }
-					onClick={ ( event ) => navigate( event, ROUTE_RULES ) }
-				>
-					{ __( 'Règles', '100son-html-normalizer' ) }
 				</a>
 				<a
 					href="#/settings"
