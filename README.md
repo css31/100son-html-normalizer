@@ -1,8 +1,8 @@
 # 100son HTML Normalizer
 
-> Moteur de **normalisation HTML configurable** pour WordPress — 8 préréglages prêts à l'emploi, garde-fou anti-perte de contenu, et API publique consommable par d'autres extensions.
+> Moteur de **normalisation HTML configurable** pour WordPress — 8 préréglages prêts à l'emploi, application par **pas** avec garde-fou de régression, historique tracé, et API publique consommable par d'autres extensions.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0--rc-orange.svg)](CHANGELOG.md)
 [![PHP](https://img.shields.io/badge/PHP-8.3+-blue.svg)](#pile-technique)
 [![WordPress](https://img.shields.io/badge/WordPress-6.8+-21759b.svg)](#pile-technique)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green.svg)](#licence)
@@ -29,7 +29,7 @@ qu'on réécrit habituellement à coups de `preg_replace` éparpillés. Il a ét
 
 ## Ce que fait l'extension
 
-### Les 8 préréglages livrés (V0.1)
+### Les 8 préréglages
 
 | Code | Nom | Action |
 |:---:|---|---|
@@ -42,50 +42,106 @@ qu'on réécrit habituellement à coups de `preg_replace` éparpillés. Il a ét
 | **P7** | `AsciiList` | Convertit les listes ASCII (`* item`, `- item`) en vraies `<ul><li>` |
 | **P8** | `RecoverSemanticStyles` | Récupère le sens : `<span style="font-weight:bold">` → `<strong>`, etc., **avant** que P6 ne tape |
 
-**Pipeline canonique :** P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2
-(L'ordre est figé pour préserver le sens : on récupère la sémantique avant de purger les styles, on enlève le shortcode avant qu'il génère des paragraphes vides, etc.)
+**Pipeline canonique :** P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2.
+L'ordre est figé pour préserver le sens : on récupère la sémantique avant de purger les styles, on enlève le shortcode avant qu'il génère des paragraphes vides, etc. Chaque préréglage est **activable / désactivable indépendamment** depuis l'admin.
 
-Chaque préréglage est **activable / désactivable indépendamment** depuis l'admin, et la plupart exposent des paramètres fins (ex. P5 : seuil minimum de `<br>` consécutifs).
+### Workflow par pas (V1.0)
 
-### Garde-fou perte de contenu
+À partir de la V1.0, la normalisation d'un corpus se fait par **pas** (« step » côté code) plutôt qu'en bulk d'un coup. Un *pas* = un sous-ensemble de règles appliqué à une sélection d'articles, exécuté article par article avec révision et contrôle de régression.
 
-Toute normalisation calcule **avant / après** :
-- nombre de mots (UTF-8)
-- nombre de caractères
-- nombre d'images
+Pipeline d'un pas (cf. cahier §4.4.2) :
 
-…et lève une **alerte de sévérité** :
+```
+pour chaque article sélectionné :
+   1.  wp_save_post_revision()            ← garde-fou §13 — toujours, avant toute écriture
+   2.  metrics(before)                    ← snapshot 7 métriques γ
+   3.  Pipeline::applySubset(rules, html) ← applique le sous-ensemble de règles cochées
+   4.  metrics(after)                     ← snapshot post-normalisation
+   5.  RegressionDetector::analyze()      ← compare before / after vs seuils γ
+       └─ si dépassement → status `regression_pending`, aucune écriture
+       └─ sinon          → wp_update_post + recalcul du diagnostic
+   6.  StepsRepository::update_per_article_result()
+```
 
-| Niveau | Seuil |
-|---|---|
-| 🟢 OK | Pertes < 10 % de mots et 0 image perdue |
-| 🟠 Attention | ≥ 10 % de mots perdus **ou** 1 image perdue |
-| 🔴 Critique | ≥ 30 % de mots perdus **ou** ≥ 2 images perdues |
+À tout moment, l'admin peut :
 
-L'alerte est **non-bloquante** : c'est un signal pour l'admin, pas une censure.
-Les métriques sont aussi **stockées dans chaque entrée du journal** → auditabilité.
+- **Voir le diff** d'un article avant d'agir (Modal plein écran, code et rendu côte à côte) ;
+- **Refuser** une régression (pose `_son100_htmln_manual_check_required=1`, aucune écriture) ;
+- **Confirmer** une régression (écriture forcée, la trace du rapport reste dans l'historique).
 
-### Interface d'administration (V0.1)
+Tous les pas sont tracés dans la table `son100_htmln_steps` avec leurs `per_article_results`, consultables depuis l'onglet **Historique** de la SPA admin et en CLI via `wp htmln steps`.
 
-Menu top-level **HTML Normalizer**, 4 pages :
+### Seuils γ — garde-fou anti-perte de contenu
 
-| Page | Rôle |
-|---|---|
-| **Préréglages** | Activer/désactiver chaque préréglage et régler ses paramètres. Case maître « Tout activer / désactiver », bouton Enregistrer en haut et en bas. |
-| **Tester un fragment** | Coller un bout de HTML, voir le résultat normalisé en source + rendu. Utile pour le débogage et pour comprendre l'effet des préréglages. |
-| **Normaliser** | Liste paginée des articles (post / page / CPT publics). Filtres : recherche par titre, catégorie, année, mois, SiteOrigin oui/non. Tri ID / Titre / Date. Aperçu avant/après côte-à-côte avec métriques. Action groupée pour normaliser une sélection. |
-| **Journal** | 500 dernières entrées (FIFO) : normalisations, aperçus, changements de configuration. Badge sévérité couleur. Lien vers article + révision. Zone de note libre persistante. |
+La régression est définie comme une **perte au-delà d'un seuil γ** sur l'une des 7 métriques structurelles d'un article. Tous les seuils sont configurables dans l'onglet **Réglages** de la SPA admin.
+
+| Métrique | Unité | Default |
+|---|---|:---:|
+| `text_loss_pct` | % de caractères perdus | 0 |
+| `words_loss_pct` | % de mots perdus | 0 |
+| `paragraphs_loss_pct` | % de paragraphes perdus | 5 |
+| `headings_loss` | nombre absolu (par niveau h1..h6 indépendamment) | 0 |
+| `images_loss` | nombre absolu | 0 |
+| `links_loss` | nombre absolu | 0 |
+| `lists_loss` | nombre absolu (`<ul>` / `<ol>`) | 0 |
+
+Sémantique : la perte tolérée est **stricte au-delà du seuil** (`loss > γ` déclenche, `loss == γ` n'alerte pas). Les valeurs par défaut sont volontairement prudentes — on préfère une alerte de plus qu'une perte silencieuse. Un seuil à 0 signifie « toute perte alerte ».
+
+Source de vérité côté code : `Cent_Son\Html_Normalizer\Settings\SettingsRepository::REGRESSION_THRESHOLD_DEFAULTS` et `Cent_Son\Html_Normalizer\Regression\RegressionDetector::analyze()`.
+
+### Interface d'administration
+
+Menu top-level **HTML Normalizer**, qui héberge cinq sous-pages en cohabitation V0.1 + V1.0 :
+
+| Page | Phase | Rôle |
+|---|:---:|---|
+| **Préréglages** | V0.1 | Activer/désactiver chaque préréglage et régler ses paramètres. |
+| **Tester un fragment** | V0.1 | Coller un bout de HTML, voir le résultat normalisé en source + rendu. |
+| **Normaliser** | V0.1 | Liste paginée des articles (V0.1, normalisation immédiate sans pas). |
+| **Journal** | V0.1 | 500 dernières entrées (FIFO) : normalisations, aperçus, changements de configuration. |
+| **Normaliser V1** | V1.0 | SPA React unique avec 3 onglets internes : `Normaliser` (F13/F14/F14.3/F15), `Historique` (F16), `Réglages` (seuils γ). |
+
+La SPA V1.0 utilise un router hash interne (`#/normalize`, `#/history`, `#/settings`) sans dépendance externe. Les pages V0.1 et la SPA V1.0 coexistent — la migration complète des pages V0.1 vers la SPA est différée V1.1.
+
+### Surface REST (V1.0)
+
+Toutes les routes sont sous le namespace `htmln/v1`, capability `manage_options` (cf. cahier §14 hyp. 14).
+
+```
+Steps        (7) : GET  /steps, GET  /steps/<uuid>, POST /steps/run,
+                   POST /steps/<uuid>/{process, confirm-article, finalize},
+                   GET  /steps/export
+Diagnostics  (6) : GET  /diagnostics, POST /diagnostics/{run, run/chunk},
+                   GET / DELETE /diagnostics/<post_id>, GET /diagnostics/stats
+Posts        (5) : GET  /posts/{post-types, scan}, GET /posts/<id>/preview,
+                   POST /posts/<id>/normalize, POST /posts/batch-normalize
+Diff         (1) : POST /posts/<id>/diff
+Settings     (1) : GET / POST /settings/regression-thresholds
+```
+
+Format d'erreur unifié `{code, message, data: {status, ...}}` aligné sur la sérialisation native `WP_Error`.
+
+### Surface CLI (V1.0)
+
+```bash
+wp htmln steps list   [--from=<date>] [--to=<date>] [--limit=<n>]
+wp htmln steps show   <uuid>
+wp htmln steps export [--file=<path>] [--from=<date>] [--to=<date>]
+wp htmln scan         [<id> | --all | --status=stale [--rebuild]]
+```
+
+Sortie JSON pretty-printée. Export CSV différé V1.1.
 
 ### API publique — utilisation depuis une autre extension
 
-L'extension expose **un seul filtre** WordPress :
+L'extension expose **un seul filtre** WordPress, stable depuis V0.1 :
 
 ```php
 $cleaned = apply_filters( 'htmln/normalize', $html, $context );
 ```
 
 - **`$html`** *(string)* — HTML d'entrée
-- **`$context`** *(array)* — métadonnées libres (ex. `[ 'source' => 'siteorigin', 'post_id' => 1234 ]`) — exploitées par les règles utilisateur en V1+
+- **`$context`** *(array)* — métadonnées libres (ex. `[ 'source' => 'siteorigin', 'post_id' => 1234 ]`)
 - **Retour** *(string)* — HTML normalisé. **Toujours une string**, jamais `null`/`false`/exception.
 
 **Contrat de robustesse** : si l'extension est désactivée, le filtre n'existe pas et `apply_filters` renvoie `$html` inchangé. Le code consommateur n'a rien à protéger.
@@ -113,7 +169,8 @@ add_action( 'save_post', function ( $post_id, $post ) {
 
 - **PHP 8.3+**
 - **WordPress 6.8+** (FSE requis)
-- **Composer** pour l'installation des dépendances (chaîne d'outils de développement uniquement)
+- **Composer** pour l'installation des dépendances PHP
+- **Node 20+** + **npm** pour rebuild la SPA admin
 
 ### Depuis le dépôt
 
@@ -122,15 +179,17 @@ cd wp-content/plugins/
 git clone git@github.com:css31/100son-html-normalizer.git
 cd 100son-html-normalizer
 composer install
+npm install
+npm run build
 ```
 
 Puis activer l'extension depuis l'admin WordPress (**Extensions → 100son HTML Normalizer**).
 
-### Pourquoi `composer install` ?
+L'activation crée automatiquement les 2 tables custom (`son100_htmln_diagnostics` et `son100_htmln_steps`) via `dbDelta()`.
 
-Le dossier `vendor/` n'est pas versionné (convention PHP/Composer). Il est régénéré à
-l'identique à partir de `composer.lock` qui, lui, est suivi en gestion de version —
-garantissant les **versions exactes** des dépendances chez tout le monde.
+### Pourquoi `composer install` et `npm run build` ?
+
+Les dossiers `vendor/` et `assets/build/` ne sont pas versionnés (convention PHP/Composer et JS/webpack). Ils sont régénérés à l'identique à partir de `composer.lock` et `package-lock.json` qui, eux, sont suivis en gestion de version — garantissant les **versions exactes** des dépendances chez tout le monde.
 
 ---
 
@@ -139,28 +198,29 @@ garantissant les **versions exactes** des dépendances chez tout le monde.
 ```
 100son-html-normalizer/
 ├── 100son-html-normalizer.php      En-tête WP + amorçage + garde-fous PHP/WP
-├── uninstall.php                   Purge des options à la désinstallation
+├── uninstall.php                   Purge des options + DROP tables custom à la désinstallation
+├── webpack.config.js               Surcharge @wordpress/scripts (entry + output)
+├── assets/
+│   ├── src/admin-spa/              Source SPA React V1.0 (router, hooks, store, views)
+│   └── build/                      Bundle minifié (gitignoré, régénéré via npm run build)
+├── languages/
+│   └── 100son-html-normalizer.pot  Fichier de traduction source (329 chaînes)
 ├── includes/
-│   ├── Plugin.php                  Singleton orchestrateur
-│   ├── Activator.php / Deactivator.php
-│   ├── Admin/
-│   │   ├── Menu.php                Définition des 4 sous-pages
-│   │   └── Pages/                  PresetsPage, TesterPage, PostsPage, LogsPage
-│   ├── Api/
-│   │   └── PublicApi.php           Filtre htmln/normalize
-│   ├── Core/
-│   │   ├── HtmlNormalizer.php      Façade haut niveau
-│   │   ├── Pipeline.php            Orchestration ordre canonique
-│   │   ├── Dom/DomHtml.php         Enveloppe DOMDocument (analyse/sérialisation)
-│   │   ├── Registry/PresetRegistry.php
-│   │   ├── Rules/                  P1…P8 + RuleInterface
-│   │   ├── Logs/                   LogRepository (FIFO 500), Logger, NotesRepository
-│   │   ├── Metrics/HtmlMetrics.php Garde-fou perte de contenu
-│   │   └── Posts/                  PostNormalizer, SiteOriginDetector
-│   └── Settings/
-│       └── SettingsRepository.php
-├── tests/                          181 tests PHPUnit verts
-└── composer.json / composer.lock
+│   ├── Plugin.php                  Singleton orchestrateur + composition root
+│   ├── Activator.php               dbDelta des 2 tables custom
+│   ├── Admin/                      Menu + 4 pages V0.1 + SpaPage V1.0 + Assets enqueue
+│   ├── Api/                        PublicApi (filtre htmln/normalize)
+│   ├── Cli/                        StepsCommand + DiagnoseCommand + CliServiceProvider
+│   ├── Core/                       HtmlNormalizer, Pipeline, Rules P1..P8, Logs, Posts, Registry
+│   ├── Diagnostics/                DiagnosticEngine, BatchRunner, Invalidator (hook save_post), Repository
+│   ├── Metrics/                    MetricsCalculator + MetricsSnapshot (7 métriques γ)
+│   ├── Regression/                 RegressionDetector + DTOs Failure/Report/Thresholds
+│   ├── Rest/                       BaseController + 5 controllers + RestServiceProvider
+│   ├── Settings/                   SettingsRepository
+│   └── Steps/                      StepRunner + ArticleResult + StepRecord + StepsRepository
+├── tests/                          548 tests PHPUnit verts
+├── composer.json / composer.lock
+└── package.json / package-lock.json
 ```
 
 ### Conventions internes
@@ -174,21 +234,21 @@ garantissant les **versions exactes** des dépendances chez tout le monde.
 | Hooks | `htmln/*` (court — public) |
 | Options / transients | `son100_htmln_*` |
 | Post-meta | `_son100_htmln_*` |
-
-Pas de table custom — repose sur les options WP et les révisions natives.
+| Tables custom | `{$wpdb->prefix}son100_htmln_*` |
 
 ---
 
 ## Pile technique
 
-- **PHP 8.3+** — `declare( strict_types=1 )` partout, types stricts paramètres + retours
+- **PHP 8.3+** — `declare( strict_types=1 )` partout, types stricts paramètres + retours, DTOs `readonly`
 - **WordPress 6.8+** — multisite **non** supporté
 - **Composer** — autoloader PSR-4
-- **PHPUnit** — 181 tests verts, 239 assertions
-- **PHPStan** — niveau 6
+- **PHPUnit** — 548 tests verts (1213 assertions)
+- **PHPStan** niveau 6 — baseline pré-Phase 4 (22 erreurs sur du code historique, 0 régression depuis)
 - **PHPCS** — WordPress Coding Standards + PSR-12
-- **Conventional Commits**, branche `main`, SemVer (`0.x` pré-V1)
-- *(à venir V1)* `@wordpress/scripts` + `@wordpress/components` pour la SPA admin React
+- **`@wordpress/scripts`** + **`@wordpress/components`** + **`@wordpress/data`** — SPA admin V1.0
+- **Node 20+ / npm** — build front
+- **Conventional Commits**, branche `main`, SemVer (`0.x` pré-V1, `1.0.0` cible V1)
 
 ---
 
@@ -196,43 +256,59 @@ Pas de table custom — repose sur les options WP et les révisions natives.
 
 ```bash
 cd wp-content/plugins/100son-html-normalizer/
+
+# Tests PHP
 vendor/bin/phpunit
+
+# Analyse statique
+vendor/bin/phpstan analyse
+
+# Lint front
+npm run lint:js
+
+# Rebuild bundle
+npm run build
 ```
 
-Tester le filtre depuis WP-CLI (bac à sable DevKinsta) :
+Tester le filtre depuis WP-CLI :
 
 ```bash
 wp eval 'echo apply_filters("htmln/normalize", "<p style=\"color:red\"></p><p>OK</p>", []);'
 # → <p>OK</p>
 ```
 
+Régénérer le `.pot` après ajout de nouvelles chaînes :
+
+```bash
+wp i18n make-pot . languages/100son-html-normalizer.pot \
+   --domain=100son-html-normalizer \
+   --exclude=vendor,node_modules,tests,assets/build
+```
+
 ---
 
 ## Feuille de route
 
-### ✅ Livré en V0.1
+### ✅ Livré
 
-- §11.1 Amorçage & infrastructure
-- §11.2 SettingsRepository + UserRulesRepository
-- §11.3 RuleInterface + 8 préréglages + fixtures + tests
-- §11.4 PresetRegistry
-- §11.6 Pipeline + HtmlNormalizer
-- §11.7 PublicApi (filtre `htmln/normalize`)
-- §11.13 F8 Normaliser des articles (UI PHP au lieu de REST/SPA)
-- *Hors cahier* : UI admin V0.1, page Journal, garde-fou métriques, note libre
+**V0.1** — moteur PHP + UI admin V0.1 (4 pages : Préréglages, Tester, Normaliser, Journal).
 
-### ⏭️ À venir (V0.x → V1.0)
+**V1.0 (en cours d'intégration)** — couche diagnostic + pas + SPA :
+- Diagnostic structurel (Phase 3) : `DiagnosticEngine`, `DiagnosticBatchRunner`, hook `save_post → is_stale`
+- Détection de régression (Phase 3.1) : 7 seuils γ + `RegressionDetector`
+- Application par pas (Phase 4) : `StepRunner` avec confirm/refuse/resume/finalize idempotent
+- Surface REST 19 routes (Phase 5) + WP-CLI 4 commandes (Phase 5.5)
+- SPA d'administration React (Phase 6) : 3 onglets `Normaliser` / `Historique` / `Réglages` avec modales `DiffModal` (F14.3) et `RegressionModal` (F15), bandeaux de pas en cours et de reprise (F14.4), `beforeunload` natif
+- i18n : text-domain branché, `.pot` généré (329 chaînes)
 
-- §11.5 — F5 HeadingStrategist (heuristique de saut h1→h3, h4 décoratifs)
-- §11.8 — REST controllers
-- §11.9 — RuleValidator + tests sécurité
-- §11.10 — F4 règles custom : `CssSelectorRule` (mode simple) + `RegexRule` (mode avancé)
-- §11.11 — PreviewRunner + endpoints REST `/rules/preview`, `/rules/validate`
-- §11.12 — F7 Export / Import de règles
-- §11.14 — WP-CLI (`wp htmln normalize`, `preview`, `presets`, `rules`)
-- §11.15 — SPA admin React (remplace l'UI PHP V0.1)
-- §11.16 — i18n (.pot)
-- §11.18 — Recette critères §8 du cahier
+### ⏭️ Différé V1.1
+
+- HeadingStrategist (heuristique de saut h1→h3, h4 décoratifs — §11.5)
+- Règles custom F4 : `CssSelectorRule` + `RegexRule` (§11.10)
+- Export / Import de règles (§11.12)
+- Migration complète des pages V0.1 vers la SPA (Dashboard, Presets SPA, CustomRules, Journal SPA)
+- Export CSV de l'historique des pas (V1.0 ne fournit que JSON)
+- Recette finale §8 du cahier
 
 Voir le [CHANGELOG](CHANGELOG.md) pour le détail livré.
 
@@ -240,9 +316,8 @@ Voir le [CHANGELOG](CHANGELOG.md) pour le détail livré.
 
 ## Extension compagne
 
-**`100son-so-to-blocks`** *(à venir)* — migration des articles SiteOrigin Page Builder vers
-les blocs Gutenberg/FSE. Consomme la sortie de HTML Normalizer via le filtre
-`htmln/normalize` entre l'extraction du HTML d'un widget Editor et la conversion en blocs.
+**`100son-so-to-blocks`** *(en cours de cadrage)* — migration des articles SiteOrigin Page Builder vers
+les blocs Gutenberg/FSE. Consomme la sortie de HTML Normalizer via le filtre `htmln/normalize` entre l'extraction du HTML d'un widget Editor et la conversion en blocs.
 
 HTML Normalizer est **optionnel** côté SO to Blocks : sans lui, l'extension a un chemin dégradé
 (HTML brut → blocs, sans normalisation préalable).

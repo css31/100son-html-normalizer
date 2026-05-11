@@ -15,4 +15,5 @@
 export * as diagnostics from './diagnostics';
 export * as steps from './steps';
 export * as posts from './posts';
+export * as settings from './settings';
 export { get, post, del, raw } from './client';

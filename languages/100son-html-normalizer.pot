@@ -1,0 +1,1440 @@
+# Copyright (C) 2026 Cyrille / 100son.net
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: 100son HTML Normalizer 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/100son-html-normalizer\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-05-11T14:14:18+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.10.0\n"
+"X-Domain: 100son-html-normalizer\n"
+
+#. Plugin Name of the plugin
+#: 100son-html-normalizer.php
+msgid "100son HTML Normalizer"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: 100son-html-normalizer.php
+msgid "https://100son.net/plugins/100son-html-normalizer"
+msgstr ""
+
+#. Description of the plugin
+#: 100son-html-normalizer.php
+msgid "Moteur de normalisation HTML configurable pour WordPress — 8 présets + règles custom + API publique htmln/normalize."
+msgstr ""
+
+#. Author of the plugin
+#: 100son-html-normalizer.php
+msgid "Cyrille / 100son.net"
+msgstr ""
+
+#. Author URI of the plugin
+#: 100son-html-normalizer.php
+msgid "https://100son.net"
+msgstr ""
+
+#. translators: 1: required PHP version, 2: current PHP version
+#: 100son-html-normalizer.php:48
+msgid "100son HTML Normalizer requiert PHP %1$s ou plus récent. Version actuelle : %2$s."
+msgstr ""
+
+#. translators: 1: required WP version, 2: current WP version
+#: 100son-html-normalizer.php:69
+msgid "100son HTML Normalizer requiert WordPress %1$s ou plus récent. Version actuelle : %2$s."
+msgstr ""
+
+#: 100son-html-normalizer.php:91
+msgid "100son HTML Normalizer : autoload Composer manquant. Exécuter `composer install` dans le dossier du plugin."
+msgstr ""
+
+#: includes/Admin/Menu.php:84
+#: includes/Admin/Menu.php:85
+msgid "HTML Normalizer"
+msgstr ""
+
+#: includes/Admin/Menu.php:96
+#: includes/Admin/Menu.php:97
+msgid "Préréglages"
+msgstr ""
+
+#: includes/Admin/Menu.php:106
+#: includes/Admin/Menu.php:107
+msgid "Tester un fragment"
+msgstr ""
+
+#: includes/Admin/Menu.php:116
+#: includes/Admin/Menu.php:117
+#: includes/Admin/Pages/TesterPage.php:64
+#: assets/src/admin-spa/App.jsx:107
+msgid "Normaliser"
+msgstr ""
+
+#: includes/Admin/Menu.php:126
+#: includes/Admin/Menu.php:127
+msgid "Journal"
+msgstr ""
+
+#: includes/Admin/Menu.php:138
+#: includes/Admin/Menu.php:139
+msgid "Normaliser V1"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:49
+#: includes/Admin/Pages/PostsPage.php:90
+#: includes/Admin/Pages/PostsPage.php:192
+#: includes/Admin/Pages/PresetsPage.php:46
+#: includes/Admin/Pages/SpaPage.php:38
+#: includes/Admin/Pages/TesterPage.php:44
+msgid "Permission refusée."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:61
+msgid "HTML Normalizer — Journal"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:65
+msgid "Note enregistrée."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:68
+msgid "Note effacée."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:71
+msgid "Journal vidé."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:77
+msgid "Historique des actions"
+msgstr ""
+
+#. translators: %1$d nombre d'entrees, %2$d capacité max
+#: includes/Admin/Pages/LogsPage.php:81
+msgid "Normalisations, aperçus, changements de configuration. %1$d entrée(s) sur %2$d max — les plus anciennes sont automatiquement évincées."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:88
+msgid "Aucune entrée enregistrée pour l'instant."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:175
+#: includes/Admin/Pages/PostsPage.php:720
+msgid "Date"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:176
+msgid "Évènement"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:177
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:361
+#: assets/src/admin-spa/views/History/StepsTable.jsx:206
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:182
+msgid "Statut"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:179
+msgid "Article / Détail"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:180
+msgid "Utilisateur"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:219
+#: includes/Admin/Pages/LogsPage.php:223
+#: includes/Admin/Pages/PostsPage.php:762
+#: includes/Admin/Pages/PostsPage.php:1283
+msgid "(sans titre)"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:235
+msgid "—"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:243
+msgid "inconnu"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:290
+msgid "Note libre"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:291
+msgid "Espace de notes contextuelles persistantes. Indépendant du journal des actions."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:299
+msgid "Tape ici les notes que tu veux garder à portée de main…"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:318
+#: includes/Admin/Pages/PresetsPage.php:192
+#: includes/Admin/Pages/PresetsPage.php:248
+#: assets/src/admin-spa/views/Settings.jsx:364
+msgid "Enregistrer"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:323
+msgid ""
+"Confirmer l'effacement de la note ?\n"
+"\n"
+"Le journal des actions n'est PAS affecté."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:327
+msgid "Effacer"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:347
+msgid "Confirmer la suppression de toutes les entrées du journal ?"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:354
+msgid "Vider le journal"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:356
+msgid "L'action est immédiate et irréversible."
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:366
+msgid "Normalisation"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:367
+#: includes/Admin/Pages/PostsPage.php:784
+#: includes/Admin/Pages/PostsPage.php:790
+msgid "Aperçu"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:368
+msgid "Configuration"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:427
+msgid "Modifié"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:432
+msgid "Inchangé"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:437
+msgid "Refusé SO"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:442
+msgid "Introuvable"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:447
+msgid "Permission"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:452
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:91
+msgid "Erreur"
+msgstr ""
+
+#: includes/Admin/Pages/LogsPage.php:457
+msgid "Mise à jour"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:109
+msgid "HTML Normalizer — Normaliser"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:298
+msgid "Aucun article sélectionné."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:359
+msgid "Types de contenu :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:373
+msgid "Articles / page :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:387
+#: includes/Admin/Pages/PostsPage.php:1136
+#: includes/Admin/Pages/PostsPage.php:1163
+msgid "Appliquer"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:409
+msgid "Janvier"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:410
+msgid "Février"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:411
+msgid "Mars"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:412
+msgid "Avril"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:413
+msgid "Mai"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:414
+msgid "Juin"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:415
+msgid "Juillet"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:416
+msgid "Août"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:417
+msgid "Septembre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:418
+msgid "Octobre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:419
+msgid "Novembre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:420
+msgid "Décembre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:430
+msgid "Recherche (titre ou ID) :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:434
+msgid "Mots du titre, ou ID exact (ex. 11448)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:440
+msgid "Catégorie :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:442
+#: includes/Admin/Pages/PostsPage.php:472
+msgid "Toutes"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:470
+msgid "Année :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:485
+msgid "Mois :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:487
+#: includes/Admin/Pages/PostsPage.php:506
+msgid "Tous"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:501
+msgid "Constructeur :"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:512
+msgid "SiteOrigin"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:518
+msgid "Gutenberg"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:524
+msgid "Autres"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:530
+msgid "Out (hors périmètre)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:537
+msgid "Filtrer"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:541
+msgid "Réinitialiser"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:580
+msgid "Aucun type de contenu sélectionné dans les filtres."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:691
+msgid "Aucun article trouvé."
+msgstr ""
+
+#. translators: %d: number of posts found
+#: includes/Admin/Pages/PostsPage.php:700
+msgid "%d article trouvé."
+msgid_plural "%d articles trouvés."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/Admin/Pages/PostsPage.php:719
+msgid "Titre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:721
+msgid "Type"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:722
+msgid "Catégories"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:723
+#: includes/Admin/Pages/PostsPage.php:1467
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:194
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:24
+msgid "Mots"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:724
+msgid "Constructeur"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:724
+msgid "Constr."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:725
+#: assets/src/admin-spa/views/History/StepsTable.jsx:213
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:204
+msgid "Actions"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:756
+msgid "Article hors périmètre — exclu des actions groupées"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:783
+msgid "Article hors périmètre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:973
+msgid "SiteOrigin Page Builder (mode natif : panels_data ou bloc siteorigin-panels)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:979
+msgid "SiteOrigin (mode aplati) — rendu HTML figé sans panels_data ni bloc, normalisation à risque"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:985
+msgid "Gutenberg (blocs FSE)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:991
+msgid "Constructeur inconnu (HTML libre / éditeur classique)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:997
+msgid "Hors périmètre (tag manuel) — actions de normalisation désactivées"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1026
+msgid "→ Auto"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1027
+msgid "→ Out"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1029
+msgid "Retirer le tag Out (revenir à la classification automatique)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1030
+msgid "Marquer cet article comme hors périmètre"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1129
+#: includes/Admin/Pages/PostsPage.php:1156
+msgid "Action groupée…"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1130
+#: includes/Admin/Pages/PostsPage.php:1157
+msgid "Normaliser la sélection"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1131
+#: includes/Admin/Pages/PostsPage.php:1158
+msgid "Normaliser (forcer SO)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1135
+#: includes/Admin/Pages/PostsPage.php:1162
+msgid "Confirmer la normalisation des articles sélectionnés ?"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1273
+msgid "← Retour à la liste"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1289
+msgid "⚠ Article SiteOrigin détecté"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1290
+msgid "Cet article utilise SiteOrigin Page Builder. Normaliser le post_content brut ignorera la structure du builder. Préférer SO to Blocks pour la migration. Si vous savez ce que vous faites, cochez « Continuer quand même » avant de cliquer sur Normaliser."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1295
+msgid "Aucune modification : le HTML est déjà conforme aux préréglages actifs."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1306
+#: includes/Admin/Pages/PostsPage.php:1460
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:156
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:173
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:98
+msgid "Avant"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1314
+#: includes/Admin/Pages/PostsPage.php:1461
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:162
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:187
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:101
+msgid "Après"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1340
+msgid "Continuer quand même (article SiteOrigin)"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1344
+msgid "Une révision WP sera créée juste avant l'écriture. Vous pourrez restaurer la version précédente depuis l'écran d'édition de l'article."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1345
+msgid "Normaliser et enregistrer"
+msgstr ""
+
+#. translators: %d: total
+#: includes/Admin/Pages/PostsPage.php:1369
+msgid "%d article traité."
+msgid_plural "%d articles traités."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/Admin/Pages/PostsPage.php:1373
+msgid "Modifiés : %d"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1376
+msgid "Inchangés : %d"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1379
+msgid "Refusés (SO) : %d"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1383
+msgid "Erreurs : %d"
+msgstr ""
+
+#. translators: %d: post id
+#: includes/Admin/Pages/PostsPage.php:1417
+msgid "Article #%d normalisé avec succès. Une révision a été créée pour rollback."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1423
+msgid "Aucune modification appliquée."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1429
+msgid "Erreur inconnue."
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1453
+msgid "Garde-fou perte de contenu"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1462
+msgid "Δ"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1468
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:23
+msgid "Caractères"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1469
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:26
+msgid "Images"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1516
+msgid "OK"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1521
+msgid "Attention"
+msgstr ""
+
+#: includes/Admin/Pages/PostsPage.php:1526
+msgid "Perte significative"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:52
+msgid "HTML Normalizer — Préréglages"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:53
+msgid "Activez les règles de nettoyage à appliquer dans la pipeline. L'ordre d'exécution est : P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2."
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:56
+msgid "Configuration enregistrée."
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:188
+msgid "Tout activer / désactiver"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:190
+msgid "Synchronise toutes les cases. N'oublie pas de cliquer sur Enregistrer."
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:218
+msgid "Activé"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:286
+#: includes/Admin/Pages/PresetsPage.php:309
+msgid "Seuil (≥ 2) :"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:296
+msgid "Conserver text-align (sinon strip total)"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:320
+msgid "Marqueurs activés :"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:335
+msgid "Marqueurs custom (1 par ligne) :"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:337
+msgid "Ex. ▸  ou  ► — un par ligne. Toujours produit <ul>."
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:345
+msgid "Mappings sémantiques activés :"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:349
+msgid "font-weight: bold (ou ≥ 700) → <strong>"
+msgstr ""
+
+#: includes/Admin/Pages/PresetsPage.php:354
+msgid "font-style: italic → <em>"
+msgstr ""
+
+#: includes/Admin/Pages/SpaPage.php:42
+msgid "HTML Normalizer — Normalisation par pas (V1.0)"
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:50
+msgid "HTML Normalizer — Tester un fragment"
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:51
+msgid "Collez un fragment HTML pour voir le résultat avec votre configuration de préréglages. Limité à 50 Ko."
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:59
+msgid "HTML d'entrée"
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:69
+msgid "Résultat"
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:71
+msgid "HTML normalisé (source)"
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:77
+msgid "Aperçu rendu"
+msgstr ""
+
+#: includes/Admin/Pages/TesterPage.php:110
+msgid "Fragment trop volumineux (max 50 Ko)."
+msgstr ""
+
+#: includes/Core/Posts/PostNormalizer.php:66
+#: includes/Core/Posts/PostNormalizer.php:116
+#: includes/Core/Posts/PostNormalizer.php:119
+msgid "Article introuvable."
+msgstr ""
+
+#: includes/Core/Posts/PostNormalizer.php:127
+msgid "Article SiteOrigin détecté. Cocher « Continuer quand même » pour outrepasser, ou utiliser SO to Blocks pour la migration."
+msgstr ""
+
+#: includes/Core/Posts/PostNormalizer.php:154
+msgid "Aucune modification : le HTML est déjà conforme."
+msgstr ""
+
+#: includes/Core/Posts/PostNormalizer.php:182
+msgid "Échec de la mise à jour."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:128
+#: includes/Core/Rules/EmptyParagraphsRule.php:37
+msgid "Paragraphes vides"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:129
+msgid "Supprime les <code>&lt;p&gt;&lt;/p&gt;</code>, <code>&lt;p&gt;&amp;nbsp;&lt;/p&gt;</code> et <code>&lt;p&gt; &lt;/p&gt;</code>. Les <code>&lt;p&gt;</code> contenant un élément structurel (image, vidéo, iframe…) sont préservés."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:133
+#: includes/Core/Rules/EmptyHeadingsRule.php:45
+msgid "Titres vides"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:134
+msgid "Supprime les <code>&lt;h1&gt;</code> à <code>&lt;h6&gt;</code> vides ou ne contenant que du blanc / <code>&amp;nbsp;</code>."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:138
+#: includes/Core/Rules/ShareaholicShortcodeRule.php:49
+msgid "Shortcodes Shareaholic"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:139
+msgid "Supprime tout shortcode <code>[shareaholic ...]</code> (forme self-closed). Les autres shortcodes WordPress sont préservés."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:143
+#: includes/Core/Rules/PinterestArtifactsRule.php:51
+msgid "Artefacts Pinterest"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:144
+msgid "Supprime les vestiges du bouton Pinterest « Save » : forme A (<code>&lt;span data-pin-do&gt;</code>, attributs <code>data-pin-*</code>) et forme B (signature <code>z-index: 8675309</code> dans l'attribut <code>style</code>). 0 faux positif vérifié sur le corpus MMM."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:148
+msgid "<code>&lt;br&gt;</code> excessifs"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:149
+msgid "Réduit les <code>&lt;br&gt;</code> consécutifs (≥ seuil) en séparation <code>&lt;/p&gt;&lt;p&gt;</code>. Les <code>&lt;p&gt;</code> éventuellement vides produits sont ramassés par P1 en fin de pipeline."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:153
+#: includes/Core/Rules/RemoveInlineStylesRule.php:60
+msgid "Styles inline"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:154
+msgid "Supprime les attributs <code>style=\"...\"</code> de tous les éléments. Avec l'option « Conserver text-align » activée, seule la déclaration <code>text-align: …</code> est conservée, les autres (<code>color</code>, <code>font-size</code>, <code>margin</code>…) sont retirées."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:158
+#: includes/Core/Rules/AsciiListRule.php:180
+msgid "Listes ASCII"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:159
+msgid "Détecte les listes ASCII (lignes commençant par <code>-</code>, <code>–</code>, <code>*</code>, <code>•</code> ou un numéro <code>N.</code>) et les convertit en <code>&lt;ul&gt;</code>/<code>&lt;ol&gt;</code>. Fonctionne intra-<code>&lt;p&gt;</code> (séparées par <code>&lt;br&gt;</code>) et hors-<code>&lt;p&gt;</code> (chaque item dans son propre <code>&lt;p&gt;</code>). Marqueurs activables individuellement, seuil configurable, marqueurs custom possibles."
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:163
+msgid "Récupération sémantique des styles"
+msgstr ""
+
+#: includes/Core/Registry/PresetRegistry.php:164
+msgid "Convertit les déclarations de présentation en balises HTML sémantiques AVANT que P6 ne strippe le style : <code>font-weight: bold</code> (ou ≥ 700) → <code>&lt;strong&gt;</code>, <code>font-style: italic</code> → <code>&lt;em&gt;</code>. Comportement chirurgical : seules ces déclarations sont retirées du <code>style</code>, les autres (<code>text-align</code>, <code>color</code>…) restent intactes pour P6."
+msgstr ""
+
+#: includes/Core/Rules/ExcessiveBrRule.php:55
+msgid "<br> excessifs"
+msgstr ""
+
+#: includes/Core/Rules/RecoverSemanticStylesRule.php:72
+msgid "Recuperation semantique des styles"
+msgstr ""
+
+#: assets/src/admin-spa/App.jsx:94
+msgid "Sections HTML Normalizer"
+msgstr ""
+
+#: assets/src/admin-spa/App.jsx:117
+msgid "Historique"
+msgstr ""
+
+#: assets/src/admin-spa/App.jsx:127
+msgid "Réglages"
+msgstr ""
+
+#: assets/src/admin-spa/views/History.jsx:84
+msgid "Historique des pas"
+msgstr ""
+
+#: assets/src/admin-spa/views/History.jsx:87
+msgid "Toutes les exécutions de pas normaliseurs sont tracées ici. Chaque pas conserve la liste des règles appliquées, le résultat par article (succès, régression confirmée, refus, erreur) et permet de retrouver l’écosystème exact d’une intervention passée."
+msgstr ""
+
+#. translators: 1 = clé métrique, 2 = avant, 3 = après, 4 = perte %, 5 = seuil %.
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:51
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:44
+msgid "%1$s : %2$d → %3$d (perte %4$s %%, seuil %5$d %%)"
+msgstr ""
+
+#. translators: 1 = clé métrique, 2 = avant, 3 = après, 4 = perte abs, 5 = seuil abs.
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:64
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:57
+msgid "%1$s : %2$d → %3$d (perte %4$d, seuil %5$d)"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:84
+msgid "Validé"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:85
+msgid "Simulation"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:86
+msgid "Régression en attente"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:90
+msgid "Refusé"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:161
+msgid "Pas non finalisé"
+msgstr ""
+
+#. translators: 1 = traités, 2 = total, 3 = en attente, 4 = bloqués sur régression.
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:165
+msgid "%1$d / %2$d traités · %3$d en attente · %4$d bloqués sur régression."
+msgstr ""
+
+#. translators: %s = UUID v4 complet du pas.
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:203
+msgid "Détail du pas %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:206
+msgid "Détail du pas"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:215
+msgid "Chargement du détail…"
+msgstr ""
+
+#. translators: %s = message d'erreur.
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:224
+msgid "Impossible de charger le détail : %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:237
+#: assets/src/admin-spa/views/History/StepsTable.jsx:194
+msgid "UUID"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:243
+#: assets/src/admin-spa/views/History/StepsTable.jsx:197
+msgid "Démarré le"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:252
+msgid "Terminé le"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:261
+msgid "pas non finalisé"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:269
+#: assets/src/admin-spa/views/History/StepsTable.jsx:203
+msgid "Articles"
+msgstr ""
+
+#. translators: 1 = total, 2 = validés, 3 = refusés, 4 = erreurs.
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:273
+msgid "%1$d au total · ✓ %2$d validés · ✗ %3$d refusés · ⚠ %4$d en erreur"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:285
+msgid "Règles appliquées"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:303
+msgid "Détail par article"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:311
+msgid "Fermer"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:331
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:342
+msgid "Aucun article traité dans ce pas."
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:358
+msgid "Article"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:364
+msgid "Détail"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepDetailDrawer.jsx:401
+msgid "(régression confirmée)"
+msgstr ""
+
+#. translators: %d = secondes.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:65
+msgid "%ds"
+msgstr ""
+
+#. translators: 1 = minutes, 2 = secondes.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:74
+msgid "%1$dm %2$ds"
+msgstr ""
+
+#. translators: 1 = heures, 2 = minutes.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:83
+msgid "%1$dh %2$02dm"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:118
+msgid "Terminé"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:119
+msgid "En cours"
+msgstr ""
+
+#. translators: %s = message d'erreur technique.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:154
+msgid "Impossible de charger l’historique : %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:169
+msgid "Chargement de l’historique…"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:180
+msgid "Aucun pas exécuté pour le moment."
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:200
+msgid "Règles"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:209
+msgid "Durée"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:248
+msgid "Total"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:258
+msgid "Validés"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:268
+msgid "Refusés (régression rejetée)"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:278
+msgid "Erreurs"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:290
+msgid "Régressions confirmées (incluses dans ✓)"
+msgstr ""
+
+#. translators: %d = nombre de régressions confirmées.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:297
+msgid "⚑ %d régr."
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:323
+msgid "Voir le détail"
+msgstr ""
+
+#. translators: %d = nombre total de pas.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:340
+msgid "%d pas au total"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:350
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:289
+msgid "« Précédent"
+msgstr ""
+
+#. translators: 1 = page courante, 2 = total de pages.
+#: assets/src/admin-spa/views/History/StepsTable.jsx:355
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:294
+msgid "page %1$d sur %2$d"
+msgstr ""
+
+#: assets/src/admin-spa/views/History/StepsTable.jsx:368
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:307
+msgid "Suivant »"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize.jsx:184
+msgid "Articles diagnostiqués"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize.jsx:199
+msgid "Les compteurs n'ont pas pu être chargés. Le tableau reste utilisable."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:62
+msgid "Normal"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:63
+msgid "À améliorer"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:72
+msgid "(obsolète)"
+msgstr ""
+
+#. translators: %s = message d'erreur technique.
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:123
+msgid "Impossible de charger les articles : %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:138
+msgid "Chargement des articles…"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:146
+msgid "Aucun article dans cet onglet."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:162
+msgid "Tout sélectionner sur la page"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:179
+msgid "ID"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:185
+msgid "Règles applicables"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:191
+msgid "Violations"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:197
+msgid "Dernier diagnostic"
+msgstr ""
+
+#. translators: %d = post_id.
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:217
+msgid "Sélectionner l'article %d"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:260
+msgid "Voir le diff"
+msgstr ""
+
+#. translators: %d = nombre total d'articles.
+#: assets/src/admin-spa/views/Normalize/ArticlesTable.jsx:276
+msgid "%d article(s) au total"
+msgstr ""
+
+#. translators: %s = message d'erreur.
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:99
+msgid "Erreur lors du calcul du diff : %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:113
+msgid "Calcul du diff…"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:128
+msgid "Aucun changement : les règles cochées ne modifient pas cet article."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:141
+msgid "Code source"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:149
+msgid "Rendu HTML"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:175
+msgid "Rendu avant normalisation"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:189
+msgid "Rendu après normalisation"
+msgstr ""
+
+#. translators: %d = nombre d'avertissements.
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:208
+msgid "%d avertissement(s) du moteur"
+msgstr ""
+
+#. translators: %d = identifiant article.
+#: assets/src/admin-spa/views/Normalize/DiffModal.jsx:230
+msgid "Diff de l'article #%d"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:25
+msgid "Paragraphes"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:27
+msgid "Liens"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:28
+msgid "Listes"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:87
+msgid "Métriques avant / après"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:95
+msgid "Métrique"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:104
+msgid "Delta"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/MetricsDiffBar.jsx:111
+msgid "Titres"
+msgstr ""
+
+#. translators: %d = identifiant article.
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:101
+msgid "Régression détectée — article #%d"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:113
+msgid "L'application des règles entraîne une perte de contenu au-delà des seuils γ configurés. Décidez si vous validez quand même cette modification."
+msgstr ""
+
+#. translators: %d = nombre de métriques fautives.
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:122
+msgid "%d métrique(s) en dépassement"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:138
+msgid "Métriques complètes avant / après"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:156
+msgid "Voir le diff complet"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:164
+msgid "Refuser cet article"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:171
+msgid "Confirmer quand même"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RegressionModal.jsx:176
+msgid "« Refuser » pose une post_meta de relance manuelle ; l'article reste inchangé. « Confirmer » écrit le résultat normalisé après création d'une révision WP (rollback natif disponible)."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:27
+msgid "P1 — Paragraphes vides"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:28
+msgid "Supprime les <p> vides ou contenant uniquement des espaces."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:35
+msgid "P2 — Titres vides"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:36
+msgid "Supprime les <h1>…<h6> vides."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:43
+msgid "P3 — Shortcode Shareaholic"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:44
+msgid "Supprime les shortcodes [shareaholic …] orphelins."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:51
+msgid "P4 — Artefacts Pinterest"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:52
+msgid "Nettoie les artefacts Pinterest résiduels."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:59
+msgid "P5 — Cascade de <br>"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:60
+msgid "Réduit les rafales <br><br><br> à un seul <br>."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:67
+msgid "P6 — Styles en ligne"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:68
+msgid "Supprime tout style=\"…\" inline (option pour préserver les alignements)."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:75
+msgid "P7 — Listes ASCII"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:76
+msgid "Convertit \"* item\" / \"- item\" en <ul><li>."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:83
+msgid "P8 — Récupération sémantique"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:87
+msgid "<span style=\"font-weight:bold\"> → <strong>, etc."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:134
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:137
+msgid "Règles à appliquer"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:141
+msgid "Cochez les règles à inclure dans le pas. Toutes activées par défaut."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:154
+msgid "Tout décocher"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:155
+msgid "Tout cocher"
+msgstr ""
+
+#. translators: 1 = nombre de règles, 2 = nombre d'articles.
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:180
+msgid "%1$d règle(s) × %2$d article(s) sélectionné(s)"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:194
+msgid "Appliquer ce pas"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/RulesSidebar.jsx:198
+msgid "Important : gardez cet onglet ouvert pendant l'opération."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepProgressBanner.jsx:45
+msgid "Erreur pendant le pas"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepProgressBanner.jsx:55
+msgid "Terminer le pas"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepProgressBanner.jsx:72
+msgid "Pas en cours"
+msgstr ""
+
+#. translators: 1 = nombre traités, 2 = total, 3 = pourcentage.
+#: assets/src/admin-spa/views/Normalize/StepProgressBanner.jsx:77
+msgid "%1$d / %2$d articles (%3$d %%)"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepProgressBanner.jsx:99
+msgid "Important : gardez cet onglet ouvert. La fermeture interrompra le pas."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepResumeBanner.jsx:119
+msgid "Pas précédent interrompu"
+msgstr ""
+
+#. translators: 1 = traités, 2 = restants, 3 = total.
+#: assets/src/admin-spa/views/Normalize/StepResumeBanner.jsx:127
+msgid "%1$d articles traités, %2$d restants sur %3$d."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepResumeBanner.jsx:137
+msgid "La reprise depuis l'article en pause sera disponible en Phase 6.5 (avec la modale de décision sur régression). Pour l'instant, vous pouvez abandonner le pas pour relâcher le verrou."
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/StepResumeBanner.jsx:149
+msgid "Abandonner ce pas"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/TabsHeader.jsx:30
+msgid "À normaliser"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/TabsHeader.jsx:32
+msgid "Normalisés"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/TabsHeader.jsx:35
+msgid "Diagnostics obsolètes"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/TabsHeader.jsx:75
+msgid "Onglets diagnostic"
+msgstr ""
+
+#: assets/src/admin-spa/views/Normalize/TabsHeader.jsx:97
+msgid "Nombre d'articles"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:38
+msgid "Caractères — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:41
+msgid "Pourcentage de caractères que la normalisation peut supprimer sans déclencher une alerte de régression. Recommandé : 0 (aucune perte tolérée)."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:48
+msgid "Mots — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:51
+msgid "Pourcentage de mots que la normalisation peut supprimer. Recommandé : 0."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:58
+msgid "Paragraphes — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:61
+msgid "Pourcentage de paragraphes que la normalisation peut supprimer (paragraphes vides éliminés par P1, etc.). Default : 5 %."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:68
+msgid "Titres — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:71
+msgid "Nombre absolu de titres qui peuvent être supprimés. Le seuil s’applique à chaque niveau h1..h6 indépendamment. Default : 0."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:78
+msgid "Images — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:81
+msgid "Nombre absolu d’images que la normalisation peut supprimer. Default : 0."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:88
+msgid "Liens — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:91
+msgid "Nombre absolu de liens (`<a href>`) que la normalisation peut supprimer. Default : 0."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:98
+msgid "Listes — perte tolérée"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:101
+msgid "Nombre absolu de listes (`<ul>` / `<ol>`) que la normalisation peut supprimer. Default : 0."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:243
+msgid "Chargement des réglages…"
+msgstr ""
+
+#. translators: %s = message d'erreur.
+#: assets/src/admin-spa/views/Settings.jsx:254
+msgid "Impossible de charger les réglages : %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:269
+msgid "Seuils γ de régression structurelle"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:275
+msgid "La normalisation ne s’écrit jamais en base sans avoir comparé avant et après. Chaque seuil ci-dessous définit la perte maximale tolérée avant que la modale « Régression détectée » ne s’ouvre et ne demande votre décision. Plus le seuil est bas, plus la SPA est prudente."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:284
+msgid "Réglages enregistrés."
+msgstr ""
+
+#. translators: %s = message d'erreur.
+#: assets/src/admin-spa/views/Settings.jsx:292
+msgid "Échec de l’enregistrement : %s"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:303
+msgid "Certains champs ne sont pas valides (entiers entre 0 et 100 pour les pourcentages). Corrigez-les avant d’enregistrer."
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:313
+msgid "Seuils en pourcentage"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:336
+msgid "Seuils en nombre absolu"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:372
+msgid "Restaurer les valeurs par défaut"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:399
+msgid "%"
+msgstr ""
+
+#: assets/src/admin-spa/views/Settings.jsx:400
+msgid "éléments"
+msgstr ""
+
+#. translators: 1 = description du seuil, 2 = unité, 3 = valeur par défaut.
+#: assets/src/admin-spa/views/Settings.jsx:403
+msgid "%1$s Unité : %2$s. Default : %3$d."
+msgstr ""

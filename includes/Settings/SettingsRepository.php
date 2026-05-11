@@ -194,6 +194,63 @@ class SettingsRepository {
 		if ( ! is_array( $raw ) ) {
 			$raw = array();
 		}
+		return $this->normalize_regression_thresholds( $raw );
+	}
+
+	/**
+	 * Persiste les 7 seuils γ de régression dans `son100_htmln_settings`.
+	 *
+	 * Le tableau d'entrée est normalisé (clés inconnues ignorées, valeurs
+	 * non numériques ou négatives retombent sur les defaults du cahier
+	 * §14 hyp. 24). Retourne le tableau **après** normalisation pour que
+	 * la SPA puisse refléter immédiatement ce qui a été écrit.
+	 *
+	 * Cohérent avec le contrat défensif de `set_f8_per_page` /
+	 * `set_f8_post_types_selection` : le setter ne lève pas, il normalise
+	 * silencieusement — toute validation stricte doit être faite en
+	 * amont (REST controller, UI). Cette approche évite à l'admin une
+	 * page Settings cassée si une donnée corrompue dort en BDD.
+	 *
+	 * @param array<string, mixed> $thresholds Tableau brut (probablement issu du body REST).
+	 * @return array{
+	 *   text_loss_pct: int,
+	 *   words_loss_pct: int,
+	 *   paragraphs_loss_pct: int,
+	 *   headings_loss: int,
+	 *   images_loss: int,
+	 *   links_loss: int,
+	 *   lists_loss: int,
+	 * } Tableau normalisé tel qu'il vient d'être persisté.
+	 */
+	public function setRegressionThresholds( array $thresholds ): array {
+		$normalized                            = $this->normalize_regression_thresholds( $thresholds );
+		$settings                              = $this->get_settings();
+		$settings['regression_thresholds']     = $normalized;
+		update_option( self::OPT_SETTINGS, $settings, false );
+		return $normalized;
+	}
+
+	/**
+	 * Normalise un tableau de seuils brut vers les 7 clés canoniques avec
+	 * valeurs entières ≥ 0. Toute clé manquante ou invalide retombe sur
+	 * le default. Toute clé inconnue est ignorée.
+	 *
+	 * Centralise la logique de validation pour les deux opérations
+	 * `getRegressionThresholds()` (lecture défensive) et
+	 * `setRegressionThresholds()` (écriture après validation).
+	 *
+	 * @param array<string, mixed> $raw Tableau brut.
+	 * @return array{
+	 *   text_loss_pct: int,
+	 *   words_loss_pct: int,
+	 *   paragraphs_loss_pct: int,
+	 *   headings_loss: int,
+	 *   images_loss: int,
+	 *   links_loss: int,
+	 *   lists_loss: int,
+	 * }
+	 */
+	private function normalize_regression_thresholds( array $raw ): array {
 		$result = array();
 		foreach ( self::REGRESSION_THRESHOLD_DEFAULTS as $key => $default ) {
 			$value = $raw[ $key ] ?? $default;

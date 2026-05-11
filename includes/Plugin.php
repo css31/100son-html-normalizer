@@ -43,6 +43,7 @@ use Cent_Son\Html_Normalizer\Rest\DiagnosticsController;
 use Cent_Son\Html_Normalizer\Rest\DiffController;
 use Cent_Son\Html_Normalizer\Rest\PostsController;
 use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
+use Cent_Son\Html_Normalizer\Rest\SettingsController;
 use Cent_Son\Html_Normalizer\Rest\StepsController;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
@@ -167,6 +168,7 @@ final class Plugin {
 	 * Phase 5.2 : StepsController.
 	 * Phase 5.3 : DiagnosticsController.
 	 * Phase 5.4 : PostsController + DiffController.
+	 * Phase 6.7 : SettingsController (seuils γ pour la SPA Settings).
 	 *
 	 * @return list<\Cent_Son\Html_Normalizer\Rest\BaseController>
 	 */
@@ -190,6 +192,7 @@ final class Plugin {
 			new DiagnosticsController( $batch_runner, $diag_repo ),
 			new PostsController( $settings, $post_normalizer, $so_detector ),
 			new DiffController( $preset_registry, $pipeline, $metrics ),
+			new SettingsController( $settings ),
 		);
 	}
 

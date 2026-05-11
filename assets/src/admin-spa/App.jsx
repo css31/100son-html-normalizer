@@ -4,10 +4,11 @@
  * Router hash minimaliste :
  *  - `#/normalize` (défaut) → vue Normalize (F13/F14/F14.3/F15).
  *  - `#/history`            → vue History (F16).
+ *  - `#/settings`           → vue Settings (F15 — seuils γ).
  *
  * Pas de dépendance externe (pas de @wordpress/router qui n'existe pas en
- * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour deux
- * routes. Si la SPA grandit (V1.1+ avec Dashboard, Settings SPA, etc.)
+ * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour trois
+ * routes. Si la SPA grandit (V1.1+ avec Dashboard, Presets SPA, etc.)
  * l'extraction vers un router maison ou react-router restera locale à ce
  * fichier sans toucher aux vues.
  *
@@ -20,6 +21,7 @@ import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import Normalize from './views/Normalize';
 import History from './views/History';
+import Settings from './views/Settings';
 
 /**
  * Identifiants de routes (utilisés dans le hash et dans le state local).
@@ -28,6 +30,7 @@ import History from './views/History';
  */
 const ROUTE_NORMALIZE = 'normalize';
 const ROUTE_HISTORY = 'history';
+const ROUTE_SETTINGS = 'settings';
 const DEFAULT_ROUTE = ROUTE_NORMALIZE;
 
 /**
@@ -36,7 +39,7 @@ const DEFAULT_ROUTE = ROUTE_NORMALIZE;
  *
  * @type {string[]}
  */
-const VALID_ROUTES = [ ROUTE_NORMALIZE, ROUTE_HISTORY ];
+const VALID_ROUTES = [ ROUTE_NORMALIZE, ROUTE_HISTORY, ROUTE_SETTINGS ];
 
 /**
  * Parse le hash courant (`#/foo`, `#foo`, `#/foo?bar`) vers un identifiant
@@ -113,11 +116,38 @@ export default function App() {
 				>
 					{ __( 'Historique', '100son-html-normalizer' ) }
 				</a>
+				<a
+					href="#/settings"
+					aria-current={
+						ROUTE_SETTINGS === route ? 'page' : undefined
+					}
+					className={ tabClass( ROUTE_SETTINGS ) }
+					onClick={ ( event ) => navigate( event, ROUTE_SETTINGS ) }
+				>
+					{ __( 'Réglages', '100son-html-normalizer' ) }
+				</a>
 			</nav>
 
-			<div className="htmln-app__view">
-				{ ROUTE_HISTORY === route ? <History /> : <Normalize /> }
-			</div>
+			<div className="htmln-app__view">{ renderRoute( route ) }</div>
 		</div>
 	);
+}
+
+/**
+ * Rend la vue correspondant à la route active. Switch séparé pour rester
+ * lisible quand le nombre de routes grandit en V1.1.
+ *
+ * @param {string} route Route active (validée par `parseHash`).
+ * @return {JSX.Element} Vue active.
+ */
+function renderRoute( route ) {
+	switch ( route ) {
+		case ROUTE_HISTORY:
+			return <History />;
+		case ROUTE_SETTINGS:
+			return <Settings />;
+		case ROUTE_NORMALIZE:
+		default:
+			return <Normalize />;
+	}
 }
