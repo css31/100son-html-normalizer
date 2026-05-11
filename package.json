@@ -1,6 +1,6 @@
 {
     "name": "100son-html-normalizer",
-    "version": "0.1.0",
+    "version": "1.0.0-rc1",
     "description": "Admin SPA build pour le plugin 100son HTML Normalizer.",
     "private": true,
     "license": "GPL-2.0-or-later",

@@ -2,7 +2,7 @@
 
 > Moteur de **normalisation HTML configurable** pour WordPress — 8 préréglages prêts à l'emploi, application par **pas** avec garde-fou de régression, historique tracé, et API publique consommable par d'autres extensions.
 
-[![Version](https://img.shields.io/badge/version-1.0.0--rc-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0--rc1-orange.svg)](CHANGELOG.md)
 [![PHP](https://img.shields.io/badge/PHP-8.3+-blue.svg)](#pile-technique)
 [![WordPress](https://img.shields.io/badge/WordPress-6.8+-21759b.svg)](#pile-technique)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-green.svg)](#licence)

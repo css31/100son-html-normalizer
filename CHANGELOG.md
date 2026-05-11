@@ -1,9 +1,140 @@
 # Changelog
 
-Toutes les modifications notables de ce plugin sont consignées ici.
+Toutes les modifications notables de cette extension sont consignées ici.
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionning [SemVer](https://semver.org/lang/fr/).
 
-## [Unreleased] — 0.1.x
+## [1.0.0-rc1] — 2026-05-11
+
+Première candidate à la version stable 1.0.0. Toutes les phases 1-6 du cahier v2.0 sont livrées : la base de la **normalisation par pas** avec **diagnostic** structurel, **détection de régression** sur 7 seuils γ, et **SPA d'administration** React. Le périmètre V0.1 (4 préréglages PHP, 4 pages admin, filtre `htmln/normalize`) reste intégralement compatible — les pages V0.1 cohabitent avec la SPA V1.0.
+
+### Ajouts majeurs
+
+#### Diagnostic structurel — F12 (Phase 3)
+
+- **Table custom `son100_htmln_diagnostics`** (`UNIQUE post_id`, `KEY status`, `KEY is_stale`) créée via `dbDelta()` à l'activation. `DB_VERSION = '2.0.0'`.
+- **`DiagnosticEngine::diagnose(WP_Post): DiagnosticRecord`** — itère les règles activées via `Rule::countMatches()`, agrège `total_violations`, status `to_improve` si > 0 sinon `normal`. `matching_rules` ne liste que les règles avec count > 0 (`{rule_id, occurrences}`). Snapshot `MetricsSnapshot` (7 métriques γ) joint. `post_modified_at_diagnosis` capturé à l'instant t pour détection `is_stale` fine.
+- **`DiagnosticBatchRunner::start_batch(?int $chunk_size, ?array $post_types_override): array`** — énumère les posts publish + post_types F8 → `{batch_id (UUID v4), total_articles, post_ids, chunk_size}`. `process_chunk(list<int>)` boucle `get_post → engine->diagnose → repository->upsert`. `DEFAULT_CHUNK_SIZE = 20`.
+- **`DiagnosticInvalidator`** — hook `save_post` priorité 999. Skip révisions, autosaves, non-publish, post_types hors F8. Marque `is_stale=1` dans try/catch (non-bloquant). **Premier branchement runtime des phases 2/3 dans `Plugin::boot()`**.
+
+#### Métriques γ — F13 (Phase 2.3)
+
+- **`MetricsSnapshot`** : DTO `readonly` 7 métriques (`chars`, `words`, `paragraphs`, `headings:{h1..h6}`, `images`, `links`, `lists`) + `toArray()` / `fromArray()` tolérants + `zero()` + `totalHeadings()`.
+- **`MetricsCalculator::compute(string): MetricsSnapshot`** : 1 parse DOM, comptages O(n), unicode-aware via `preg_match_all('/[\p{L}\p{N}]+/u')`, NBSP normalisés, `<a href>` filtrés sur href non vide. Ne lève jamais.
+
+#### Détection de régression — F15 (Phase 3.1)
+
+- **`RegressionThresholds`** : DTO immuable des 7 seuils γ + constructeurs `from_array` / `from_settings(SettingsRepository)` / `defaults()`.
+- **`RegressionFailure`** : DTO d'une métrique en dépassement (`metric_key`, `before`, `after`, `threshold`, `unit` `pct`/`absolute`, `loss`, `loss_pct`).
+- **`RegressionReport`** : synthèse (liste non vide de failures), méthodes `has_failure(key)` / `failure_for(key)` / `failure_count()` / `to_array()` / `from_array()`.
+- **`RegressionDetector::analyze(MetricsSnapshot $before, $after, RegressionThresholds): ?RegressionReport`** :
+  - Pourcentages (chars/words/paragraphs) : `loss_pct = (before - after) / before × 100` arrondi 2 décimales, comparaison stricte `>`.
+  - Absolus (images/links/lists) : `loss = before - after`, comparaison stricte `>`.
+  - Headings : seuil indépendant par niveau h1..h6 → 6 checks, `metric_key = "headings.h{N}"`.
+  - `before ≤ 0` → null. Perte == seuil → pas de déclenchement. Gains → null.
+
+#### Application par pas — F14 (Phase 4)
+
+- **Table custom `son100_htmln_steps`** (`UNIQUE step_uuid`, `KEY started_at`) avec colonnes JSON `applied_rules`, `affected_post_ids`, `per_article_results`.
+- **`StepRunner`** — orchestrateur F14 avec 6 méthodes publiques :
+  - `start_step($post_ids, $rule_ids, ?$user_id): string` — génère UUID v4 serveur (§13).
+  - `process_article($uuid, $post_id, $dry_run = false): ArticleResult` — pipeline §4.4.2 complet : révision systématique → applySubset → metrics avant/après → analyze régression → branchement (success / dry_run / regression_pending).
+  - `confirm_article($uuid, $post_id): ArticleResult` — admin accepte régression : nouvelle révision + écriture forcée + recalcul diagnostic.
+  - `refuse_article($uuid, $post_id): ArticleResult` — admin refuse : pose `_son100_htmln_manual_check_required = 1`.
+  - `resume_progress($uuid): ?array{uuid, total_articles, processed[], regression_pending[], pending[]}` — bandeau de reprise.
+  - `finalize_step($uuid): ?StepRecord` — idempotent. Comptage success/refused/errored.
+- **`ArticleResult`** : DTO 5 statuts (`success`, `dry_run`, `regression_pending`, `refused`, `error`). `to_persistence_array()` shape strict `{status, regression?, error?}`.
+- **Garde-fous §13 respectés** : `wp_save_post_revision()` systématiquement avant écriture ; `RegressionDetector::analyze()` systématiquement appelé (jamais shortcircuité) ; `step_uuid` côté serveur (`wp_generate_uuid4()`) ; try/catch global autour de `applySubset`.
+
+#### Surface REST — V1.0 (Phase 5)
+
+19 routes sous le namespace `htmln/v1`, toutes en `manage_options` (cf. cahier §14 hyp. 14) :
+
+```
+Steps        (7) : GET  /steps, GET /steps/<uuid>, POST /steps/run,
+                   POST /steps/<uuid>/{process, confirm-article, finalize},
+                   GET  /steps/export
+Diagnostics  (6) : GET  /diagnostics, POST /diagnostics/{run, run/chunk},
+                   GET / DELETE /diagnostics/<post_id>, GET /diagnostics/stats
+Posts        (5) : GET  /posts/{post-types, scan}, GET /posts/<id>/preview,
+                   POST /posts/<id>/normalize, POST /posts/batch-normalize
+Diff         (1) : POST /posts/<id>/diff
+Settings     (1) : GET / POST /settings/regression-thresholds
+```
+
+- **Format d'erreur unifié** `{code, message, data: {status, ...extra}}` aligné sur la sérialisation native `WP_Error`.
+- **`BaseController` abstract** : namespace constant, permission callback partagé, helpers `respond()` / `rest_error()` / `rest_error_from_wp()` / `sanitize_int_list()` / `sanitize_string_list()`.
+- **`RestServiceProvider`** : idempotent, branche un seul `add_action('rest_api_init', register_all_routes)`.
+
+#### Surface WP-CLI — V1.0 (Phase 5.5)
+
+```
+wp htmln steps list   [--from=<date>] [--to=<date>] [--limit=<n>]
+wp htmln steps show   <uuid>
+wp htmln steps export [--file=<path>] [--from=<date>] [--to=<date>]
+wp htmln scan         [<id> | --all | --status=stale [--rebuild]]
+```
+
+Sortie JSON pretty-printée. Export CSV reporté V1.1.
+
+#### SPA admin React — V1.0 (Phase 6)
+
+Nouvelle sous-page **« Normaliser V1 »** sous le menu HTML Normalizer. SPA unique avec router hash interne sur 3 routes :
+
+- **`#/normalize`** (F13/F14/F14.3/F15) : 3 onglets (`to_improve` / `normal` / `stale`) + tableau paginé avec checkboxes par ligne + bouton « Voir le diff » + sidebar 8 préréglages cochables + bandeaux `StepProgressBanner` / `StepResumeBanner` + hook `useStepRunner` (pause/resume sur régression) + `useBeforeunload`.
+- **`#/history`** (F16) : listing paginé `/steps` + `StepDetailDrawer` Modal plein écran avec `per_article_results` complet (status, régression, erreur, lien vers édition article).
+- **`#/settings`** : 7 inputs validés (3 % + 4 absolus), bouton « Restaurer les valeurs par défaut », Notice succès/erreur/warning.
+
+Modales clés :
+- **`DiffModal`** (F14.3) : Modal `isFullScreen`, toggle Code/Rendu, 2 `<pre>` ou 2 `<iframe sandbox="allow-same-origin">` **sans `allow-scripts`** (cf. §13). Sanitize JS maison (`utils/sanitizeForIframe.js`, DOMParser, suppression `<script>`, attrs `on*`, URLs `javascript:`).
+- **`RegressionModal`** (F15) : 3 boutons (Voir diff / Refuser / Confirmer), `shouldCloseOnClickOutside={false}` `shouldCloseOnEsc={false}`, `MetricsDiffBar` 7 métriques avec delta coloré.
+
+Stack : `@wordpress/scripts` 27 + `@wordpress/components` + `@wordpress/data` (store namespace `htmln/spa`) + `@wordpress/api-fetch` + `@wordpress/i18n`. Bundle final 53.4 KiB minifié.
+
+#### Internationalisation (Phase 6.7)
+
+- `wp_set_script_translations()` câblé sur le handle SPA dès Phase 6.1.
+- `languages/100son-html-normalizer.pot` généré via `wp i18n make-pot` (329 chaînes msgid couvrant PHP + JS).
+- `load_plugin_textdomain()` branché sur `init` (WP 6.7+).
+
+### Modifications
+
+- **`SettingsRepository::getRegressionThresholds(): array`** (Phase 1) — retourne les 7 seuils γ avec defaults du cahier §14 hyp. 24. Constante publique `REGRESSION_THRESHOLD_DEFAULTS`.
+- **`SettingsRepository::setRegressionThresholds(array): array`** (Phase 6.7) — setter défensif (entiers ≥ 0, fallback defaults sur invalides, ignore clés inconnues, préserve les autres réglages). Helper privé `normalize_regression_thresholds()`.
+- **`RuleInterface::countMatches(string $html, array $context = []): int`** (Phase 1) — ajout du contrat de comptage à l'interface. 8 préréglages P1-P8 implémentent la sémantique « ce que apply() supprimerait/transformerait ».
+- **`Pipeline::applySubset(array $rules, array $rule_ids, string $html, …): string`** (Phase 1) — délègue à `run()` après filtrage en respectant l'ordre des règles fournies.
+- **`PresetRegistry::get_rules_for_subset(array $rule_ids): array`** (Phase 1) — helper symétrique, respecte l'ordre canonique `PRESETS`, ignore les ids inconnus, filtre les presets désactivés.
+- **README** réécrit pour V1.0 : sections « Workflow par pas » + « Seuils γ », surface REST + CLI documentée, architecture actualisée.
+
+### Renommage de cahier
+
+- `Cahier des charges — HTML Normalizer-v1.9.md` → `claude/CDC-html-normalizer-v1.9-archive.md`
+- `Cahier des charges — HTML Normalizer-v2.0.md` → `claude/CDC-html-normalizer.md`
+- `Cahier des charges — SO to Blocks-v0.3.md` → `claude/CDC-so-to-blocks.md`
+
+### Sécurité
+
+- **Sandbox iframes** (DiffModal) : `sandbox="allow-same-origin"` **jamais** `allow-scripts`. Sanitize JS local en défense en profondeur (DOMPurify écarté pour limiter le poids — `sandbox` est la 1ʳᵉ couche).
+- **Nonce REST** propagé automatiquement par `@wordpress/api-fetch`.
+- **UUID v4 toujours serveur** (`wp_generate_uuid4()`), jamais client.
+- **Toutes les routes REST** : `permission_callback` `manage_options`.
+- **`wp_kses_post`** appliqué au `srcdoc` des iframes de DiffModal.
+
+### Tests et qualité
+
+- **PHPUnit** : 548 verts, 1213 assertions (était 181 / 239 fin V0.1).
+- **PHPStan niveau 6** : 22 erreurs baseline héritées de code historique (notamment `Diagnostics/DiagnosticEngine.php:77` sur `WP_Post::$post_modified`). **Zéro régression introduite par les phases 1-6**.
+- **PHPCS** : WPCS + PSR-12.
+- **lint-js** (`@wordpress/scripts lint-js`) : 0 erreur.
+- **Bundle SPA** : 53.4 KiB minifié (594 octets en 6.1 → 53.4 KiB en 6.7).
+
+### Compatibilité corpus MMM-2
+
+- Extension activée sans erreur fatale sur `ma-maison-mag-2.local`.
+- Cas-tests de non-régression à valider en recette manuelle : posts 11448 (chapô variant A), 374 (chapô variant B), 1392 (resync stale), 2500 (bullet conversion), 6690 (quote `<p>` 14pt), 6150 (art3f bullet list).
+
+---
+
+## [0.1.x] — Pré-V1 (jusqu'au 2026-05-09)
 
 ### Ajouts (V0.1, hors cahier des charges initial v1.7 → v1.9)
 
