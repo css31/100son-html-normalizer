@@ -42,6 +42,7 @@ use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
 use Cent_Son\Html_Normalizer\Rest\DiagnosticsController;
 use Cent_Son\Html_Normalizer\Rest\DiffController;
 use Cent_Son\Html_Normalizer\Rest\PostsController;
+use Cent_Son\Html_Normalizer\Rest\PresetsController;
 use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
 use Cent_Son\Html_Normalizer\Rest\SettingsController;
 use Cent_Son\Html_Normalizer\Rest\StepsController;
@@ -193,6 +194,7 @@ final class Plugin {
 			new PostsController( $settings, $post_normalizer, $so_detector ),
 			new DiffController( $preset_registry, $pipeline, $metrics ),
 			new SettingsController( $settings ),
+			new PresetsController( $settings, $preset_registry ),
 		);
 	}
 

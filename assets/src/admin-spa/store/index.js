@@ -33,15 +33,28 @@ export const STORE_NAME = 'htmln/spa';
  * État initial — toutes les valeurs `null` signalent « pas encore chargé »
  * et permettent aux vues d'afficher un skeleton/loader avant le premier fetch.
  *
+ * `selectedRules` est éphémère : initialisé à la liste complète P1..P8 au
+ * boot, modifié par l'onglet Règles, perdu au reload (cf. décision post-rc1).
+ *
  * @typedef {Object} HtmlnSpaState
  * @property {?{normal: number, to_improve: number, stale: number, total: number}} diagnosticsStats     Compteurs F13 onglets (null = pas encore chargé).
  * @property {?{uuid: string, progress?: Object}}                                  currentStep          Pas F14 en cours (null = aucun pas actif).
  * @property {?Object<string, number>}                                             regressionThresholds Seuils γ courants (Settings 6.7).
+ * @property {string[]}                                                            selectedRules        Sélection éphémère des règles à appliquer au prochain pas.
  */
+
+/**
+ * Liste canonique des 8 ids de préréglages, dans l'ordre du pipeline.
+ *
+ * @type {string[]}
+ */
+export const ALL_RULE_IDS = [ 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8' ];
+
 const DEFAULT_STATE = {
 	diagnosticsStats: null,
 	currentStep: null,
 	regressionThresholds: null,
+	selectedRules: [ ...ALL_RULE_IDS ],
 };
 
 const actions = {
@@ -76,6 +89,42 @@ const actions = {
 	setRegressionThresholds( thresholds ) {
 		return { type: 'SET_REGRESSION_THRESHOLDS', thresholds };
 	},
+
+	/**
+	 * Remplace la sélection de règles pour le prochain pas. Les ids
+	 * inconnus sont filtrés silencieusement, l'ordre canonique est
+	 * préservé pour cohérence d'affichage.
+	 *
+	 * @param {string[]} ruleIds Liste candidate.
+	 */
+	setSelectedRules( ruleIds ) {
+		return { type: 'SET_SELECTED_RULES', ruleIds };
+	},
+
+	/**
+	 * Bascule l'état d'un id dans la sélection. Ajoute s'il est absent,
+	 * retire s'il est présent.
+	 *
+	 * @param {string} ruleId Identifiant P1..P8.
+	 */
+	toggleSelectedRule( ruleId ) {
+		return { type: 'TOGGLE_SELECTED_RULE', ruleId };
+	},
+
+	/**
+	 * Coche les 8 règles canoniques.
+	 */
+	selectAllRules() {
+		return { type: 'SET_SELECTED_RULES', ruleIds: [ ...ALL_RULE_IDS ] };
+	},
+
+	/**
+	 * Décoche toutes les règles. Le bouton « Appliquer ce pas » sera
+	 * désactivé en aval tant que la sélection est vide.
+	 */
+	deselectAllRules() {
+		return { type: 'SET_SELECTED_RULES', ruleIds: [] };
+	},
 };
 
 /**
@@ -95,6 +144,29 @@ function reducer( state = DEFAULT_STATE, action ) {
 			return { ...state, diagnosticsStats: action.stats };
 		case 'SET_REGRESSION_THRESHOLDS':
 			return { ...state, regressionThresholds: action.thresholds };
+		case 'SET_SELECTED_RULES': {
+			const candidates = Array.isArray( action.ruleIds )
+				? action.ruleIds
+				: [];
+			// Filtre les ids inconnus + préserve l'ordre canonique.
+			const filtered = ALL_RULE_IDS.filter( ( id ) =>
+				candidates.includes( id )
+			);
+			return { ...state, selectedRules: filtered };
+		}
+		case 'TOGGLE_SELECTED_RULE': {
+			const id = String( action.ruleId );
+			if ( ! ALL_RULE_IDS.includes( id ) ) {
+				return state;
+			}
+			const present = state.selectedRules.includes( id );
+			const next = present
+				? state.selectedRules.filter( ( r ) => r !== id )
+				: ALL_RULE_IDS.filter(
+						( r ) => state.selectedRules.includes( r ) || r === id
+				  );
+			return { ...state, selectedRules: next };
+		}
 		default:
 			return state;
 	}
@@ -132,6 +204,15 @@ const selectors = {
 	 * @return {?Object} Seuils ou null.
 	 */
 	getRegressionThresholds: ( state ) => state.regressionThresholds,
+
+	/**
+	 * Sélection éphémère de règles pour le prochain pas (P1..P8 par
+	 * défaut). Partagée entre l'onglet Règles et la vue Normaliser.
+	 *
+	 * @param {HtmlnSpaState} state État du store.
+	 * @return {string[]} Liste dans l'ordre canonique.
+	 */
+	getSelectedRules: ( state ) => state.selectedRules,
 };
 
 /**

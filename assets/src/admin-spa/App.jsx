@@ -4,13 +4,14 @@
  * Router hash minimaliste :
  *  - `#/normalize` (défaut) → vue Normalize (F13/F14/F14.3/F15).
  *  - `#/history`            → vue History (F16).
+ *  - `#/rules`              → vue Rules (configuration des 8 préréglages).
  *  - `#/settings`           → vue Settings (F15 — seuils γ).
  *
  * Pas de dépendance externe (pas de @wordpress/router qui n'existe pas en
- * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour trois
- * routes. Si la SPA grandit (V1.1+ avec Dashboard, Presets SPA, etc.)
- * l'extraction vers un router maison ou react-router restera locale à ce
- * fichier sans toucher aux vues.
+ * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour ces 4
+ * routes. Si la SPA grandit (V1.1+ avec Dashboard, etc.) l'extraction
+ * vers un router maison ou react-router restera locale à ce fichier
+ * sans toucher aux vues.
  *
  * Le rendu utilise la barre `.nav-tab-wrapper` native WP-Admin, ce qui
  * garantit la cohérence visuelle avec les autres écrans de l'admin et
@@ -21,6 +22,7 @@ import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import Normalize from './views/Normalize';
 import History from './views/History';
+import Rules from './views/Rules';
 import Settings from './views/Settings';
 
 /**
@@ -30,6 +32,7 @@ import Settings from './views/Settings';
  */
 const ROUTE_NORMALIZE = 'normalize';
 const ROUTE_HISTORY = 'history';
+const ROUTE_RULES = 'rules';
 const ROUTE_SETTINGS = 'settings';
 const DEFAULT_ROUTE = ROUTE_NORMALIZE;
 
@@ -39,7 +42,12 @@ const DEFAULT_ROUTE = ROUTE_NORMALIZE;
  *
  * @type {string[]}
  */
-const VALID_ROUTES = [ ROUTE_NORMALIZE, ROUTE_HISTORY, ROUTE_SETTINGS ];
+const VALID_ROUTES = [
+	ROUTE_NORMALIZE,
+	ROUTE_HISTORY,
+	ROUTE_RULES,
+	ROUTE_SETTINGS,
+];
 
 /**
  * Parse le hash courant (`#/foo`, `#foo`, `#/foo?bar`) vers un identifiant
@@ -117,6 +125,14 @@ export default function App() {
 					{ __( 'Historique', '100son-html-normalizer' ) }
 				</a>
 				<a
+					href="#/rules"
+					aria-current={ ROUTE_RULES === route ? 'page' : undefined }
+					className={ tabClass( ROUTE_RULES ) }
+					onClick={ ( event ) => navigate( event, ROUTE_RULES ) }
+				>
+					{ __( 'Règles', '100son-html-normalizer' ) }
+				</a>
+				<a
 					href="#/settings"
 					aria-current={
 						ROUTE_SETTINGS === route ? 'page' : undefined
@@ -144,6 +160,8 @@ function renderRoute( route ) {
 	switch ( route ) {
 		case ROUTE_HISTORY:
 			return <History />;
+		case ROUTE_RULES:
+			return <Rules />;
 		case ROUTE_SETTINGS:
 			return <Settings />;
 		case ROUTE_NORMALIZE:
