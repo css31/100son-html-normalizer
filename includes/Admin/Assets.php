@@ -91,9 +91,11 @@ final class Assets {
 			SON100_HTMLN_PATH . 'languages'
 		);
 
-		// Bundle CSS (généré par `@wordpress/scripts` quand des fichiers
-		// SCSS/CSS sont importés depuis l'entry). Optionnel — Phase 6.1
-		// n'a pas encore de styles.
+		// Bundle CSS (généré par `@wordpress/scripts` à partir des `.scss`
+		// importés depuis l'entry). `wp-scripts` produit aussi une variante
+		// `admin-spa-rtl.css` ; `wp_style_add_data(..., 'rtl', 'replace')`
+		// fait basculer automatiquement vers cette variante quand `is_rtl()`
+		// est vrai, ce qui couvre les langues RTL côté admin sans surcoût.
 		$css_path = SON100_HTMLN_PATH . 'assets/build/admin-spa.css';
 		if ( file_exists( $css_path ) ) {
 			wp_enqueue_style(
@@ -102,6 +104,7 @@ final class Assets {
 				array( 'wp-components' ),
 				$version
 			);
+			wp_style_add_data( self::SCRIPT_HANDLE, 'rtl', 'replace' );
 		}
 	}
 

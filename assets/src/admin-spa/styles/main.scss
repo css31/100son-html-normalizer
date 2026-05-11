@@ -1,0 +1,829 @@
+/* -----------------------------------------------------------------------------
+ * 100son HTML Normalizer — styles SPA d'administration
+ *
+ * Polish minimal V1.0 : style les classes `htmln-*` posées dans le JS pour
+ * rendre la SPA lisible. Aucune charte custom — on s'appuie sur les couleurs
+ * WP-Admin natives (`--wp-admin-theme-color` qui s'adapte au profil de
+ * couleur de l'utilisateur) et sur les patterns visuels WP-Admin standards
+ * (notice, wp-list-table, nav-tab-wrapper).
+ *
+ * Organisation : tout dans un seul fichier pour V1.0 — le découpage en
+ * partials viendra si le SCSS dépasse ~500 lignes ou si on introduit des
+ * tokens partagés.
+ * ---------------------------------------------------------------------------- */
+
+/* =============================================================================
+ *  Variables d'apparence locales (V1.0 — pas un design system, juste des
+ *  raccourcis pour cohérence interne. Reposent sur les CSS vars WP existantes
+ *  quand pertinent).
+ * ========================================================================== */
+
+.htmln-spa-root {
+	--htmln-radius: 4px;
+	--htmln-radius-lg: 6px;
+	--htmln-border: #dcdcde;
+	--htmln-border-strong: #c3c4c7;
+	--htmln-bg-subtle: #f6f7f7;
+	--htmln-bg-paper: #ffffff;
+	--htmln-text: #1d2327;
+	--htmln-text-muted: #50575e;
+	--htmln-text-faint: #787c82;
+	--htmln-gap: 12px;
+	--htmln-gap-lg: 20px;
+
+	/* Couleurs sémantiques pour badges et compteurs. Alignées sur la palette
+	 * WP-Admin (green, orange, red, gray, purple). */
+	--htmln-color-success: #00a32a;
+	--htmln-color-warning: #dba617;
+	--htmln-color-danger: #d63638;
+	--htmln-color-muted: #646970;
+	--htmln-color-info: #2271b1;
+	--htmln-color-confirmed: #8a46f0;
+}
+
+/* =============================================================================
+ *  Layout général
+ * ========================================================================== */
+
+.htmln-spa-root {
+	color: var( --htmln-text );
+	font-size: 14px;
+	line-height: 1.5;
+	max-width: 1400px;
+	padding-bottom: 32px;
+}
+
+.htmln-app__tabs {
+	margin-bottom: 16px;
+}
+
+.htmln-app__view {
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius-lg );
+	padding: 20px 24px;
+}
+
+/* =============================================================================
+ *  Badges et compteurs (utilisés dans les tableaux + détails)
+ * ========================================================================== */
+
+.htmln-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.6;
+	white-space: nowrap;
+	border: 1px solid transparent;
+}
+
+.htmln-badge--normal {
+	background: rgba( 0, 163, 42, 0.12 );
+	color: #007a1e;
+	border-color: rgba( 0, 163, 42, 0.3 );
+}
+
+.htmln-badge--to_improve {
+	background: rgba( 219, 166, 23, 0.18 );
+	color: #8a6a00;
+	border-color: rgba( 219, 166, 23, 0.4 );
+}
+
+.htmln-badge--stale {
+	background: rgba( 100, 105, 112, 0.15 );
+	color: var( --htmln-color-muted );
+	border-color: rgba( 100, 105, 112, 0.35 );
+}
+
+.htmln-badge--confirmed {
+	background: rgba( 138, 70, 240, 0.12 );
+	color: var( --htmln-color-confirmed );
+	border-color: rgba( 138, 70, 240, 0.35 );
+}
+
+.htmln-badge__stale,
+.htmln-badge__confirmed {
+	font-style: italic;
+	font-weight: 400;
+	margin-left: 4px;
+}
+
+/* Compteurs synthétiques sous une cellule (ex. ligne d'historique :
+ *   ✓ 12 · ✗ 1 · ⚠ 0 · ⚑ 2 régr.). Les classes individuelles donnent une
+ *   teinte distincte mais on reste lisible monochrome aussi. */
+
+.htmln-counter {
+	display: inline-block;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.htmln-counter--success {
+	color: var( --htmln-color-success );
+}
+
+.htmln-counter--refused {
+	color: var( --htmln-color-muted );
+}
+
+.htmln-counter--error {
+	color: var( --htmln-color-danger );
+}
+
+.htmln-counter--regression {
+	color: var( --htmln-color-confirmed );
+}
+
+/* =============================================================================
+ *  Notices et états vides
+ * ========================================================================== */
+
+.htmln-error.notice {
+	margin: 12px 0;
+}
+
+.htmln-empty {
+	padding: 32px;
+	text-align: center;
+	color: var( --htmln-text-muted );
+	font-style: italic;
+	background: var( --htmln-bg-subtle );
+	border-radius: var( --htmln-radius );
+}
+
+.htmln-table-loading {
+	padding: 32px;
+	text-align: center;
+	color: var( --htmln-text-muted );
+}
+
+/* =============================================================================
+ *  Tableaux (Normaliser + Historique) — extensions de wp-list-table
+ * ========================================================================== */
+
+.htmln-table-wrap {
+	margin-top: 16px;
+}
+
+.htmln-articles-table,
+.htmln-steps-table,
+.htmln-per-article-table {
+	margin-top: 8px;
+
+	code {
+		font-size: 12px;
+	}
+}
+
+.htmln-uuid {
+	font-family: SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+	color: var( --htmln-text-muted );
+	background: var( --htmln-bg-subtle );
+	padding: 2px 6px;
+	border-radius: 3px;
+}
+
+.htmln-steps-table__counters {
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.htmln-pagination {
+	margin-top: 12px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var( --htmln-gap );
+}
+
+.htmln-pagination__spinner {
+	display: inline-flex;
+	align-items: center;
+}
+
+/* =============================================================================
+ *  Vue Normaliser — footer (post-rc1, remplace la sidebar)
+ * ========================================================================== */
+
+.htmln-normalize__footer {
+	margin-top: 20px;
+	padding-top: 16px;
+	border-top: 1px solid var( --htmln-border );
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var( --htmln-gap-lg );
+	flex-wrap: wrap;
+}
+
+.htmln-normalize__footer-recap {
+	color: var( --htmln-text );
+
+	strong {
+		color: var( --htmln-text );
+	}
+
+	a {
+		color: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+		text-decoration: none;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+}
+
+.htmln-normalize__footer-rules {
+	color: var( --htmln-text-muted );
+	font-family: SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+}
+
+.htmln-normalize__footer-action {
+	flex-shrink: 0;
+}
+
+/* =============================================================================
+ *  Onglet Règles — cards par préréglage
+ * ========================================================================== */
+
+.htmln-rules__header {
+	margin-bottom: 16px;
+
+	h2 {
+		margin: 0 0 4px;
+		font-size: 20px;
+	}
+
+	.description {
+		color: var( --htmln-text-muted );
+		margin: 0;
+	}
+}
+
+.htmln-rules__toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var( --htmln-gap );
+	padding: 12px 16px;
+	background: var( --htmln-bg-subtle );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+	margin-bottom: 20px;
+	flex-wrap: wrap;
+}
+
+.htmln-rules__count {
+	font-weight: 600;
+}
+
+.htmln-rules__toolbar-actions {
+	display: inline-flex;
+	gap: 8px;
+}
+
+.htmln-rules__list {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.htmln-rule {
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius-lg );
+	padding: 20px 24px;
+	transition: opacity 0.15s ease;
+
+	&--disabled {
+		opacity: 0.55;
+		background: var( --htmln-bg-subtle );
+	}
+}
+
+.htmln-rule__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var( --htmln-gap-lg );
+	margin-bottom: 12px;
+	flex-wrap: wrap;
+}
+
+.htmln-rule__title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	flex: 1;
+}
+
+.htmln-rule__code {
+	background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	color: #fff;
+	padding: 4px 10px;
+	border-radius: var( --htmln-radius );
+	font-family: SFMono-Regular, Menlo, Consolas, monospace;
+	font-weight: 600;
+	font-size: 13px;
+	line-height: 1;
+}
+
+.htmln-rule__label {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+
+	code {
+		font-size: 13px;
+		background: var( --htmln-bg-subtle );
+		padding: 1px 5px;
+		border-radius: 3px;
+	}
+}
+
+.htmln-rule__actions {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	align-items: flex-start;
+	min-width: 220px;
+
+	/* `CheckboxControl` et `ToggleControl` ont leurs propres margins via
+	 * `@wordpress/components` — on les compacte ici. */
+	.components-base-control {
+		margin-bottom: 0;
+	}
+}
+
+.htmln-rule__description {
+	color: var( --htmln-text );
+	margin: 0 0 16px;
+
+	code {
+		background: var( --htmln-bg-subtle );
+		padding: 1px 5px;
+		border-radius: 3px;
+		font-size: 12px;
+	}
+}
+
+.htmln-rule__params {
+	background: var( --htmln-bg-subtle );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+	padding: 14px 18px;
+	margin: 0 0 16px;
+
+	legend {
+		font-weight: 600;
+		font-size: 13px;
+		color: var( --htmln-text-muted );
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		padding: 0 6px;
+	}
+
+	.components-base-control {
+		margin-bottom: 12px;
+	}
+
+	.components-button {
+		margin-top: 4px;
+	}
+}
+
+.htmln-rule__params-label {
+	margin: 12px 0 6px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.htmln-rule__example {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+
+	@media ( max-width: 900px ) {
+		grid-template-columns: 1fr;
+	}
+}
+
+.htmln-rule__example-col {
+	background: var( --htmln-bg-subtle );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+	padding: 12px 14px;
+	min-width: 0;
+
+	h4 {
+		margin: 0 0 8px;
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var( --htmln-text-muted );
+	}
+
+	pre {
+		margin: 0;
+		font-family: SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 12px;
+		line-height: 1.5;
+		white-space: pre-wrap;
+		word-break: break-word;
+		color: var( --htmln-text );
+	}
+}
+
+/* =============================================================================
+ *  Onglet Historique
+ * ========================================================================== */
+
+.htmln-history__header {
+	margin-bottom: 16px;
+
+	h2 {
+		margin: 0 0 4px;
+		font-size: 20px;
+	}
+
+	.description {
+		color: var( --htmln-text-muted );
+		margin: 0;
+		max-width: 80ch;
+	}
+}
+
+.htmln-step-detail__loading {
+	padding: 32px;
+	text-align: center;
+}
+
+.htmln-step-detail__meta {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 8px 20px;
+	margin: 0 0 20px;
+
+	dt {
+		font-weight: 600;
+		color: var( --htmln-text-muted );
+	}
+
+	dd {
+		margin: 0;
+	}
+}
+
+.htmln-step-detail__progress {
+	margin: 0 0 20px;
+}
+
+.htmln-step-detail__heading {
+	font-size: 16px;
+	margin: 0 0 12px;
+}
+
+.htmln-step-detail__footer {
+	margin-top: 20px;
+	padding-top: 16px;
+	border-top: 1px solid var( --htmln-border );
+	text-align: right;
+}
+
+.htmln-per-article-table__error {
+	margin: 0;
+
+	code {
+		font-size: 12px;
+		color: var( --htmln-color-danger );
+		background: rgba( 214, 54, 56, 0.08 );
+		padding: 2px 6px;
+		border-radius: 3px;
+	}
+}
+
+.htmln-per-article-table__failures {
+	margin: 0;
+	padding-left: 16px;
+	font-size: 13px;
+	color: var( --htmln-text-muted );
+}
+
+/* =============================================================================
+ *  Onglet Réglages
+ * ========================================================================== */
+
+.htmln-settings__header {
+	margin-bottom: 16px;
+
+	h2 {
+		margin: 0 0 4px;
+		font-size: 20px;
+	}
+
+	.description {
+		color: var( --htmln-text-muted );
+		margin: 0;
+		max-width: 80ch;
+	}
+}
+
+.htmln-settings__form {
+	max-width: 720px;
+}
+
+.htmln-settings__group {
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+	padding: 16px 20px;
+	margin: 0 0 16px;
+
+	legend {
+		font-weight: 600;
+		font-size: 13px;
+		color: var( --htmln-text-muted );
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		padding: 0 6px;
+	}
+}
+
+.htmln-settings__field {
+	margin-bottom: 10px;
+
+	&--invalid {
+		.components-text-control__input {
+			border-color: var( --htmln-color-danger );
+		}
+	}
+}
+
+.htmln-settings__actions {
+	margin-top: 16px;
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+/* =============================================================================
+ *  Modales — DiffModal, RegressionModal, StepDetailDrawer
+ * ========================================================================== */
+
+.htmln-diff-modal__view-toggle {
+	display: flex;
+	gap: 8px;
+	padding: 12px 0;
+	border-bottom: 1px solid var( --htmln-border );
+	margin-bottom: 12px;
+}
+
+.htmln-diff-modal__pane {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	height: calc( 100vh - 220px );
+	min-height: 320px;
+}
+
+.htmln-diff-modal__col {
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+
+	h4 {
+		margin: 0;
+		padding: 8px 12px;
+		background: var( --htmln-bg-subtle );
+		border-bottom: 1px solid var( --htmln-border );
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var( --htmln-text-muted );
+	}
+}
+
+.htmln-diff-modal__code {
+	margin: 0;
+	flex: 1;
+	overflow: auto;
+	padding: 12px;
+	font-family: SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+	background: var( --htmln-bg-paper );
+}
+
+.htmln-diff-modal__iframe {
+	flex: 1;
+	width: 100%;
+	border: none;
+	background: #fff;
+}
+
+.htmln-diff-modal__loading {
+	padding: 32px;
+	text-align: center;
+	color: var( --htmln-text-muted );
+}
+
+.htmln-diff-modal__warnings {
+	margin: 12px 0;
+}
+
+.htmln-regression-modal {
+	.components-modal__content {
+		max-width: 720px;
+	}
+}
+
+.htmln-regression-modal__failures {
+	margin: 0 0 16px;
+	padding-left: 20px;
+
+	li {
+		margin-bottom: 4px;
+	}
+}
+
+.htmln-regression-modal__actions {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 20px;
+	flex-wrap: wrap;
+}
+
+.htmln-regression-modal__hint {
+	margin-top: 12px;
+	font-size: 12px;
+	color: var( --htmln-text-faint );
+	font-style: italic;
+}
+
+/* MetricsDiffBar — petit tableau aligné, deltas colorés. */
+
+.htmln-metrics-diff {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+
+	th,
+	td {
+		padding: 6px 10px;
+		text-align: left;
+		border-bottom: 1px solid var( --htmln-border );
+	}
+
+	thead th {
+		background: var( --htmln-bg-subtle );
+		color: var( --htmln-text-muted );
+		font-weight: 600;
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	tbody th {
+		font-weight: 500;
+		color: var( --htmln-text );
+	}
+
+	td {
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+.htmln-metrics-diff__delta--loss {
+	color: var( --htmln-color-danger );
+	font-weight: 600;
+}
+
+.htmln-metrics-diff__delta--gain {
+	color: var( --htmln-color-success );
+	font-weight: 600;
+}
+
+.htmln-metrics-diff__delta--neutral {
+	color: var( --htmln-text-faint );
+}
+
+/* =============================================================================
+ *  Bandeaux StepProgressBanner / StepResumeBanner
+ *
+ *  Note : ces deux composants utilisent leur propre classe en plus de
+ *  `notice notice-info` / `notice-warning` / `notice-error`. La classe WP
+ *  fournit déjà la couleur d'accent à gauche ; on n'ajoute donc qu'un
+ *  layout flex pour aligner spinner / texte / boutons.
+ * ========================================================================== */
+
+.htmln-step-banner,
+.htmln-step-resume {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var( --htmln-gap );
+	flex-wrap: wrap;
+	margin: 12px 0;
+
+	p {
+		margin: 0;
+	}
+}
+
+.htmln-step-banner__progress {
+	flex: 1 1 200px;
+	height: 8px;
+	background: var( --htmln-border );
+	border-radius: 999px;
+	overflow: hidden;
+	min-width: 200px;
+}
+
+.htmln-step-banner__progress-fill {
+	height: 100%;
+	background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	transition: width 0.25s ease;
+}
+
+.htmln-step-banner__warning {
+	flex-basis: 100%;
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: var( --htmln-text-faint );
+	font-style: italic;
+}
+
+.htmln-step-resume__hint {
+	flex-basis: 100%;
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: var( --htmln-text-faint );
+	font-style: italic;
+}
+
+/* =============================================================================
+ *  Onglets internes (TabsHeader F13 : to_improve / normal / stale)
+ * ========================================================================== */
+
+.htmln-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid var( --htmln-border );
+
+	button {
+		background: transparent;
+		border: 1px solid transparent;
+		border-bottom: none;
+		border-radius: var( --htmln-radius ) var( --htmln-radius ) 0 0;
+		padding: 8px 16px;
+		font-size: 14px;
+		color: var( --htmln-text-muted );
+		cursor: pointer;
+		margin-bottom: -1px;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+
+		&[aria-selected='true'] {
+			background: var( --htmln-bg-paper );
+			border-color: var( --htmln-border );
+			color: var( --htmln-text );
+			font-weight: 600;
+		}
+
+		&:hover:not( [aria-selected='true'] ) {
+			color: var( --htmln-text );
+			background: var( --htmln-bg-subtle );
+		}
+	}
+}
+
+.htmln-tabs__count {
+	background: var( --htmln-bg-subtle );
+	border: 1px solid var( --htmln-border );
+	border-radius: 999px;
+	padding: 1px 8px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var( --htmln-text-muted );
+	min-width: 22px;
+	text-align: center;
+
+	.htmln-tabs button[aria-selected='true'] & {
+		background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+		border-color: transparent;
+		color: #fff;
+	}
+}

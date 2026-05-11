@@ -16,6 +16,7 @@
 import { createRoot } from '@wordpress/element';
 import App from './App';
 import './store';
+import './styles/main.scss';
 
 /**
  * Affiche un message d'erreur lisible dans le conteneur #htmln-app pour
