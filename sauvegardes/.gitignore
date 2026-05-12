@@ -1,0 +1,17 @@
+# Dossier des sauvegardes BDD de recette (RECETTE.md Phase A & L).
+#
+# Stratégie : on track ce fichier `.gitignore` pour que le dossier
+# `sauvegardes/` existe dans le dépôt — comme ça la commande
+# `wp-sandbox db export ... > sauvegardes/...` marche du premier coup
+# sans `mkdir` préalable. Mais on exclut *tout le reste* du contenu
+# (dumps SQL, dumps compressés, etc.) pour ne pas polluer git avec
+# des fichiers volumineux qui ne sont pas du code.
+#
+# Si tu ajoutes un nouveau type de fichier qui DOIT être suivi
+# (README, script de restore, etc.), ajoute-le ici avec `!nom-du-fichier`.
+
+# Tout ignorer par défaut
+*
+
+# Sauf ce fichier lui-même
+!.gitignore

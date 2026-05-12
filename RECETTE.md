@@ -44,11 +44,22 @@ docker exec -u www-data devkinsta_fpm php8.3 /usr/local/bin/wp \
   --path=/www/kinsta/public/ma-maison-mag-2 plugin status 100son-html-normalizer
 
 # Backup BDD sandbox AVANT toute écriture (Phase F écrira en base).
-# `-` = sortie sur stdout ; sans ça, mysqldump (qui tourne *dans* le
-# container devkinsta_fpm) essaye d'écrire dans `/home/cyrille/...`
-# qui n'existe pas côté container — d'où une erreur ENOENT. Le pipe
-# `>` côté hôte récupère le dump et l'écrit dans le bon dossier.
-wp-sandbox db export - > ~/htmln-recette-$(date +%Y%m%d-%H%M).sql
+#
+# Stockage dans `sauvegardes/` à la racine de l'extension — dossier
+# tracké par git mais dont le contenu est ignoré (cf. sauvegardes/.gitignore).
+# Profite du volume monté DevKinsta : pas besoin de pipe stdout, on
+# peut passer le chemin tel quel au container (il voit le même fichier
+# que l'hôte via le mount `/www/kinsta/public/ma-maison-mag-2/`).
+#
+# Le chemin est fourni à `wp` au format container (préfixé
+# `/www/kinsta/public/ma-maison-mag-2/`) car wp-cli tourne *dans*
+# devkinsta_fpm — il ne voit pas le chemin hôte `/home/cyrille/…`.
+cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
+
+wp-sandbox db export \
+  /www/kinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer/sauvegardes/htmln-recette-$(date +%Y%m%d-%H%M).sql
+
+ls -lh sauvegardes/htmln-recette-*.sql | tail -1
 
 # État de référence
 cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
@@ -331,10 +342,14 @@ wp-sandbox db query "SELECT meta_key FROM wp_postmeta WHERE meta_key LIKE '_son1
 # → vide
 
 # Restaurer depuis le backup phase A.
-# Idem que pour `db export` : on pipe le fichier hôte sur stdin pour
-# que mysql (dans le container) le lise depuis le pipe — il n'a pas
-# accès direct à `/home/cyrille/`.
-wp-sandbox db import - < ~/htmln-recette-YYYYMMDD-HHMM.sql
+# Le fichier vit dans `sauvegardes/` (dossier monté visible côté
+# container), on peut donc passer le chemin container directement.
+# Remplace YYYYMMDD-HHMM par l'horodatage réel — `ls sauvegardes/`
+# pour retrouver.
+cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
+
+wp-sandbox db import \
+  /www/kinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer/sauvegardes/htmln-recette-YYYYMMDD-HHMM.sql
 
 # Reinstall pour repartir
 cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
