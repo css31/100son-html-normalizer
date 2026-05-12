@@ -1,20 +1,33 @@
 /**
  * NotesEditor — éditeur Gutenberg restreint pour l'onglet Notes SPA.
  *
- * Architecture inline (pas d'iframe) :
+ * Architecture inline (pas d'iframe), avec header d'éditeur persistant +
+ * toolbar fixe (`hasFixedToolbar: true`) :
  *
  *   <SlotFillProvider>
- *     <BlockEditorProvider value={blocks} onChange={...} settings={...}>
+ *     <BlockEditorProvider settings={ { ..., hasFixedToolbar: true } } ...>
  *       <BlockTools>
- *         <WritingFlow>
- *           <ObserveTyping>
- *             <BlockList />
- *           </ObserveTyping>
- *         </WritingFlow>
+ *         <div class="htmln-notes__editor-bar">
+ *           <Inserter renderToggle={...} />     ← bouton "+ Ajouter un bloc"
+ *           <BlockToolbar hideDragHandle />     ← toolbar contextuelle horizontale
+ *         </div>
+ *         <div class="htmln-notes__canvas editor-styles-wrapper">
+ *           <WritingFlow><ObserveTyping><BlockList/></ObserveTyping></WritingFlow>
+ *         </div>
  *       </BlockTools>
  *       <Popover.Slot />
  *     </BlockEditorProvider>
  *   </SlotFillProvider>
+ *
+ * Pourquoi ce pattern et pas le toolbar flottant par défaut :
+ *  - Embarqué hors du contexte post-editor, le popover toolbar essaie de
+ *    s'ancrer au bloc et n'a pas l'espace horizontal qu'il attend → ses
+ *    items stackent verticalement, rendant la toolbar inutilisable.
+ *  - Pas d'inserter principal persistant non plus → l'utilisateur ne sait
+ *    plus comment ajouter un bloc en dehors du `+` between-blocks au hover.
+ *  - `hasFixedToolbar: true` + `<BlockToolbar>` rendu explicitement = mode
+ *    « document toolbar » utilisé par Site Editor / Widgets / Customize —
+ *    horizontal stable, indépendant du popover positioning.
  *
  * Whitelist de blocs (`allowedBlockTypes` dans settings) : paragraph,
  * heading, list, list-item, quote, code, separator, image, table.
@@ -52,9 +65,10 @@ import {
 	BlockEditorProvider,
 	BlockList,
 	BlockTools,
+	BlockToolbar,
 	WritingFlow,
 	ObserveTyping,
-	// `BlockBreadcrumb` est dispo mais alourdit l'UI sans valeur pour 1 note.
+	Inserter,
 } from '@wordpress/block-editor';
 import {
 	parse,
@@ -158,6 +172,11 @@ function buildEditorSettings() {
 		// qui a été sauvé. L'utilisateur insère ce qu'il veut.
 		template: null,
 		templateLock: false,
+		// Toolbar fixe au-dessus du contenu (mode document) au lieu du
+		// popover flottant qui pose des problèmes de positionnement quand
+		// l'éditeur est embarqué hors du contexte post-editor (toolbar
+		// stackait verticalement faute d'espace horizontal cohérent).
+		hasFixedToolbar: true,
 		// Désactive la liste des modèles natifs WP qui n'a aucun sens ici.
 		__experimentalBlockPatterns: [],
 		__experimentalBlockPatternCategories: [],
@@ -267,15 +286,47 @@ export default function NotesEditor( {
 					onChange={ setBlocks }
 					settings={ settings }
 				>
-					<div className="htmln-notes__canvas editor-styles-wrapper">
-						<BlockTools>
+					<BlockTools>
+						<div className="htmln-notes__editor-bar">
+							{ /* Inserter principal persistant. `rootClientId=""`
+							 *   = insertion à la racine du document. Le bouton
+							 *   est rendu via `renderToggle` pour le styler en
+							 *   bouton WP standard (`@wordpress/components`)
+							 *   plutôt qu'avec le rendu par défaut. */ }
+							<Inserter
+								rootClientId=""
+								renderToggle={ ( {
+									onToggle,
+									disabled,
+									isOpen,
+								} ) => (
+									<Button
+										onClick={ onToggle }
+										disabled={ disabled }
+										variant="secondary"
+										aria-expanded={ isOpen }
+										className="htmln-notes__inserter-toggle"
+									>
+										{ __(
+											'+ Ajouter un bloc',
+											'100son-html-normalizer'
+										) }
+									</Button>
+								) }
+							/>
+							{ /* Toolbar fixe (cf. settings.hasFixedToolbar) :
+							 *   `hideDragHandle` retire la poignée de drag, qui
+							 *   n'a pas de sens dans un canevas linéaire à 1 col. */ }
+							<BlockToolbar hideDragHandle />
+						</div>
+						<div className="htmln-notes__canvas editor-styles-wrapper">
 							<WritingFlow>
 								<ObserveTyping>
 									<BlockList />
 								</ObserveTyping>
 							</WritingFlow>
-						</BlockTools>
-					</div>
+						</div>
+					</BlockTools>
 					<Popover.Slot />
 				</BlockEditorProvider>
 			</SlotFillProvider>

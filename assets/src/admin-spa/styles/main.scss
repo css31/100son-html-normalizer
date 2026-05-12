@@ -863,6 +863,20 @@
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+
+	/* Conteneur global de l'éditeur — combine la barre fixe et le canevas
+	 * dans un même cadre. Donne un cadre visuel cohérent et permet de
+	 * styler la barre comme un header de mini-éditeur. */
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius-lg );
+	overflow: hidden;
+	background: var( --htmln-bg-paper );
+
+	/* Le SlotFillProvider est notre racine — on enlève son margin pour ne
+	 * pas dépasser du cadre. */
+	.components-slot-fill-provider {
+		display: contents;
+	}
 }
 
 .htmln-notes__editor--booting {
@@ -872,18 +886,67 @@
 	font-style: italic;
 }
 
+/* =============================================================================
+ *  Barre d'éditeur Notes — header persistant avec inserter + toolbar fixe
+ *
+ *  Le `BlockToolbar` rendu en mode `hasFixedToolbar` produit normalement
+ *  son propre wrapper `.block-editor-block-contextual-toolbar`. On le
+ *  laisse couler à droite de notre inserter, en flex-row, avec un fond
+ *  subtil pour séparer visuellement du canevas.
+ * ========================================================================== */
+
+.htmln-notes__editor-bar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 12px;
+	background: var( --htmln-bg-subtle );
+	border-bottom: 1px solid var( --htmln-border );
+	min-height: 48px;
+	flex-wrap: wrap;
+	position: sticky;
+	top: 32px; /* sous la admin-bar WP */
+	z-index: 10;
+
+	/* La toolbar du bloc, quand on a `hasFixedToolbar: true`, monte ici via
+	 * `<BlockToolbar>`. On force ses items à rester en ligne — certains
+	 * styles WP par défaut tentent de la wrapper, ce qui est ce qu'on
+	 * voulait éviter. */
+	.block-editor-block-toolbar,
+	.block-editor-block-contextual-toolbar {
+		flex: 1 1 auto;
+		min-width: 0;
+		border: none;
+		background: transparent;
+
+		.components-toolbar-group,
+		.components-accessible-toolbar {
+			border: none;
+			background: transparent;
+		}
+	}
+
+	/* Quand aucun bloc n'est sélectionné, `<BlockToolbar>` rend un
+	 * placeholder vide — on garde simplement l'inserter visible et on
+	 * laisse l'espace droit libre. */
+	.htmln-notes__inserter-toggle {
+		flex-shrink: 0;
+	}
+}
+
 .htmln-notes__canvas {
 	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius-lg );
 	padding: 24px 32px;
 	min-height: 320px;
 
 	/* Recentre le contenu façon document — l'éditeur Gutenberg natif rend
 	 * les blocs sur ~610px de large dans `editor-styles-wrapper`. On laisse
-	 * couler jusqu'à 760px pour des notes plus aérées qu'un post. */
-	& > .block-editor-block-list__layout,
-	& > .block-editor-writing-flow {
+	 * couler jusqu'à 760px pour des notes plus aérées qu'un post.
+	 *
+	 * IMPORTANT : on ne contraint **que** la writing flow elle-même, pas
+	 * l'ensemble du canevas — sans ça, l'inserter between-blocks et les
+	 * popovers ancrés se retrouvent dans une colonne trop étroite. */
+	.block-editor-writing-flow {
 		max-width: 760px;
 		margin: 0 auto;
 	}
