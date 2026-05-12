@@ -43,7 +43,7 @@ export default function StepProgressBanner( { progress, error, onAbandon } ) {
 				<p>
 					<strong>
 						{ __(
-							'Erreur pendant le pas',
+							'Erreur pendant le lot',
 							'100son-html-normalizer'
 						) }
 					</strong>
@@ -52,7 +52,7 @@ export default function StepProgressBanner( { progress, error, onAbandon } ) {
 				</p>
 				<p>
 					<Button variant="secondary" onClick={ onAbandon }>
-						{ __( 'Terminer le pas', '100son-html-normalizer' ) }
+						{ __( 'Terminer le lot', '100son-html-normalizer' ) }
 					</Button>
 				</p>
 			</div>
@@ -69,7 +69,7 @@ export default function StepProgressBanner( { progress, error, onAbandon } ) {
 			<p>
 				<Spinner />{ ' ' }
 				<strong>
-					{ __( 'Pas en cours', '100son-html-normalizer' ) }
+					{ __( 'Lot en cours', '100son-html-normalizer' ) }
 				</strong>
 				{ ' — ' }
 				{ sprintf(
@@ -97,7 +97,7 @@ export default function StepProgressBanner( { progress, error, onAbandon } ) {
 			</div>
 			<p className="htmln-step-banner__warning">
 				{ __(
-					'Important : gardez cet onglet ouvert. La fermeture interrompra le pas.',
+					'Important : gardez cet onglet ouvert. La fermeture interrompra le lot.',
 					'100son-html-normalizer'
 				) }
 			</p>

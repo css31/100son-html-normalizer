@@ -159,7 +159,7 @@ function ProgressBlock( { progress } ) {
 		<div className="htmln-step-detail__progress notice notice-warning inline">
 			<p>
 				<strong>
-					{ __( 'Pas non finalisé', '100son-html-normalizer' ) }
+					{ __( 'Lot non finalisé', '100son-html-normalizer' ) }
 				</strong>{ ' ' }
 				{ sprintf(
 					// translators: 1 = traités, 2 = total, 3 = en attente, 4 = bloqués sur régression.
@@ -200,11 +200,11 @@ export default function StepDetailDrawer( {
 			title={
 				uuid
 					? sprintf(
-							// translators: %s = UUID v4 complet du pas.
-							__( 'Détail du pas %s', '100son-html-normalizer' ),
+							// translators: %s = UUID v4 complet du lot.
+							__( 'Détail du lot %s', '100son-html-normalizer' ),
 							uuid
 					  )
-					: __( 'Détail du pas', '100son-html-normalizer' )
+					: __( 'Détail du lot', '100son-html-normalizer' )
 			}
 			onRequestClose={ onClose }
 			className="htmln-step-detail-modal"
@@ -260,7 +260,7 @@ export default function StepDetailDrawer( {
 							) : (
 								<em>
 									{ __(
-										'pas non finalisé',
+										'lot non finalisé',
 										'100son-html-normalizer'
 									) }
 								</em>
@@ -325,7 +325,7 @@ function PerArticleResults( { perArticle } ) {
 		return (
 			<p className="htmln-empty">
 				{ __(
-					'Aucun article traité dans ce pas.',
+					'Aucun article traité dans ce lot.',
 					'100son-html-normalizer'
 				) }
 			</p>
@@ -336,7 +336,7 @@ function PerArticleResults( { perArticle } ) {
 		return (
 			<p className="htmln-empty">
 				{ __(
-					'Aucun article traité dans ce pas.',
+					'Aucun article traité dans ce lot.',
 					'100son-html-normalizer'
 				) }
 			</p>

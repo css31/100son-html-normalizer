@@ -141,7 +141,7 @@ export default function Rules() {
 				<h2>{ __( 'Règles', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'Les 9 préréglages du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain pas et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Préréglages » (V0.1).',
+						'Les 9 préréglages du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain lot et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Préréglages » (V0.1).',
 						'100son-html-normalizer'
 					) }
 				</p>
@@ -165,7 +165,7 @@ export default function Rules() {
 					{ sprintf(
 						// translators: 1 = sélectionnées, 2 = total.
 						__(
-							'%1$d / %2$d règles sélectionnées pour le prochain pas',
+							'%1$d / %2$d règles sélectionnées pour le prochain lot',
 							'100son-html-normalizer'
 						),
 						selectedCount,
@@ -264,7 +264,7 @@ function RuleCard( {
 				<div className="htmln-rule__actions">
 					<CheckboxControl
 						label={ __(
-							'Sélectionnée pour le prochain pas',
+							'Sélectionnée pour le prochain lot',
 							'100son-html-normalizer'
 						) }
 						checked={ isSelected }

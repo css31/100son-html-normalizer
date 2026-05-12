@@ -179,7 +179,7 @@ export default function StepsTable( {
 		return (
 			<p className="htmln-empty">
 				{ __(
-					'Aucun pas exécuté pour le moment.',
+					'Aucun lot exécuté pour le moment.',
 					'100son-html-normalizer'
 				) }
 			</p>
@@ -335,8 +335,8 @@ export default function StepsTable( {
 				<div className="tablenav-pages">
 					<span className="displaying-num">
 						{ sprintf(
-							// translators: %d = nombre total de pas.
-							__( '%d pas au total', '100son-html-normalizer' ),
+							// translators: %d = nombre total de lots.
+							__( '%d lots au total', '100son-html-normalizer' ),
 							total
 						) }
 					</span>

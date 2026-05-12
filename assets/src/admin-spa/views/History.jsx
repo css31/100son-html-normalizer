@@ -81,11 +81,11 @@ export default function History() {
 		<div className="htmln-history">
 			<header className="htmln-history__header">
 				<h2>
-					{ __( 'Historique des pas', '100son-html-normalizer' ) }
+					{ __( 'Historique des lots', '100son-html-normalizer' ) }
 				</h2>
 				<p className="description">
 					{ __(
-						'Toutes les exécutions de pas normaliseurs sont tracées ici. Chaque pas conserve la liste des règles appliquées, le résultat par article (succès, régression confirmée, refus, erreur) et permet de retrouver l’écosystème exact d’une intervention passée.',
+						'Toutes les exécutions de lots normaliseurs sont tracées ici. Chaque lot conserve la liste des règles appliquées, le résultat par article (succès, régression confirmée, refus, erreur) et permet de retrouver l’écosystème exact d’une intervention passée.',
 						'100son-html-normalizer'
 					) }
 				</p>

@@ -1,6 +1,6 @@
 # 100son HTML Normalizer
 
-> Moteur de **normalisation HTML configurable** pour WordPress — 8 préréglages prêts à l'emploi, application par **pas** avec garde-fou de régression, historique tracé, et API publique consommable par d'autres extensions.
+> Moteur de **normalisation HTML configurable** pour WordPress — 8 préréglages prêts à l'emploi, application par **lot** avec garde-fou de régression, historique tracé, et API publique consommable par d'autres extensions.
 
 [![Version](https://img.shields.io/badge/version-1.0.0--rc1-orange.svg)](CHANGELOG.md)
 [![PHP](https://img.shields.io/badge/PHP-8.3+-blue.svg)](#pile-technique)
@@ -46,11 +46,11 @@ qu'on réécrit habituellement à coups de `preg_replace` éparpillés. Il a ét
 **Pipeline canonique :** P3 → P4 → P8 → P6 → P7 → P5 → P9 → P1 → P2.
 L'ordre est figé pour préserver le sens : on récupère la sémantique avant de purger les styles, on enlève le shortcode avant qu'il génère des paragraphes vides, etc. Chaque préréglage est **activable / désactivable indépendamment** depuis l'admin.
 
-### Workflow par pas (V1.0)
+### Workflow par lots (V1.0)
 
-À partir de la V1.0, la normalisation d'un corpus se fait par **pas** (« step » côté code) plutôt qu'en bulk d'un coup. Un *pas* = un sous-ensemble de règles appliqué à une sélection d'articles, exécuté article par article avec révision et contrôle de régression.
+À partir de la V1.0, la normalisation d'un corpus se fait par **lots** (« step » côté code anglais, « lot » côté UI française) plutôt qu'en bulk d'un coup. Un *lot* = un sous-ensemble de règles appliqué à une sélection d'articles, exécuté article par article avec révision et contrôle de régression.
 
-Pipeline d'un pas (cf. cahier §4.4.2) :
+Pipeline d'un lot (cf. cahier §4.4.2) :
 
 ```
 pour chaque article sélectionné :
@@ -70,7 +70,38 @@ pour chaque article sélectionné :
 - **Refuser** une régression (pose `_son100_htmln_manual_check_required=1`, aucune écriture) ;
 - **Confirmer** une régression (écriture forcée, la trace du rapport reste dans l'historique).
 
-Tous les pas sont tracés dans la table `son100_htmln_steps` avec leurs `per_article_results`, consultables depuis l'onglet **Historique** de la SPA admin et en CLI via `wp htmln steps`.
+Tous les lots sont tracés dans la table `son100_htmln_steps` avec leurs `per_article_results`, consultables depuis l'onglet **Historique** de la SPA admin et en CLI via `wp htmln steps`.
+
+### État des règles : « activée » vs « sélectionnée »
+
+Dans l'onglet **Règles** de la SPA, chaque card expose **deux contrôles distincts** qui n'ont pas du tout le même rôle :
+
+| Contrôle | Stockage | Effet |
+|---|---|---|
+| 🔘 Toggle **« Activée par défaut »** | Persistant en BDD (option `son100_htmln_presets`) | Pilote ce qui est **appliqué dans le pipeline complet** (filtre `htmln/normalize`, page Aperçu, F8) ET ce qui est **calculé pour le diagnostic** (colonne « Règles applicables ») |
+| ☑️ Checkbox **« Sélectionnée pour le prochain lot »** | Éphémère en mémoire (`htmln/spa.selectedRules`, store SPA) | Pilote uniquement quelles règles seront appliquées au prochain **clic « Appliquer ce lot à K articles »** (workflow F14). Reset à « tout coché » au reload de la page |
+
+#### Ce que montre la colonne « Règles applicables »
+
+Elle affiche les règles qui ont **matché le contenu** d'un article **lors du dernier scan**, parmi les règles **activées globalement (toggle ON)** à ce moment-là. **Sans rapport avec la sélection éphémère du prochain lot.**
+
+Plus précisément, au scan :
+
+1. `DiagnosticEngine::diagnose()` itère `PresetRegistry::get_enabled_rules()` — uniquement les règles avec toggle ON, persistées en BDD.
+2. Pour chacune, il appelle `countMatches($post_content)` (lecture pure, pas de modification).
+3. Si `count > 0`, la règle est ajoutée à `matching_rules` du diagnostic, avec son compte d'occurrences.
+4. La colonne affiche la liste `matching_rules` brute du diagnostic stocké dans `son100_htmln_diagnostics`.
+
+#### Conséquences pratiques
+
+| Action | Effet sur la colonne « Règles applicables » |
+|---|---|
+| Cocher/décocher **« Sélectionnée pour le prochain lot »** | **Aucun** — la colonne n'est pas recalculée. Tu changes uniquement ce qui s'appliquera au prochain lot F14 |
+| Toggler **« Activée par défaut »** d'une règle OFF, **sans rescan** | La colonne continue d'afficher cette règle sur les articles concernés (le diagnostic stocké en base n'a pas été recalculé) |
+| Toggler **« Activée par défaut »** d'une règle puis **relancer un scan** | La colonne reflète le nouvel état des règles activées sur tous les articles |
+| Modifier un article via Gutenberg | Son diagnostic devient `is_stale=1` et l'article apparaît dans l'onglet `stale`. Au prochain scan, son diagnostic est recalculé avec l'état actuel des règles activées |
+
+**En une phrase** : « Règles applicables » = règles avec toggle **ON** qui matchaient le contenu **au moment du dernier scan**. Si tu vois une incohérence entre l'état actuel des toggles et la colonne, c'est probablement que la colonne est issue d'un scan antérieur — bouton **« Scanner le corpus »** (ou « Scanner la sélection (N) ») pour rafraîchir.
 
 ### Onglet Notes (V1.0)
 
@@ -305,12 +336,12 @@ wp i18n make-pot . languages/100son-html-normalizer.pot \
 
 **V0.1** — moteur PHP + UI admin V0.1 (4 pages : Préréglages, Tester, Normaliser, Journal).
 
-**V1.0 (en cours d'intégration)** — couche diagnostic + pas + SPA :
+**V1.0 (en cours d'intégration)** — couche diagnostic + lots + SPA :
 - Diagnostic structurel (Phase 3) : `DiagnosticEngine`, `DiagnosticBatchRunner`, hook `save_post → is_stale`
 - Détection de régression (Phase 3.1) : 7 seuils γ + `RegressionDetector`
-- Application par pas (Phase 4) : `StepRunner` avec confirm/refuse/resume/finalize idempotent
+- Application par lot (Phase 4) : `StepRunner` avec confirm/refuse/resume/finalize idempotent
 - Surface REST 19 routes (Phase 5) + WP-CLI 4 commandes (Phase 5.5)
-- SPA d'administration React (Phase 6) : 3 onglets `Normaliser` / `Historique` / `Réglages` avec modales `DiffModal` (F14.3) et `RegressionModal` (F15), bandeaux de pas en cours et de reprise (F14.4), `beforeunload` natif
+- SPA d'administration React (Phase 6) : 3 onglets `Normaliser` / `Historique` / `Réglages` avec modales `DiffModal` (F14.3) et `RegressionModal` (F15), bandeaux de lot en cours et de reprise (F14.4), `beforeunload` natif
 - i18n : text-domain branché, `.pot` généré (329 chaînes)
 
 ### ⏭️ Différé V1.1
@@ -319,7 +350,7 @@ wp i18n make-pot . languages/100son-html-normalizer.pot \
 - Règles custom F4 : `CssSelectorRule` + `RegexRule` (§11.10)
 - Export / Import de règles (§11.12)
 - Migration complète des pages V0.1 vers la SPA (Dashboard, Presets SPA, CustomRules, Journal SPA)
-- Export CSV de l'historique des pas (V1.0 ne fournit que JSON)
+- Export CSV de l'historique des lots (V1.0 ne fournit que JSON)
 - Recette finale §8 du cahier
 
 Voir le [CHANGELOG](CHANGELOG.md) pour le détail livré.

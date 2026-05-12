@@ -39,7 +39,7 @@ final class SpaPage {
 		}
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'HTML Normalizer — Normalisation par pas (V1.0)', '100son-html-normalizer' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'HTML Normalizer — Normalisation par lots (V1.0)', '100son-html-normalizer' ) . '</h1>';
 		// Conteneur consommé par `assets/src/admin-spa/index.js`. Vide tant
 		// que le bundle React n'est pas chargé — l'utilisateur voit alors
 		// simplement le titre, signal explicite que les assets manquent.

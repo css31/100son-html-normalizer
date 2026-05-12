@@ -117,7 +117,7 @@ export default function StepResumeBanner( { activeUuid, onResolved } ) {
 			<p>
 				<strong>
 					{ __(
-						'Pas précédent interrompu',
+						'Lot précédent interrompu',
 						'100son-html-normalizer'
 					) }
 				</strong>
@@ -135,7 +135,7 @@ export default function StepResumeBanner( { activeUuid, onResolved } ) {
 			</p>
 			<p className="htmln-step-resume__hint">
 				{ __(
-					"La reprise depuis l'article en pause sera disponible en Phase 6.5 (avec la modale de décision sur régression). Pour l'instant, vous pouvez abandonner le pas pour relâcher le verrou.",
+					"La reprise depuis l'article en pause sera disponible en Phase 6.5 (avec la modale de décision sur régression). Pour l'instant, vous pouvez abandonner le lot pour relâcher le verrou.",
 					'100son-html-normalizer'
 				) }
 			</p>
@@ -146,7 +146,7 @@ export default function StepResumeBanner( { activeUuid, onResolved } ) {
 					disabled={ isAbandoning }
 				>
 					{ isAbandoning && <Spinner /> }{ ' ' }
-					{ __( 'Abandonner ce pas', '100son-html-normalizer' ) }
+					{ __( 'Abandonner ce lot', '100son-html-normalizer' ) }
 				</Button>
 			</p>
 		</div>
