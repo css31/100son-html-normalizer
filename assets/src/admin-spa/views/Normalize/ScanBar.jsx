@@ -17,12 +17,13 @@ import { Button, Notice } from '@wordpress/components';
 
 /**
  * @param {Object}                              props
- * @param {boolean}                             props.isScanning     Scan en cours.
- * @param {?{processed: number, total: number}} props.progress       Avancement.
- * @param {?string}                             props.error          Message d'erreur du dernier scan (ou null).
- * @param {boolean}                             props.disabled       Bloque le bouton (ex. pas en cours).
- * @param {() => void}                          props.onScan         Déclenche le scan.
- * @param {() => void}                          props.onDismissError Reset l'erreur affichée.
+ * @param {boolean}                             props.isScanning        Scan en cours.
+ * @param {?{processed: number, total: number}} props.progress          Avancement.
+ * @param {?string}                             props.error             Message d'erreur du dernier scan (ou null).
+ * @param {boolean}                             props.disabled          Bloque le bouton (ex. pas en cours).
+ * @param {number}                              props.selectedPostCount Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
+ * @param {() => void}                          props.onScan            Déclenche le scan.
+ * @param {() => void}                          props.onDismissError    Reset l'erreur affichée.
  * @return {JSX.Element} Barre.
  */
 export default function ScanBar( {
@@ -30,6 +31,7 @@ export default function ScanBar( {
 	progress,
 	error,
 	disabled,
+	selectedPostCount = 0,
 	onScan,
 	onDismissError,
 } ) {
@@ -40,6 +42,20 @@ export default function ScanBar( {
 			? Math.min( 100, Math.round( ( processed / total ) * 100 ) )
 			: 0;
 
+	// Label du bouton extrait pour éviter un ternaire imbriqué (no-nested-ternary).
+	let buttonLabel;
+	if ( isScanning ) {
+		buttonLabel = __( 'Scan en cours…', '100son-html-normalizer' );
+	} else if ( selectedPostCount > 0 ) {
+		buttonLabel = sprintf(
+			// translators: %d = nombre d'articles cochés dans le tableau.
+			__( 'Scanner la sélection (%d)', '100son-html-normalizer' ),
+			selectedPostCount
+		);
+	} else {
+		buttonLabel = __( 'Scanner le corpus', '100son-html-normalizer' );
+	}
+
 	return (
 		<div className="htmln-scan-bar">
 			<div className="htmln-scan-bar__main">
@@ -49,9 +65,7 @@ export default function ScanBar( {
 					disabled={ isScanning || disabled }
 					isBusy={ isScanning }
 				>
-					{ isScanning
-						? __( 'Scan en cours…', '100son-html-normalizer' )
-						: __( 'Scanner le corpus', '100son-html-normalizer' ) }
+					{ buttonLabel }
 				</Button>
 
 				{ isScanning && (
@@ -78,10 +92,19 @@ export default function ScanBar( {
 
 				{ ! isScanning && (
 					<p className="htmln-scan-bar__hint description">
-						{ __(
-							'Recalcule le diagnostic pour tous les articles publiés (post_type=post). Idempotent.',
-							'100son-html-normalizer'
-						) }
+						{ selectedPostCount > 0
+							? sprintf(
+									// translators: %d = nombre d'articles cochés.
+									__(
+										'Recalcule le diagnostic pour les %d article(s) sélectionné(s) uniquement.',
+										'100son-html-normalizer'
+									),
+									selectedPostCount
+							  )
+							: __(
+									'Recalcule le diagnostic pour tous les articles publiés (post_type=post). Idempotent.',
+									'100son-html-normalizer'
+							  ) }
 					</p>
 				) }
 			</div>

@@ -229,7 +229,14 @@ export default function Normalize() {
 				progress={ scanProgress }
 				error={ scanError }
 				disabled={ isRunning }
-				onScan={ startScan }
+				selectedPostCount={ selectedPostIds.size }
+				onScan={ () =>
+					startScan(
+						selectedPostIds.size > 0
+							? Array.from( selectedPostIds )
+							: null
+					)
+				}
 				onDismissError={ dismissScanError }
 			/>
 
