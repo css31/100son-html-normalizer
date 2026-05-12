@@ -1029,6 +1029,39 @@
 	}
 }
 
+/* =============================================================================
+ *  Désactivation du `+` between-blocks de Gutenberg
+ *
+ *  Comportement natif : un `+` flottant apparaît au survol entre deux
+ *  blocs (avec une animation de glissement) et ouvre au clic la palette
+ *  des blocs à insérer. Jugé imprécis par l'utilisateur — zone de hover
+ *  fine, animation source de confusion, déclenchement aléatoire selon
+ *  les micro-mouvements de souris.
+ *
+ *  Alternative active : le bouton « + Ajouter un bloc » persistant dans
+ *  la barre du haut (cf. .htmln-notes__editor-bar) ouvre la même palette
+ *  via un clic explicite. Insertion à la suite du bloc sélectionné, ou
+ *  en fin de document si rien n'est sélectionné.
+ *
+ *  On hide le popover et son contenu plutôt que de chercher à le
+ *  désactiver côté JS — il est rendu par <BlockTools>/<InsertionPoint>
+ *  via le mécanisme de hover détection de Gutenberg, sans setting prop
+ *  pour le désactiver proprement en V1.0. CSS overlay = solution la plus
+ *  stable face aux changements internes de @wordpress/block-editor.
+ * ========================================================================== */
+
+.htmln-notes__editor {
+	/* Le popover lui-même (conteneur flottant) + les variantes spécifiques
+	 * inbetween (entre blocs) et inserter-indicator (la ligne de drop). */
+	.block-editor-block-popover__inbetween,
+	.block-editor-block-list__insertion-point,
+	.block-editor-block-list__insertion-point-indicator,
+	.block-editor-block-list__insertion-point-inserter,
+	.block-editor-inserter__toggle.block-editor-button-block-appender {
+		display: none !important;
+	}
+}
+
 /* Barre d'actions inférieure — footer du cadre éditeur, séparé du canvas
  * par un fond subtle et un border-top. `flex-direction: row` explicite
  * pour résister à toute règle parente intempestive. */
