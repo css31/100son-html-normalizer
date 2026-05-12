@@ -76,6 +76,19 @@ import {
 	registerBlockType,
 	getBlockType,
 } from '@wordpress/blocks';
+// Side-effect import : la version WP-bundled de `wp-format-library`
+// auto-enregistre les format types (bold, italic, link, strikethrough,
+// underline, code, image inline, text-color, etc.) auprès de
+// `@wordpress/rich-text` au chargement du script. Sans cet import, les
+// slots `.block-editor-block-toolbar__slot` dédiés au formatage restent
+// vides quand on sélectionne du texte dans un bloc.
+//
+// `wp-scripts` externalise cet import vers `window.wp.formatLibrary` et
+// ajoute `wp-format-library` aux dépendances dans `admin-spa.asset.php`,
+// ce qui déclenche l'enqueue WP du script auto-registrant.
+//
+// eslint-disable-next-line import/no-unassigned-import
+import '@wordpress/format-library';
 
 /**
  * Liste des blocs autorisés (cf. arbitrage utilisateur).
