@@ -827,3 +827,88 @@
 		color: #fff;
 	}
 }
+
+/* =============================================================================
+ *  Onglet Notes — éditeur Gutenberg restreint
+ *
+ *  L'éditeur est rendu inline (pas d'iframe). On hérite des styles natifs
+ *  `wp-edit-blocks` / `wp-block-library` enqueués côté PHP — on n'écrit
+ *  donc *aucune* règle sur les blocs eux-mêmes, juste le canvas qui les
+ *  contient + la barre d'actions sous l'éditeur.
+ * ========================================================================== */
+
+.htmln-notes__header {
+	margin-bottom: 16px;
+
+	h2 {
+		margin: 0 0 4px;
+		font-size: 20px;
+	}
+
+	.description {
+		color: var( --htmln-text-muted );
+		margin: 0;
+		max-width: 80ch;
+
+		code {
+			background: var( --htmln-bg-subtle );
+			padding: 1px 5px;
+			border-radius: 3px;
+			font-size: 12px;
+		}
+	}
+}
+
+.htmln-notes__editor {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.htmln-notes__editor--booting {
+	padding: 32px;
+	text-align: center;
+	color: var( --htmln-text-muted );
+	font-style: italic;
+}
+
+.htmln-notes__canvas {
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius-lg );
+	padding: 24px 32px;
+	min-height: 320px;
+
+	/* Recentre le contenu façon document — l'éditeur Gutenberg natif rend
+	 * les blocs sur ~610px de large dans `editor-styles-wrapper`. On laisse
+	 * couler jusqu'à 760px pour des notes plus aérées qu'un post. */
+	& > .block-editor-block-list__layout,
+	& > .block-editor-writing-flow {
+		max-width: 760px;
+		margin: 0 auto;
+	}
+
+	/* Filet : sans wp-edit-blocks chargé, on garde au moins un placeholder
+	 * lisible pour le bloc paragraphe au lieu d'un texte invisible. */
+	[data-rich-text-placeholder]::after {
+		color: var( --htmln-text-faint );
+	}
+}
+
+.htmln-notes__actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.htmln-notes__dirty-hint {
+	color: var( --htmln-text-faint );
+	font-style: italic;
+}
+
+.htmln-notes--loading {
+	padding: 32px;
+	text-align: center;
+	color: var( --htmln-text-muted );
+}

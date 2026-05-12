@@ -429,6 +429,37 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_kses_post' ) ) {
+	/**
+	 * Stub `wp_kses_post` — la vraie filtre via le tableau global
+	 * `$allowedposttags` et préserve les commentaires HTML (donc les
+	 * commentaires `<!-- wp:* -->` de la block grammar Gutenberg). Pour
+	 * les tests unitaires on simule ce contrat minimal :
+	 *  - les commentaires HTML restent intacts (essentiel pour les tests
+	 *    `RichNotesRepository` qui valident le round-trip block grammar) ;
+	 *  - les `<script>` complets (tag + contenu) sont strippés (anti-XSS
+	 *    basique, suffisant pour valider la sanitization côté test) ;
+	 *  - le reste passe.
+	 *
+	 * Suffisant pour les tests qui se concentrent sur la sémantique du
+	 * repo et du controller, pas sur l'exhaustivité de kses.
+	 *
+	 * @param mixed $value Entrée brute.
+	 * @return string
+	 */
+	function wp_kses_post( mixed $value ): string {
+		if ( ! is_scalar( $value ) ) {
+			return '';
+		}
+		$str = (string) $value;
+		return preg_replace(
+			'#<script\b[^>]*>.*?</script>#is',
+			'',
+			$str
+		) ?? $str;
+	}
+}
+
 if ( ! function_exists( 'sanitize_key' ) ) {
 	function sanitize_key( mixed $value ): string {
 		return is_scalar( $value )

@@ -38,9 +38,11 @@ use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticBatchRunner;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
+use Cent_Son\Html_Normalizer\Notes\RichNotesRepository;
 use Cent_Son\Html_Normalizer\Regression\RegressionDetector;
 use Cent_Son\Html_Normalizer\Rest\DiagnosticsController;
 use Cent_Son\Html_Normalizer\Rest\DiffController;
+use Cent_Son\Html_Normalizer\Rest\NotesController;
 use Cent_Son\Html_Normalizer\Rest\PostsController;
 use Cent_Son\Html_Normalizer\Rest\PresetsController;
 use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
@@ -170,6 +172,7 @@ final class Plugin {
 	 * Phase 5.3 : DiagnosticsController.
 	 * Phase 5.4 : PostsController + DiffController.
 	 * Phase 6.7 : SettingsController (seuils γ pour la SPA Settings).
+	 * Post-rc1 : NotesController (onglet « Notes » SPA, édition Gutenberg).
 	 *
 	 * @return list<\Cent_Son\Html_Normalizer\Rest\BaseController>
 	 */
@@ -184,6 +187,7 @@ final class Plugin {
 		$engine          = new DiagnosticEngine( $preset_registry, $metrics );
 		$diag_repo       = new DiagnosticsRepository();
 		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
+		$rich_notes      = new RichNotesRepository();
 
 		return array(
 			new StepsController(
@@ -195,6 +199,7 @@ final class Plugin {
 			new DiffController( $preset_registry, $pipeline, $metrics ),
 			new SettingsController( $settings ),
 			new PresetsController( $settings, $preset_registry ),
+			new NotesController( $rich_notes ),
 		);
 	}
 

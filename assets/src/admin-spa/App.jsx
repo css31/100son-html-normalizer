@@ -5,6 +5,7 @@
  *  - `#/rules`              → vue Rules (configuration des 8 préréglages).
  *  - `#/normalize` (défaut) → vue Normalize (F13/F14/F14.3/F15).
  *  - `#/history`            → vue History (F16).
+ *  - `#/notes`              → vue Notes (post-rc1, éditeur Gutenberg restreint).
  *  - `#/settings`           → vue Settings (F15 — seuils γ).
  *
  * Note : l'ordre du `nav` est purement visuel. La route par défaut (au
@@ -13,7 +14,7 @@
  * configuration en amont (relue à chaque pas).
  *
  * Pas de dépendance externe (pas de @wordpress/router qui n'existe pas en
- * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour ces 4
+ * V1.0) — un `useState` synchronisé sur `hashchange` suffit pour ces 5
  * routes. Si la SPA grandit (V1.1+ avec Dashboard, etc.) l'extraction
  * vers un router maison ou react-router restera locale à ce fichier
  * sans toucher aux vues.
@@ -29,6 +30,7 @@ import Normalize from './views/Normalize';
 import History from './views/History';
 import Rules from './views/Rules';
 import Settings from './views/Settings';
+import Notes from './views/Notes';
 
 /**
  * Identifiants de routes (utilisés dans le hash et dans le state local).
@@ -39,6 +41,7 @@ const ROUTE_NORMALIZE = 'normalize';
 const ROUTE_HISTORY = 'history';
 const ROUTE_RULES = 'rules';
 const ROUTE_SETTINGS = 'settings';
+const ROUTE_NOTES = 'notes';
 const DEFAULT_ROUTE = ROUTE_NORMALIZE;
 
 /**
@@ -52,6 +55,7 @@ const VALID_ROUTES = [
 	ROUTE_HISTORY,
 	ROUTE_RULES,
 	ROUTE_SETTINGS,
+	ROUTE_NOTES,
 ];
 
 /**
@@ -138,6 +142,14 @@ export default function App() {
 					{ __( 'Historique', '100son-html-normalizer' ) }
 				</a>
 				<a
+					href="#/notes"
+					aria-current={ ROUTE_NOTES === route ? 'page' : undefined }
+					className={ tabClass( ROUTE_NOTES ) }
+					onClick={ ( event ) => navigate( event, ROUTE_NOTES ) }
+				>
+					{ __( 'Notes', '100son-html-normalizer' ) }
+				</a>
+				<a
 					href="#/settings"
 					aria-current={
 						ROUTE_SETTINGS === route ? 'page' : undefined
@@ -169,6 +181,8 @@ function renderRoute( route ) {
 			return <Rules />;
 		case ROUTE_SETTINGS:
 			return <Settings />;
+		case ROUTE_NOTES:
+			return <Notes />;
 		case ROUTE_NORMALIZE:
 		default:
 			return <Normalize />;

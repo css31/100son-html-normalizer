@@ -17,4 +17,5 @@ export * as steps from './steps';
 export * as posts from './posts';
 export * as settings from './settings';
 export * as presets from './presets';
+export * as notes from './notes';
 export { get, post, del, raw } from './client';

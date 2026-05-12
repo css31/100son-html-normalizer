@@ -74,6 +74,23 @@ final class Assets {
 			? $asset['version']
 			: SON100_HTMLN_VERSION;
 
+		// Onglet « Notes » (post-rc1) : l'éditeur Gutenberg restreint a besoin
+		// de la médiathèque pour le bloc `core/image` (sélecteur Media Frame
+		// de WP). `wp_enqueue_media()` est idempotent — sans effet si la page
+		// l'a déjà appelé, et sans surcoût mesurable en pratique.
+		wp_enqueue_media();
+
+		// CSS éditeur Gutenberg : nécessaires pour que `<BlockEditorProvider>`
+		// rende les blocs avec leur style natif (paragraphe, titre, liste,
+		// citation, code, table, image). Sans ça, l'éditeur fonctionne mais
+		// les blocs s'affichent sans aucun style — UX incompréhensible.
+		// L'enqueue est scope-restreint à la page SPA — pas de pollution
+		// globale (cf. §13 « ne pas charger d'assets globalement »).
+		wp_enqueue_style( 'wp-edit-blocks' );
+		wp_enqueue_style( 'wp-format-library' );
+		wp_enqueue_style( 'wp-block-library' );
+		wp_enqueue_style( 'wp-block-library-theme' );
+
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			SON100_HTMLN_URL . 'assets/build/admin-spa.js',

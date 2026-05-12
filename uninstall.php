@@ -22,6 +22,7 @@ $son100_htmln_options = array(
 	'son100_htmln_rules_user',
 	'son100_htmln_logs',
 	'son100_htmln_logs_notes',
+	'son100_htmln_notes_rich',
 	'son100_htmln_db_version',
 );
 

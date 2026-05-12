@@ -3,6 +3,54 @@
 Toutes les modifications notables de cette extension sont consignées ici.
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionning [SemVer](https://semver.org/lang/fr/).
 
+## [1.0.0-rc2] — 2026-05-12
+
+Ajout de l'**onglet Notes** dans la SPA d'administration — éditeur Gutenberg restreint pour saisir des notes libres persistées côté serveur. Cohabite avec la zone de notes plain-text de la page Journal V0.1 (stockages séparés) jusqu'à la disparition de cette dernière en V1.1.
+
+### Ajouts
+
+#### Onglet Notes (SPA)
+
+- **Nouvel onglet `[Notes]`** dans la barre primaire de la SPA, entre `[Historique]` et `[Réglages]`. Route hash `#/notes`.
+- **Éditeur Gutenberg restreint** (`BlockEditorProvider` inline, pas d'iframe) avec une **whitelist de 9 blocs** : `core/paragraph`, `core/heading`, `core/list`, `core/list-item`, `core/quote`, `core/code`, `core/separator`, `core/image`, `core/table`. Inserter, Inspector et toolbar standards Gutenberg.
+- **Persistance** : option dédiée `son100_htmln_notes_rich` (block grammar Gutenberg sérialisée). Indépendante de `son100_htmln_logs_notes` (V0.1 plain text, page Journal) — choix d'isolation pour ne pas exposer le contenu riche à un round-trip `sanitize_textarea_field` qui détruirait les commentaires `<!-- wp:* -->`.
+- **Sanitization serveur** via `wp_kses_post()` — préserve la block grammar, strippe le code dangereux (script, event handlers).
+- **Save explicite** (bouton « Enregistrer ») + bouton « Vider la note » avec `window.confirm`. Dirty-state local affiché en discrète mention « Modifications non enregistrées. ».
+
+#### Repository + REST
+
+- **`Notes\RichNotesRepository`** — repo dédié sur `son100_htmln_notes_rich`, API `get() / set(string) / clear()`. `set()` applique `wp_kses_post()` + `trim()`. `clear()` met à chaîne vide (pas `delete_option` — évite le yo-yo autoload).
+- **`Rest\NotesController`** — endpoint singleton `/htmln/v1/notes` (GET / PUT / DELETE), capability `manage_options`, namespace `htmln/v1` :
+  - `GET /notes` → `{ content: string }` (chaîne vide si jamais saisi)
+  - `PUT /notes` → body `{ content: string }`, retourne le contenu post-sanitization (autorité serveur — la SPA resynchronise l'éditeur si modification)
+  - `DELETE /notes` → vide, retourne `{ content: '' }`
+- 7 tests `NotesControllerTest` + 8 tests `RichNotesRepositoryTest` (round-trip block grammar, strip de `<script>`, trim, idempotence clear).
+
+#### Enqueue Gutenberg côté SPA
+
+- **`Admin\Assets::on_enqueue`** étendu pour appeler `wp_enqueue_media()` + enqueue des styles `wp-edit-blocks`, `wp-format-library`, `wp-block-library`, `wp-block-library-theme` quand on est sur la page SPA. Scope-restreint inchangé (uniquement sur `?page=100son-html-normalizer-spa`).
+- Le bundle reste mince côté JS (62.4 → 68.1 KiB, +5.7 KiB) car `@wordpress/scripts` externalise `wp-block-editor` / `wp-blocks` / `wp-block-library` vers les globals `wp.*`. CSS : 11.5 → 12.5 KiB.
+
+#### Dépendances NPM
+
+- `@wordpress/block-editor` ^14.0
+- `@wordpress/block-library` ^9.0
+- `@wordpress/blocks` ^13.0
+- `@wordpress/format-library` ^5.0
+
+#### Désinstallation
+
+- `uninstall.php` purge également `son100_htmln_notes_rich`.
+
+### Stats
+
+- **PHPUnit** : 562 → 581 tests verts (+19), 1255 → 1299 assertions
+- **Bundle SPA** : 62.4 KiB JS / 11.5 KiB CSS → 68.1 KiB JS / 12.5 KiB CSS (RTL auto)
+- **Lint JS** : 0 erreur, 0 warning
+- **PHPStan** : niveau 6, 0 erreur (inchangé)
+
+---
+
 ## [1.0.0-rc1] — 2026-05-11
 
 Première candidate à la version stable 1.0.0. Toutes les phases 1-6 du cahier v2.0 sont livrées : la base de la **normalisation par pas** avec **diagnostic** structurel, **détection de régression** sur 7 seuils γ, et **SPA d'administration** React. Le périmètre V0.1 (4 préréglages PHP, 4 pages admin, filtre `htmln/normalize`) reste intégralement compatible — les pages V0.1 cohabitent avec la SPA V1.0.

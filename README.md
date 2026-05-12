@@ -71,6 +71,17 @@ pour chaque article sélectionné :
 
 Tous les pas sont tracés dans la table `son100_htmln_steps` avec leurs `per_article_results`, consultables depuis l'onglet **Historique** de la SPA admin et en CLI via `wp htmln steps`.
 
+### Onglet Notes (V1.0)
+
+La SPA expose un onglet **Notes** qui embarque un éditeur Gutenberg restreint pour saisir des notes libres persistées côté serveur. Pratique pour garder un carnet de bord, des questions en suspens, des `TODO` de campagne, etc. — sans avoir à créer un brouillon de post dédié.
+
+- **Blocs disponibles** (whitelist) : paragraphe, titre, liste, citation, code, séparateur, image, tableau. Embeds et patterns désactivés.
+- **Persistance** : option dédiée `son100_htmln_notes_rich`, contenu sérialisé en *block grammar* Gutenberg (commentaires `<!-- wp:* -->` inclus). Sanitization via `wp_kses_post()` — strippe le code dangereux, préserve la grammaire.
+- **Sauvegarde explicite** via bouton « Enregistrer » (pas d'autosave) — l'indicateur « Modifications non enregistrées. » s'affiche tant que tu n'as pas validé.
+- **Désinstallation** : la note est **supprimée** lors de l'uninstall. Exporte le contenu si tu veux le conserver.
+
+> **Note** : un carnet de notes en plain text reste accessible sur la page V0.1 « Journal » (option séparée `son100_htmln_logs_notes`). Les deux cohabitent jusqu'à la disparition des pages V0.1 en V1.1.
+
 ### Seuils γ — garde-fou anti-perte de contenu
 
 La régression est définie comme une **perte au-delà d'un seuil γ** sur l'une des 7 métriques structurelles d'un article. Tous les seuils sont configurables dans l'onglet **Réglages** de la SPA admin.
