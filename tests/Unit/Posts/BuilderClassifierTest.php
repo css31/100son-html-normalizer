@@ -212,4 +212,78 @@ final class BuilderClassifierTest extends TestCase {
 		$this->assertContains( BuilderClassifier::TYPE_OTHER, BuilderClassifier::ALL_TYPES );
 		$this->assertContains( BuilderClassifier::TYPE_OUT, BuilderClassifier::ALL_TYPES );
 	}
+
+	// =========================================================================
+	//  rc4 — `panels_data` fossile : un article migré vers Gutenberg garde
+	//  parfois son ancien `panels_data` en post-meta. Le `post_content`
+	//  effectif (Gutenberg pur) doit primer sur le vestige meta.
+	// =========================================================================
+
+	public function test_gutenberg_content_overrides_fossil_panels_data(): void {
+		// Cas réel observé sur le corpus MMM-2 (post #19785) : article
+		// migré vers Gut dont l'ancien `panels_data` SO est resté en
+		// post-meta. Le rendu effectif est Gutenberg → la classification
+		// doit l'être aussi.
+		$this->register_post(
+			60,
+			'<!-- wp:image {"id":1,"align":"center"} --><figure class="wp-block-image"><img src="x.jpg"/></figure><!-- /wp:image -->'
+				. '<!-- wp:paragraph --><p>Contenu réel Gutenberg.</p><!-- /wp:paragraph -->',
+			array(
+				'panels_data' => array(
+					'widgets'    => array( array( 'class' => 'SiteOrigin_Widget' ) ),
+					'grids'      => array(),
+					'grid_cells' => array(),
+				),
+			)
+		);
+		$this->assertSame(
+			BuilderClassifier::TYPE_GUTENBERG,
+			$this->classifier->classify( 60 )
+		);
+	}
+
+	public function test_so_classes_with_panels_data_is_siteorigin(): void {
+		// Cas typique SO actif natif : `panels_data` en meta + rendu HTML
+		// aplati dans `post_content` (classes `panel-layout`/`so-panel`).
+		// Distingue du flat (qui n'a pas le meta).
+		$this->register_post(
+			61,
+			'<div class="panel-layout"><div class="so-panel"><p>x</p></div></div>',
+			array( 'panels_data' => array( 'widgets' => array( 'x' ) ) )
+		);
+		$this->assertSame(
+			BuilderClassifier::TYPE_SITEORIGIN,
+			$this->classifier->classify( 61 )
+		);
+	}
+
+	public function test_panels_data_alone_without_content_marker_is_siteorigin(): void {
+		// Cas dégénéré : `panels_data` présent mais `post_content` vide
+		// ou sans aucun marqueur (ni SO ni Gut). Probablement un article
+		// SO dont la mise en page n'a jamais été régénérée en post_content.
+		// On respecte la présence du meta.
+		$this->register_post(
+			62,
+			'<p>Texte brut sans marqueur.</p>',
+			array( 'panels_data' => array( 'widgets' => array( 'x' ) ) )
+		);
+		$this->assertSame(
+			BuilderClassifier::TYPE_SITEORIGIN,
+			$this->classifier->classify( 62 )
+		);
+	}
+
+	public function test_so_block_marker_wins_over_fossil_panels_data(): void {
+		// `<!-- wp:siteorigin-panels` dans le contenu prime sur tout —
+		// inutile de regarder le meta. Filet de sécurité du nouvel ordre.
+		$this->register_post(
+			63,
+			'<!-- wp:siteorigin-panels/layout-block --><p>x</p><!-- /wp:siteorigin-panels/layout-block -->',
+			array( 'panels_data' => array() ) // meta vide, contenu SO 2.10+
+		);
+		$this->assertSame(
+			BuilderClassifier::TYPE_SITEORIGIN,
+			$this->classifier->classify( 63 )
+		);
+	}
 }

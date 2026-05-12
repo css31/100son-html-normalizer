@@ -2,11 +2,17 @@
  * BuilderBadge — pastille colorée indiquant le constructeur d'origine
  * d'un article diagnostiqué.
  *
- * 5 variantes reflétant `BuilderClassifier::TYPE_*` côté PHP :
+ * 5 variantes reflétant `BuilderClassifier::TYPE_*` côté PHP, plus une
+ * 6e variante visuelle « Gutenberg avec fossile SO » qui réutilise le
+ * type `gutenberg` mais signale en orange la présence d'un ancien
+ * `panels_data` en post-meta (vestige de migration) :
  *
  *   - `siteorigin`      → `SO`   pastille rouge (intervention prudente)
  *   - `siteorigin_flat` → `SO~`  pastille jaune (intervention TRÈS prudente)
  *   - `gutenberg`       → `Gut`  pastille verte
+ *   - `gutenberg` + fossile → `Gut` pastille **orange** (rc4) — signale
+ *                             un `panels_data` résiduel à nettoyer
+ *                             éventuellement
  *   - `other`           → `?`    pastille neutre
  *   - `out`             → `Out`  pastille grise (hors périmètre)
  *
@@ -65,13 +71,34 @@ const PRESETS = {
 };
 
 /**
+ * Tooltip enrichi pour le cas « Gutenberg + fossile `panels_data` » —
+ * informe l'admin que l'article a un passé SO inerte sans dramatiser
+ * (le rendu reste Gutenberg, le meta peut être supprimé sans impact).
+ *
+ * @return {string} Titre HTML-safe (rendu dans `title=`).
+ */
+function getFossilTitle() {
+	return __(
+		"Gutenberg avec fossile SiteOrigin : un ancien `panels_data` est resté en post-meta après migration. Inerte au front (c'est `post_content` qui est servi). Peut être nettoyé via WP-CLI : `wp post meta delete <ID> panels_data`.",
+		'100son-html-normalizer'
+	);
+}
+
+/**
  * @param {Object}  props
- * @param {?string} props.type Une des 5 valeurs `BuilderClassifier::TYPE_*`
- *                             ou null/undefined (pour diagnostics pré-2.1.0
- *                             sans builder_type calculé).
+ * @param {?string} props.type                  Une des 5 valeurs
+ *                                              `BuilderClassifier::TYPE_*`
+ *                                              ou null/undefined (pour
+ *                                              diagnostics pré-2.1.0 sans
+ *                                              builder_type calculé).
+ * @param {boolean} [props.hasFossilPanelsData] Vrai si l'article est
+ *                                              Gutenberg mais conserve un
+ *                                              `panels_data` en post-meta.
+ *                                              Sans effet pour les autres
+ *                                              types.
  * @return {JSX.Element} Pastille `<span>`.
  */
-export default function BuilderBadge( { type } ) {
+export default function BuilderBadge( { type, hasFossilPanelsData = false } ) {
 	const preset = type && PRESETS[ type ] ? PRESETS[ type ] : null;
 
 	if ( ! preset ) {
@@ -86,6 +113,19 @@ export default function BuilderBadge( { type } ) {
 				) }
 			>
 				—
+			</span>
+		);
+	}
+
+	// Cas spécial Gutenberg + fossile : on bascule sur un modifier visuel
+	// orange et on remplace le tooltip par une explication ciblée.
+	if ( 'gutenberg' === type && hasFossilPanelsData ) {
+		return (
+			<span
+				className="htmln-builder-badge htmln-builder-badge--gutenberg-fossil"
+				title={ getFossilTitle() }
+			>
+				{ preset.label }
 			</span>
 		);
 	}

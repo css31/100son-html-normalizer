@@ -73,17 +73,25 @@ final class BuilderClassifier {
 	/**
 	 * Classifie un article en un des 5 types.
 	 *
-	 * Ordre des tests :
+	 * Ordre des tests (rc4 — refonte pour gérer le cas « `panels_data`
+	 * fossile ») :
 	 *  1. Override manuel `out` → priorité absolue.
-	 *  2. `panels_data` en post-meta → `siteorigin`.
-	 *  3. Bloc `<!-- wp:siteorigin-panels` dans le contenu → `siteorigin`.
-	 *  4. Classes `panel-layout` ou `so-panel` dans le contenu → `siteorigin_flat`.
-	 *  5. `has_blocks()` détecte un autre marqueur `<!-- wp:` → `gutenberg`.
+	 *  2. Bloc `<!-- wp:siteorigin-panels` dans `post_content` → `siteorigin`
+	 *     (SiteOrigin 2.10+, mode packagé Gutenberg).
+	 *  3. Classes `panel-layout` ou `so-panel` dans `post_content` :
+	 *     - avec `panels_data` non-vide → `siteorigin` (édition SO active) ;
+	 *     - sans `panels_data` → `siteorigin_flat` (rendu HTML aplati,
+	 *       migration partielle).
+	 *  4. `has_blocks( $content )` → `gutenberg`. Cette étape est placée
+	 *     **avant** le test sur `panels_data` seul pour respecter le rendu
+	 *     effectif : un article migré vers Gutenberg garde souvent son
+	 *     ancien `panels_data` en post-meta comme vestige, mais c'est
+	 *     `post_content` qui est servi au front — c'est lui qui doit
+	 *     piloter la classification.
+	 *  5. `panels_data` non-vide sans aucun marqueur dans `post_content` →
+	 *     `siteorigin` (cas dégénéré : article SO dont `post_content` est
+	 *     vide ou non encore régénéré).
 	 *  6. Sinon → `other`.
-	 *
-	 * Un article SO peut techniquement contenir aussi des blocs (édition
-	 * mixte rare), mais la présence d'un marqueur SO prévaut — c'est lui
-	 * qui pilote le rendu front.
 	 *
 	 * @param int $post_id Identifiant.
 	 * @return string Une des constantes `TYPE_*`.
@@ -99,28 +107,34 @@ final class BuilderClassifier {
 			return self::TYPE_OUT;
 		}
 
-		// 2. panels_data en post-meta.
-		$panels_data = get_post_meta( $post_id, 'panels_data', true );
-		if ( $this->panels_data_is_non_empty( $panels_data ) ) {
-			return self::TYPE_SITEORIGIN;
-		}
+		$content         = (string) get_post_field( 'post_content', $post_id );
+		$panels_data     = get_post_meta( $post_id, 'panels_data', true );
+		$has_panels_data = $this->panels_data_is_non_empty( $panels_data );
 
-		// Charge le contenu pour les tests 3-5.
-		$content = (string) get_post_field( 'post_content', $post_id );
-
-		// 3. Bloc SO packagé en Gutenberg (SiteOrigin 2.10+).
+		// 2. Bloc SO packagé en Gutenberg (SiteOrigin 2.10+).
 		if ( str_contains( $content, '<!-- wp:siteorigin-panels' ) ) {
 			return self::TYPE_SITEORIGIN;
 		}
 
-		// 4. SO aplati — rendu HTML figé.
-		if ( str_contains( $content, 'panel-layout' ) || str_contains( $content, 'so-panel' ) ) {
-			return self::TYPE_SITEORIGIN_FLAT;
+		// 3. Classes SO dans le contenu rendu.
+		$has_so_classes = str_contains( $content, 'panel-layout' )
+			|| str_contains( $content, 'so-panel' );
+		if ( $has_so_classes ) {
+			return $has_panels_data
+				? self::TYPE_SITEORIGIN
+				: self::TYPE_SITEORIGIN_FLAT;
 		}
 
-		// 5. Gutenberg natif.
+		// 4. Gutenberg natif — prime sur `panels_data` fossile.
 		if ( function_exists( 'has_blocks' ) && has_blocks( $content ) ) {
 			return self::TYPE_GUTENBERG;
+		}
+
+		// 5. `panels_data` seul sans aucun marqueur dans le contenu —
+		// vestige actif rare (article SO dont `post_content` n'a pas été
+		// re-rendu après la dernière édition de la mise en page).
+		if ( $has_panels_data ) {
+			return self::TYPE_SITEORIGIN;
 		}
 
 		return self::TYPE_OTHER;

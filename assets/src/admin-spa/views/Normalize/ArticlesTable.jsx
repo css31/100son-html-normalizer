@@ -336,7 +336,12 @@ export default function ArticlesTable( {
 								<StatusBadge item={ item } />
 							</td>
 							<td className="htmln-articles-table__col-builder">
-								<BuilderBadge type={ item.builder_type } />
+								<BuilderBadge
+									type={ item.builder_type }
+									hasFossilPanelsData={ Boolean(
+										item.has_fossil_panels_data
+									) }
+								/>
 							</td>
 							<td>{ renderRuleIds( item.matching_rules ) }</td>
 							<td>{ sumViolations( item.matching_rules ) }</td>
