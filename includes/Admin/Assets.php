@@ -113,13 +113,20 @@ final class Assets {
 		// `admin-spa-rtl.css` ; `wp_style_add_data(..., 'rtl', 'replace')`
 		// fait basculer automatiquement vers cette variante quand `is_rtl()`
 		// est vrai, ce qui couvre les langues RTL côté admin sans surcoût.
+		//
+		// `?ver=` basé sur `filemtime()` (rc4 — fix cache navigateur) :
+		// le hash du `*.asset.php` ne reflète que les changements JS, donc
+		// une édition CSS-seule ne le bumpait pas et le navigateur servait
+		// l'ancien fichier. `filemtime` change à chaque rebuild → cache
+		// invalidé sûrement.
 		$css_path = SON100_HTMLN_PATH . 'assets/build/admin-spa.css';
 		if ( file_exists( $css_path ) ) {
+			$css_version = (string) filemtime( $css_path );
 			wp_enqueue_style(
 				self::SCRIPT_HANDLE,
 				SON100_HTMLN_URL . 'assets/build/admin-spa.css',
 				array( 'wp-components' ),
-				$version
+				'' !== $css_version ? $css_version : $version
 			);
 			wp_style_add_data( self::SCRIPT_HANDLE, 'rtl', 'replace' );
 		}
