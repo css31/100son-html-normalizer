@@ -862,7 +862,7 @@
 .htmln-notes__editor {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: 0; /* barre + canevas collés dans le cadre */
 
 	/* Conteneur global de l'éditeur — combine la barre fixe et le canevas
 	 * dans un même cadre. Donne un cadre visuel cohérent et permet de
@@ -872,10 +872,15 @@
 	overflow: hidden;
 	background: var( --htmln-bg-paper );
 
-	/* Le SlotFillProvider est notre racine — on enlève son margin pour ne
-	 * pas dépasser du cadre. */
-	.components-slot-fill-provider {
-		display: contents;
+	/* `<BlockTools>` rend un wrapper `<div>` sans classe autour de ses
+	 * enfants — par défaut `display:block`, ce qui fait que la barre,
+	 * le canevas et le popover-slot s'empilent normalement en colonne.
+	 * On force le flow column ici aussi pour cohérence visuelle même
+	 * dans le cas d'enfants supplémentaires (popover-slot etc.). */
+	& > div {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
 	}
 }
 
@@ -889,16 +894,35 @@
 /* =============================================================================
  *  Barre d'éditeur Notes — header persistant avec inserter + toolbar fixe
  *
- *  Le `BlockToolbar` rendu en mode `hasFixedToolbar` produit normalement
- *  son propre wrapper `.block-editor-block-contextual-toolbar`. On le
- *  laisse couler à droite de notre inserter, en flex-row, avec un fond
- *  subtil pour séparer visuellement du canevas.
+ *  Architecture DOM réelle observée (Gutenberg WP 6.8) :
+ *
+ *    .htmln-notes__editor-bar
+ *      └── button.htmln-notes__inserter-toggle        ← « + Ajouter un bloc »
+ *      └── div.components-accessible-toolbar.block-editor-block-contextual-toolbar.is-unstyled
+ *            └── div.block-editor-block-toolbar
+ *                  ├── div (sans classe, wrapper interne)
+ *                  │     └── div.components-toolbar-group.block-editor-block-toolbar__block-controls
+ *                  │           ├── div.components-toolbar-group (block switcher)
+ *                  │           └── div.components-toolbar-group.block-editor-block-mover
+ *                  ├── div.components-toolbar-group (alignement)
+ *                  ├── div.components-toolbar-group (slot vide)
+ *                  └── div.components-toolbar-group.block-editor-block-settings-menu
+ *
+ *  WP applique normalement `display:flex` sur `.components-accessible-toolbar`
+ *  et `.block-editor-block-toolbar`, mais en contexte embarqué hors du
+ *  `editor-styles-wrapper` du post-editor, certains de ces styles ne se
+ *  propagent pas (notamment au `<div>` sans classe qui wrappe les controls).
+ *  Le résultat : les items se rendent en bloc, donc verticalement.
+ *
+ *  Stratégie : forcer `display:flex; flex-direction:row` sur les 4 niveaux
+ *  porteurs de toolbar groups, avec `!important` car la cascade WP a une
+ *  spécificité parfois supérieure à nos sélecteurs encapsulés.
  * ========================================================================== */
 
 .htmln-notes__editor-bar {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 8px;
 	padding: 8px 12px;
 	background: var( --htmln-bg-subtle );
 	border-bottom: 1px solid var( --htmln-border );
@@ -908,29 +932,72 @@
 	top: 32px; /* sous la admin-bar WP */
 	z-index: 10;
 
-	/* La toolbar du bloc, quand on a `hasFixedToolbar: true`, monte ici via
-	 * `<BlockToolbar>`. On force ses items à rester en ligne — certains
-	 * styles WP par défaut tentent de la wrapper, ce qui est ce qu'on
-	 * voulait éviter. */
-	.block-editor-block-toolbar,
-	.block-editor-block-contextual-toolbar {
-		flex: 1 1 auto;
-		min-width: 0;
-		border: none;
-		background: transparent;
-
-		.components-toolbar-group,
-		.components-accessible-toolbar {
-			border: none;
-			background: transparent;
-		}
+	/* L'inserter dropdown wrapper — sa propre div n'a pas besoin de
+	 * styling, mais on lui retire les éventuels margin par défaut. */
+	.block-editor-inserter {
+		flex-shrink: 0;
+		margin: 0;
 	}
 
-	/* Quand aucun bloc n'est sélectionné, `<BlockToolbar>` rend un
-	 * placeholder vide — on garde simplement l'inserter visible et on
-	 * laisse l'espace droit libre. */
 	.htmln-notes__inserter-toggle {
 		flex-shrink: 0;
+	}
+
+	/* Niveau 1 : la toolbar contextuelle elle-même. */
+	.components-accessible-toolbar,
+	.block-editor-block-contextual-toolbar {
+		display: flex !important;
+		flex-direction: row !important;
+		align-items: center;
+		flex-wrap: wrap;
+		flex: 1 1 auto;
+		min-width: 0;
+		gap: 0;
+		border: none;
+		background: transparent;
+		padding: 0;
+		margin: 0;
+	}
+
+	/* Niveau 2 : le conteneur block-toolbar interne. */
+	.block-editor-block-toolbar {
+		display: flex !important;
+		flex-direction: row !important;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0;
+		width: auto;
+		border: none;
+		background: transparent;
+	}
+
+	/* Niveau 3 : le `<div>` sans classe que WP insère pour wrapper le
+	 * groupe block-controls (block-switcher + block-mover). C'est ce
+	 * wrapper qui casse le flex parent en passant à display:block —
+	 * on le force à se comporter comme un flex container row. */
+	.block-editor-block-toolbar > div:not( [class] ) {
+		display: flex !important;
+		flex-direction: row !important;
+		align-items: center;
+		min-width: 0;
+	}
+
+	/* Niveau 4 : chaque toolbar-group. WP les met en `inline-flex` par
+	 * défaut, mais en contexte cassé on peut tomber sur `inline`. */
+	.components-toolbar-group {
+		display: inline-flex !important;
+		flex-direction: row !important;
+		align-items: center;
+		border: none;
+		background: transparent;
+	}
+
+	/* Les boutons toolbar gardent leur dimension WP standard, mais on
+	 * compacte les paddings parasites qu'on ne veut pas dans une barre
+	 * embarquée. */
+	.components-toolbar-group .components-button {
+		height: 36px;
+		min-width: 36px;
 	}
 }
 
