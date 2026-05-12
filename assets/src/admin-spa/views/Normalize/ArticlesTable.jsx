@@ -260,12 +260,53 @@ export default function ArticlesTable( {
 							</th>
 							<td>{ item.post_id }</td>
 							<td className="htmln-articles-table__title">
-								{ item.post_title
-									? String( item.post_title )
-									: __(
-											'(sans titre)',
-											'100son-html-normalizer'
-									  ) }
+								<div className="htmln-articles-table__title-cell">
+									{ item.permalink ? (
+										<a
+											href={ item.permalink }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="htmln-articles-table__title-link"
+											title={ __(
+												'Ouvrir l’article (lecture, nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ item.post_title
+												? String( item.post_title )
+												: __(
+														'(sans titre)',
+														'100son-html-normalizer'
+												  ) }
+										</a>
+									) : (
+										<span className="htmln-articles-table__title-link">
+											{ item.post_title
+												? String( item.post_title )
+												: __(
+														'(sans titre)',
+														'100son-html-normalizer'
+												  ) }
+										</span>
+									) }
+									{ item.edit_url && (
+										<a
+											href={ item.edit_url }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="button button-small htmln-articles-table__edit-btn"
+											title={ __(
+												'Ouvrir l’éditeur (nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ __(
+												'Éditer',
+												'100son-html-normalizer'
+											) }
+										</a>
+									) }
+								</div>
 							</td>
 							<td>
 								<StatusBadge item={ item } />

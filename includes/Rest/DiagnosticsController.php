@@ -493,12 +493,28 @@ final class DiagnosticsController extends BaseController {
 	private function diagnostic_to_array( DiagnosticRecord $record ): array {
 		$post_title = '';
 		$post_date  = '';
+		$permalink  = '';
+		$edit_url   = '';
 		if ( function_exists( 'get_post' ) ) {
 			$post = get_post( $record->post_id );
 			if ( null !== $post ) {
 				$post_title = (string) $post->post_title;
 				$post_date  = (string) $post->post_date;
 			}
+		}
+		// Lien public (frontend reading). `get_permalink` retourne false sur
+		// un post inexistant ou un type sans URL publique — on garde alors
+		// chaîne vide et la SPA n'affiche pas le lien.
+		if ( function_exists( 'get_permalink' ) ) {
+			$pl        = get_permalink( $record->post_id );
+			$permalink = is_string( $pl ) ? $pl : '';
+		}
+		// URL d'édition admin. `'raw'` pour récupérer l'URL non-html-escapée
+		// — la SPA fait son propre escape en setant la prop `href` JSX
+		// (React escape automatiquement les attributs).
+		if ( function_exists( 'get_edit_post_link' ) ) {
+			$eu       = get_edit_post_link( $record->post_id, 'raw' );
+			$edit_url = is_string( $eu ) ? $eu : '';
 		}
 
 		// Fallback classification au render pour les rows pré-2.1.0 (où la
@@ -517,6 +533,8 @@ final class DiagnosticsController extends BaseController {
 			'post_id'                     => $record->post_id,
 			'post_title'                  => $post_title,
 			'post_date'                   => $post_date,
+			'permalink'                   => $permalink,
+			'edit_url'                    => $edit_url,
 			'status'                      => $record->status,
 			'builder_type'                => $builder_type,
 			'matching_rules'              => $record->matching_rules,

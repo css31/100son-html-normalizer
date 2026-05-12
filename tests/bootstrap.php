@@ -156,6 +156,37 @@ if ( ! function_exists( 'has_blocks' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_permalink' ) ) {
+	/**
+	 * Stub `get_permalink` — URL publique simulée pour les tests SPA.
+	 * Format aligné sur la convention WP /?p=ID (la sandbox utilise
+	 * pretty permalinks en réalité, mais ça suffit pour valider le
+	 * round-trip dans le payload REST).
+	 */
+	function get_permalink( int|\WP_Post|null $post = null ): string|false {
+		$id = $post instanceof \WP_Post ? $post->ID : (int) $post;
+		if ( $id <= 0 ) {
+			return false;
+		}
+		return 'http://example.test/?p=' . $id;
+	}
+}
+
+if ( ! function_exists( 'get_edit_post_link' ) ) {
+	/**
+	 * Stub `get_edit_post_link` — URL admin simulée. La vraie WP cherche
+	 * le post type et applique des capability checks ; ici on retourne
+	 * juste un format prévisible pour assertions de test.
+	 */
+	function get_edit_post_link( int $post_id = 0, string $context = 'display' ): ?string {
+		unset( $context );
+		if ( $post_id <= 0 ) {
+			return null;
+		}
+		return 'http://example.test/wp-admin/post.php?post=' . $post_id . '&action=edit';
+	}
+}
+
 if ( ! function_exists( 'update_post_meta' ) ) {
 	function update_post_meta( int $post_id, string $key, mixed $value, mixed $prev_value = '' ): int|bool {
 		\Son100_Htmln_Test_Posts_Registry::$meta[ $post_id ][ $key ] = $value;
