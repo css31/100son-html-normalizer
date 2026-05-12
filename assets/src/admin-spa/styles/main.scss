@@ -446,6 +446,21 @@
 	text-align: center;
 }
 
+/* Chip rule_id dans la cellule « Règles applicables » du tableau Normaliser.
+ * Le `title=` attribute déclenche le tooltip natif du navigateur (label
+ * humain de la règle, ex. « Paragraphes vides » pour P1). On signale
+ * visuellement la présence du tooltip par un curseur `help` et un soulign
+ * pointillé discret au survol. */
+.htmln-rule-chip {
+	cursor: help;
+	border-bottom: 1px dotted transparent;
+	transition: border-bottom-color 0.1s ease;
+
+	&:hover {
+		border-bottom-color: var( --htmln-text-muted );
+	}
+}
+
 .htmln-articles-table__title {
 	max-width: 360px;
 	min-width: 200px;

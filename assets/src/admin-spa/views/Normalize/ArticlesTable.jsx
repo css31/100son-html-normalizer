@@ -18,10 +18,15 @@
  */
 
 import { __, sprintf } from '@wordpress/i18n';
+import { Fragment } from '@wordpress/element';
 import { Spinner, Button } from '@wordpress/components';
 import BuilderBadge from './BuilderBadge';
 import PaginationBar from './PaginationBar';
-import { formatRuleIdList } from '../../utils/ruleLabels';
+import {
+	getRuleLabel,
+	getRuleTooltip,
+	compareRuleIdsByDisplayOrder,
+} from '../../utils/ruleLabels';
 
 /**
  * Calcule le total des occurrences à partir des règles applicables.
@@ -40,16 +45,36 @@ function sumViolations( matchingRules ) {
 }
 
 /**
- * Concatène les rule_id en chaîne lisible avec mapping d'affichage
- * (P2 → P2.1, P9 → P2.2) et tri par ordre d'affichage UI.
- * Délègue à `formatRuleIdList` qui centralise la logique pour tous
- * les composants qui montrent des rule_ids.
+ * Rend la liste des rule_ids comme une suite de `<span title="…">`
+ * séparés par virgules. Chaque span porte le titre humain de la règle
+ * (cf. `RULE_TOOLTIPS` dans `utils/ruleLabels`) — le tooltip natif du
+ * navigateur s'affiche au survol.
+ *
+ * Tri par ordre d'affichage UI (P1, P2.1, P2.2, P3…), pas par ordre
+ * d'exécution du pipeline.
  *
  * @param {Array<{rule_id?: string}>} matchingRules Règles applicables.
- * @return {string} Liste lisible ou tiret si vide.
+ * @return {JSX.Element|string} JSX (suite de spans) ou tiret si vide.
  */
-function formatRuleIds( matchingRules ) {
-	return formatRuleIdList( matchingRules );
+function renderRuleIds( matchingRules ) {
+	if ( ! Array.isArray( matchingRules ) || 0 === matchingRules.length ) {
+		return '—';
+	}
+	const ids = matchingRules
+		.map( ( rule ) => String( rule?.rule_id ?? '' ) )
+		.filter( ( id ) => '' !== id )
+		.sort( compareRuleIdsByDisplayOrder );
+	if ( 0 === ids.length ) {
+		return '—';
+	}
+	return ids.map( ( id, index ) => (
+		<Fragment key={ id }>
+			{ index > 0 && ', ' }
+			<span className="htmln-rule-chip" title={ getRuleTooltip( id ) }>
+				{ getRuleLabel( id ) }
+			</span>
+		</Fragment>
+	) );
 }
 
 /**
@@ -313,7 +338,7 @@ export default function ArticlesTable( {
 							<td className="htmln-articles-table__col-builder">
 								<BuilderBadge type={ item.builder_type } />
 							</td>
-							<td>{ formatRuleIds( item.matching_rules ) }</td>
+							<td>{ renderRuleIds( item.matching_rules ) }</td>
 							<td>{ sumViolations( item.matching_rules ) }</td>
 							<td>
 								{ item.metrics &&

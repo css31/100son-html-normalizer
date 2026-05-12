@@ -44,6 +44,29 @@ export const RULE_DISPLAY_LABELS = {
 };
 
 /**
+ * Map ID interne → titre humain court (plain text, pour `title=`
+ * attribute des `<span>` qui rendent les rule_ids dans le tableau
+ * Normaliser et ailleurs).
+ *
+ * Aligné sur les labels de `PresetRegistry::get_all_presets_metadata()`
+ * côté PHP — en plain text (pas de balises HTML : un `title=` ne
+ * supporte que du texte).
+ *
+ * @type {Object<string, string>}
+ */
+export const RULE_TOOLTIPS = {
+	P1: 'Paragraphes vides',
+	P2: 'Titres vides',
+	P3: 'Shortcodes Shareaholic',
+	P4: 'Artefacts Pinterest',
+	P5: '<br> excessifs',
+	P6: 'Styles inline',
+	P7: 'Listes ASCII',
+	P8: 'Récupération sémantique des styles',
+	P9: "Titres autour d'images",
+};
+
+/**
  * Map ID interne → ordre d'affichage (entier, ASC). Détermine la
  * position dans la liste des cards Règles + dans toutes les listes
  * triées par display order.
@@ -88,6 +111,19 @@ export function getRuleLabel( id ) {
 export function getRuleOrder( id ) {
 	const str = String( id ?? '' );
 	return RULE_DISPLAY_ORDER[ str ] ?? Infinity;
+}
+
+/**
+ * Retourne le titre humain à utiliser dans le tooltip d'une cellule
+ * rendant un rule_id. Retombe sur l'ID lui-même si inconnu (filet
+ * pour custom rules futures).
+ *
+ * @param {string} id ID interne.
+ * @return {string} Titre court plain text.
+ */
+export function getRuleTooltip( id ) {
+	const str = String( id ?? '' );
+	return RULE_TOOLTIPS[ str ] ?? str;
 }
 
 /**
