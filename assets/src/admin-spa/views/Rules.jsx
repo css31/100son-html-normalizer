@@ -34,6 +34,10 @@ import {
 } from '@wordpress/components';
 import { STORE_NAME, ALL_RULE_IDS } from '../store';
 import { usePresets } from '../hooks/usePresets';
+import {
+	getRuleLabel,
+	compareRuleIdsByDisplayOrder,
+} from '../utils/ruleLabels';
 
 /**
  * Exemples statiques par règle pour l'encart « Avant / Après ».
@@ -73,6 +77,10 @@ const RULE_EXAMPLES = {
 	P8: {
 		before: '<span style="font-weight:bold; color:red;">Important</span> et <span style="font-style:italic;">accent</span>',
 		after: '<strong style="color:red;">Important</strong> et <em>accent</em>',
+	},
+	P9: {
+		before: '<h2><img src="/photo.jpg" alt="Photo de Une"></h2>\n<h2>Vrai titre</h2>',
+		after: '<img src="/photo.jpg" alt="Photo de Une">\n<h2>Vrai titre</h2>',
 	},
 };
 
@@ -133,7 +141,7 @@ export default function Rules() {
 				<h2>{ __( 'Règles', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'Les 8 préréglages P1 → P8 du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain pas et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Préréglages » (V0.1).',
+						'Les 9 préréglages du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain pas et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Préréglages » (V0.1).',
 						'100son-html-normalizer'
 					) }
 				</p>
@@ -183,23 +191,31 @@ export default function Rules() {
 			</div>
 
 			<div className="htmln-rules__list">
-				{ ( presets ?? [] ).map( ( preset ) => (
-					<RuleCard
-						key={ preset.id }
-						preset={ preset }
-						isSelected={ selectedRules.includes( preset.id ) }
-						isSaving={ isSaving }
-						onToggleSelected={ () =>
-							toggleSelectedRule( preset.id )
-						}
-						onToggleEnabled={ ( checked ) =>
-							handleToggleEnabled( preset.id, checked )
-						}
-						onSaveParams={ ( partial ) =>
-							handleSaveParams( preset.id, partial )
-						}
-					/>
-				) ) }
+				{ /* Tri d'affichage : pas l'ordre du pipeline (P3 → P4 → … → P2)
+				 *   mais l'ordre lisible humain où les règles d'une même
+				 *   famille sont contiguës (P1, P2.1, P2.2, P3, …). Cf.
+				 *   `utils/ruleLabels.RULE_DISPLAY_ORDER`. */ }
+				{ [ ...( presets ?? [] ) ]
+					.sort( ( a, b ) =>
+						compareRuleIdsByDisplayOrder( a.id, b.id )
+					)
+					.map( ( preset ) => (
+						<RuleCard
+							key={ preset.id }
+							preset={ preset }
+							isSelected={ selectedRules.includes( preset.id ) }
+							isSaving={ isSaving }
+							onToggleSelected={ () =>
+								toggleSelectedRule( preset.id )
+							}
+							onToggleEnabled={ ( checked ) =>
+								handleToggleEnabled( preset.id, checked )
+							}
+							onSaveParams={ ( partial ) =>
+								handleSaveParams( preset.id, partial )
+							}
+						/>
+					) ) }
 			</div>
 		</div>
 	);
@@ -234,7 +250,9 @@ function RuleCard( {
 		>
 			<header className="htmln-rule__header">
 				<div className="htmln-rule__title">
-					<code className="htmln-rule__code">{ preset.id }</code>
+					<code className="htmln-rule__code" title={ preset.id }>
+						{ getRuleLabel( preset.id ) }
+					</code>
 					<h3
 						className="htmln-rule__label"
 						/* eslint-disable-next-line react/no-danger -- HTML serveur de confiance depuis PresetRegistry. */

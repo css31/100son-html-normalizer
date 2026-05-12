@@ -55,6 +55,7 @@ import { useStepRunner } from '../hooks/useStepRunner';
 import { useScanBatch } from '../hooks/useScanBatch';
 import { useBeforeunload } from '../hooks/useBeforeunload';
 import { STORE_NAME, ALL_RULE_IDS } from '../store';
+import { formatRuleIdList } from '../utils/ruleLabels';
 
 const DEFAULT_PER_PAGE = 50;
 
@@ -382,7 +383,7 @@ function ApplyStepFooter( {
 					<>
 						{ ' — ' }
 						<span className="htmln-normalize__footer-rules">
-							{ selectedRules.join( ', ' ) }
+							{ formatRuleIdList( selectedRules ) }
 						</span>
 					</>
 				) }

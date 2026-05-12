@@ -19,6 +19,7 @@
 
 import { __, sprintf } from '@wordpress/i18n';
 import { Spinner, Button } from '@wordpress/components';
+import { formatRuleIdList } from '../../utils/ruleLabels';
 
 /**
  * Tronque un UUID v4 à ses 8 premiers caractères pour affichage compact.
@@ -217,9 +218,7 @@ export default function StepsTable( {
 				</thead>
 				<tbody>
 					{ items.map( ( step ) => {
-						const rules = Array.isArray( step.applied_rules )
-							? step.applied_rules.join( ', ' )
-							: '—';
+						const rules = formatRuleIdList( step.applied_rules );
 						const confirmedRegressions = countConfirmedRegressions(
 							step.per_article_results
 						);

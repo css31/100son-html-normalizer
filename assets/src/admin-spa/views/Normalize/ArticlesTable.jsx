@@ -21,6 +21,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { Spinner, Button } from '@wordpress/components';
 import BuilderBadge from './BuilderBadge';
 import PaginationBar from './PaginationBar';
+import { formatRuleIdList } from '../../utils/ruleLabels';
 
 /**
  * Calcule le total des occurrences à partir des règles applicables.
@@ -39,18 +40,16 @@ function sumViolations( matchingRules ) {
 }
 
 /**
- * Concatène les rule_id en chaîne lisible (ex. `P1, P3, P7`).
+ * Concatène les rule_id en chaîne lisible avec mapping d'affichage
+ * (P2 → P2.1, P9 → P2.2) et tri par ordre d'affichage UI.
+ * Délègue à `formatRuleIdList` qui centralise la logique pour tous
+ * les composants qui montrent des rule_ids.
  *
  * @param {Array<{rule_id?: string}>} matchingRules Règles applicables.
  * @return {string} Liste lisible ou tiret si vide.
  */
 function formatRuleIds( matchingRules ) {
-	if ( ! Array.isArray( matchingRules ) || 0 === matchingRules.length ) {
-		return '—';
-	}
-	return matchingRules
-		.map( ( rule ) => String( rule?.rule_id ?? '?' ) )
-		.join( ', ' );
+	return formatRuleIdList( matchingRules );
 }
 
 /**

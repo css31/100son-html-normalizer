@@ -21,6 +21,7 @@
 
 import { __, sprintf } from '@wordpress/i18n';
 import { Modal, Spinner, Button } from '@wordpress/components';
+import { formatRuleIdList } from '../../utils/ruleLabels';
 
 /**
  * Format lisible d'une RegressionFailure (cf. RegressionFailure::to_array()).
@@ -287,12 +288,7 @@ export default function StepDetailDrawer( {
 								'100son-html-normalizer'
 							) }
 						</dt>
-						<dd>
-							{ Array.isArray( step.applied_rules ) &&
-							step.applied_rules.length > 0
-								? step.applied_rules.join( ', ' )
-								: '—' }
-						</dd>
+						<dd>{ formatRuleIdList( step.applied_rules ) }</dd>
 					</dl>
 
 					{ ! step.is_finished && (
