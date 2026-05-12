@@ -105,6 +105,12 @@ final class DiagnosticsController extends BaseController {
 			'permission_callback' => $can_read,
 		) );
 
+		register_rest_route( $ns, '/diagnostics/facets', array(
+			'methods'             => 'GET',
+			'callback'            => array( $this, 'get_facets' ),
+			'permission_callback' => $can_read,
+		) );
+
 		register_rest_route( $ns, '/diagnostics/(?P<post_id>\d+)', array(
 			'methods'             => 'GET',
 			'callback'            => array( $this, 'get_diagnostic' ),
@@ -123,12 +129,16 @@ final class DiagnosticsController extends BaseController {
 	// =========================================================================
 
 	/**
-	 * `GET /diagnostics` — liste paginée filtrable par `status`.
+	 * `GET /diagnostics` — liste paginée filtrable.
 	 *
 	 * Query :
 	 *  - `status` : `normal` | `to_improve` | `stale` | absent (tous).
 	 *  - `page`, `per_page` : pagination (cap MAX_PER_PAGE).
-	 *  - `post_type[]`, `search` : V1.1 — acceptés mais ignorés en V1.0.
+	 *  - `search` (string)  : titre ou ID exact si numérique.
+	 *  - `cat` (int > 0)    : ID de catégorie WP (taxonomie `category`).
+	 *  - `year` (int > 0)   : année (sur `wp_posts.post_date`).
+	 *  - `month` (int 1-12) : mois (combiné avec year).
+	 *  - `builder` (string) : `siteorigin` (couvre flat) | `gutenberg` | `other` | `out`.
 	 *
 	 * Réponse 200 : `{ items, total, page, per_page, total_pages }`.
 	 * Réponse 400 si `status` est fourni mais hors whitelist.
@@ -149,9 +159,17 @@ final class DiagnosticsController extends BaseController {
 		}
 
 		[ 'page' => $page, 'per_page' => $per_page, 'offset' => $offset ] = $this->parse_pagination( $request );
+		$filters = $this->parse_filters( $request );
 
-		$total = $this->repo->count_paginated( $status );
-		$items = $this->repo->list_paginated( $status, $per_page, $offset );
+		$total = $this->repo->count_paginated( $status, $filters );
+		$items = $this->repo->list_paginated( $status, $per_page, $offset, $filters );
+
+		// Pré-charge le cache d'objets WP pour les post_ids retournés,
+		// évite N+1 queries sur `get_post()` dans `diagnostic_to_array`.
+		if ( function_exists( '_prime_post_caches' ) && array() !== $items ) {
+			$post_ids = array_map( static fn( DiagnosticRecord $r ): int => $r->post_id, $items );
+			_prime_post_caches( $post_ids, false, false );
+		}
 
 		return $this->respond( array(
 			'items'       => array_map( array( $this, 'diagnostic_to_array' ), $items ),
@@ -159,6 +177,37 @@ final class DiagnosticsController extends BaseController {
 			'page'        => $page,
 			'per_page'    => $per_page,
 			'total_pages' => 0 === $per_page ? 0 : (int) ceil( $total / $per_page ),
+		) );
+	}
+
+	/**
+	 * `GET /diagnostics/facets` — données pour les dropdowns de filtres SPA.
+	 *
+	 * Réponse 200 :
+	 *  - `years` : list<int>, années disponibles (DESC).
+	 *  - `categories` : list<{id, name, count}>, catégories ayant ≥ 1 article
+	 *    diagnostiqué. Pas de filtrage hide_empty — on respecte le contenu
+	 *    réel du diagnostic.
+	 *  - `builders` : map<string, int>, count par type (siteorigin / gutenberg
+	 *    / other / out / unknown).
+	 *
+	 * Pas paginé — les volumes sont faibles (catégories : <100 typique,
+	 * années : <30, builders : 5). Cache HTTP côté WP-REST suffit.
+	 *
+	 * @param WP_REST_Request $request Requête (inutilisée).
+	 * @return WP_REST_Response
+	 */
+	public function get_facets( WP_REST_Request $request ): WP_REST_Response {
+		unset( $request );
+
+		$years     = $this->repo->list_distinct_years();
+		$builders  = $this->repo->count_by_builder();
+		$categories = $this->fetch_categories_with_counts();
+
+		return $this->respond( array(
+			'years'      => $years,
+			'categories' => $categories,
+			'builders'   => $builders,
 		) );
 	}
 
@@ -316,6 +365,99 @@ final class DiagnosticsController extends BaseController {
 	}
 
 	/**
+	 * Parse les 5 filtres optionnels de `GET /diagnostics` (post-rc3).
+	 *
+	 * Sanitization stricte par clé :
+	 *  - `search`  : trim + sanitize_text_field ; refuse les chaînes vides.
+	 *  - `cat`     : absint ; ignoré si ≤ 0.
+	 *  - `year`    : absint ; ignoré si ≤ 0 (et si > 2200 — sécurité bidon).
+	 *  - `month`   : absint ; ignoré si hors [1,12].
+	 *  - `builder` : sanitize_key ; whitelist 4 valeurs (post-arbitrage UX).
+	 *
+	 * @param WP_REST_Request $request Requête.
+	 * @return array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string}
+	 */
+	private function parse_filters( WP_REST_Request $request ): array {
+		$filters = array();
+
+		$search_raw = $request->get_param( 'search' );
+		if ( is_scalar( $search_raw ) ) {
+			$search = trim( sanitize_text_field( (string) $search_raw ) );
+			if ( '' !== $search ) {
+				$filters['search'] = $search;
+			}
+		}
+
+		$cat_raw = $request->get_param( 'cat' );
+		if ( null !== $cat_raw ) {
+			$cat = absint( $cat_raw );
+			if ( $cat > 0 ) {
+				$filters['cat_id'] = $cat;
+			}
+		}
+
+		$year_raw = $request->get_param( 'year' );
+		if ( null !== $year_raw ) {
+			$year = absint( $year_raw );
+			if ( $year > 0 && $year < 2200 ) {
+				$filters['year'] = $year;
+			}
+		}
+
+		$month_raw = $request->get_param( 'month' );
+		if ( null !== $month_raw ) {
+			$month = absint( $month_raw );
+			if ( $month >= 1 && $month <= 12 ) {
+				$filters['month'] = $month;
+			}
+		}
+
+		$builder_raw = $request->get_param( 'builder' );
+		if ( is_scalar( $builder_raw ) ) {
+			$builder = sanitize_key( (string) $builder_raw );
+			if ( in_array( $builder, array( 'siteorigin', 'gutenberg', 'other', 'out' ), true ) ) {
+				$filters['builder'] = $builder;
+			}
+		}
+
+		return $filters;
+	}
+
+	/**
+	 * Récupère les catégories ayant au moins un article diagnostiqué, avec
+	 * leur compte. Utilise `get_terms()` standard, restreint à la taxonomy
+	 * `category` (alignement V0.1). `count` ici = nombre total d'articles
+	 * de la catégorie (pas filtré par état diagnostic), suffit au filtre.
+	 *
+	 * @return list<array{id: int, name: string, count: int}>
+	 */
+	private function fetch_categories_with_counts(): array {
+		if ( ! function_exists( 'get_terms' ) ) {
+			return array();
+		}
+		$terms = get_terms( array(
+			'taxonomy'   => 'category',
+			'hide_empty' => true,
+			'orderby'    => 'name',
+		) );
+		if ( ! is_array( $terms ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $terms as $term ) {
+			if ( ! is_object( $term ) || ! property_exists( $term, 'term_id' ) ) {
+				continue;
+			}
+			$out[] = array(
+				'id'    => (int) $term->term_id,
+				'name'  => property_exists( $term, 'name' ) ? (string) $term->name : '',
+				'count' => property_exists( $term, 'count' ) ? (int) $term->count : 0,
+			);
+		}
+		return $out;
+	}
+
+	/**
 	 * Pagination — extrait page/per_page/offset bornés.
 	 *
 	 * @param WP_REST_Request $request Requête.
@@ -341,10 +483,22 @@ final class DiagnosticsController extends BaseController {
 	 * @return array<string, mixed>
 	 */
 	private function diagnostic_to_array( DiagnosticRecord $record ): array {
+		$post_title = '';
+		$post_date  = '';
+		if ( function_exists( 'get_post' ) ) {
+			$post = get_post( $record->post_id );
+			if ( null !== $post ) {
+				$post_title = (string) $post->post_title;
+				$post_date  = (string) $post->post_date;
+			}
+		}
 		return array(
 			'id'                          => $record->id,
 			'post_id'                     => $record->post_id,
+			'post_title'                  => $post_title,
+			'post_date'                   => $post_date,
 			'status'                      => $record->status,
+			'builder_type'                => $record->builder_type,
 			'matching_rules'              => $record->matching_rules,
 			'metrics'                     => $record->metrics,
 			'is_stale'                    => $record->is_stale,

@@ -101,11 +101,23 @@ final class DiagnosticsControllerTest extends TestCase {
 			public function find_by_post_id( int $post_id ): ?DiagnosticRecord {
 				return $this->by_post_id[ $post_id ] ?? null;
 			}
-			public function list_paginated( ?string $status, int $limit = 50, int $offset = 0 ): array {
+			public function list_paginated( ?string $status, int $limit = 50, int $offset = 0, array $filters = array() ): array {
 				return array_slice( $this->list, $offset, $limit );
 			}
-			public function count_paginated( ?string $status ): int {
+			public function count_paginated( ?string $status, array $filters = array() ): int {
 				return $this->count_override ?? count( $this->list );
+			}
+			public function list_distinct_years(): array {
+				return array();
+			}
+			public function count_by_builder(): array {
+				return array(
+					'siteorigin' => 0,
+					'gutenberg'  => 0,
+					'other'      => 0,
+					'out'        => 0,
+					'unknown'    => 0,
+				);
 			}
 			public function count_by_status(): array {
 				return $this->stats_override ?? array(
@@ -158,9 +170,10 @@ final class DiagnosticsControllerTest extends TestCase {
 	//  register_routes
 	// =========================================================================
 
-	public function test_register_routes_creates_six_endpoints(): void {
+	public function test_register_routes_creates_seven_endpoints(): void {
 		$this->make_controller()->register_routes();
-		$this->assertCount( 6, $GLOBALS['son100_htmln_test_rest_routes'] );
+		// 6 endpoints initiaux + /diagnostics/facets (post-rc3).
+		$this->assertCount( 7, $GLOBALS['son100_htmln_test_rest_routes'] );
 	}
 
 	public function test_register_routes_uses_htmln_v1_namespace(): void {

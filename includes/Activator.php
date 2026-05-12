@@ -27,8 +27,12 @@ final class Activator {
 	 * Historique :
 	 *  - 1.0.0 : V0.1 (aucune table custom)
 	 *  - 2.0.0 : V1.0 Phase 2.1 — ajout `son100_htmln_diagnostics` et `son100_htmln_steps`
+	 *  - 2.1.0 : post-rc3 — ajout colonne `builder_type` (VARCHAR(20) NULL +
+	 *            KEY) dans `son100_htmln_diagnostics` pour filtrage SPA.
+	 *            dbDelta est idempotent : ajoute la colonne sur instances
+	 *            existantes, NULL initial puis re-rempli au prochain scan.
 	 */
-	public const DB_VERSION = '2.0.0';
+	public const DB_VERSION = '2.1.0';
 
 	/**
 	 * Exécuté à l'activation du plugin.
@@ -64,10 +68,12 @@ final class Activator {
 		$steps_table     = $wpdb->prefix . 'son100_htmln_steps';
 
 		// F12 — Diagnostic batch (status par article + matching_rules + métriques + is_stale).
+		// 2.1.0 — Ajout `builder_type` pour filtrage SPA Normaliser (cf. BuilderClassifier).
 		$sql_diag = "CREATE TABLE $diag_table (
 			id BIGINT UNSIGNED AUTO_INCREMENT NOT NULL,
 			post_id BIGINT UNSIGNED NOT NULL,
 			status VARCHAR(20) NOT NULL,
+			builder_type VARCHAR(20) NULL,
 			matching_rules LONGTEXT NULL,
 			metrics LONGTEXT NULL,
 			is_stale TINYINT(1) NOT NULL DEFAULT 0,
@@ -76,7 +82,8 @@ final class Activator {
 			PRIMARY KEY  (id),
 			UNIQUE KEY uniq_post_id (post_id),
 			KEY idx_status (status),
-			KEY idx_stale (is_stale)
+			KEY idx_stale (is_stale),
+			KEY idx_builder (builder_type)
 		) $charset_collate;";
 
 		// F14/F16 — Historique des pas (UUID, règles appliquées, articles touchés, résultats par article).

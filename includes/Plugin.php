@@ -32,6 +32,7 @@ use Cent_Son\Html_Normalizer\Core\Logs\Logger;
 use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
 use Cent_Son\Html_Normalizer\Core\Logs\NotesRepository;
 use Cent_Son\Html_Normalizer\Core\Pipeline;
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
 use Cent_Son\Html_Normalizer\Core\Posts\SiteOriginDetector;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
@@ -184,7 +185,7 @@ final class Plugin {
 		$normalizer      = new HtmlNormalizer( $preset_registry, $pipeline );
 		$so_detector     = new SiteOriginDetector();
 		$post_normalizer = new PostNormalizer( $normalizer, $so_detector );
-		$engine          = new DiagnosticEngine( $preset_registry, $metrics );
+		$engine          = new DiagnosticEngine( $preset_registry, $metrics, new BuilderClassifier() );
 		$diag_repo       = new DiagnosticsRepository();
 		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
 		$rich_notes      = new RichNotesRepository();
@@ -219,7 +220,7 @@ final class Plugin {
 		$settings        = new SettingsRepository();
 		$preset_registry = new PresetRegistry( $settings );
 		$metrics         = new MetricsCalculator();
-		$engine          = new DiagnosticEngine( $preset_registry, $metrics );
+		$engine          = new DiagnosticEngine( $preset_registry, $metrics, new BuilderClassifier() );
 		$diag_repo       = new DiagnosticsRepository();
 		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
 
@@ -265,7 +266,7 @@ final class Plugin {
 			$pipeline,
 			$metrics,
 			new RegressionDetector(),
-			new DiagnosticEngine( $preset_registry, $metrics ),
+			new DiagnosticEngine( $preset_registry, $metrics, new BuilderClassifier() ),
 			$settings,
 		);
 	}

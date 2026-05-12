@@ -37,6 +37,7 @@ final class DiagnosticRecord {
 	 * @param bool                                          $is_stale                    Vrai si invalide depuis le dernier `save_post`.
 	 * @param string                                        $diagnosed_at                Datetime MySQL (`Y-m-d H:i:s`) au moment du diagnostic.
 	 * @param string|null                                   $post_modified_at_diagnosis  `post_modified` snapshot au diagnostic, pour détection stale fine.
+	 * @param string|null                                   $builder_type                Type de constructeur (cf. BuilderClassifier::TYPE_*). Null pour les diagnostics pré-2.1.0.
 	 */
 	public function __construct(
 		public readonly ?int $id,
@@ -47,6 +48,7 @@ final class DiagnosticRecord {
 		public readonly bool $is_stale,
 		public readonly string $diagnosed_at,
 		public readonly ?string $post_modified_at_diagnosis,
+		public readonly ?string $builder_type = null,
 	) {}
 
 	/**
@@ -71,6 +73,9 @@ final class DiagnosticRecord {
 			post_modified_at_diagnosis: isset( $row['post_modified_at_diagnosis'] ) && '' !== $row['post_modified_at_diagnosis']
 				? (string) $row['post_modified_at_diagnosis']
 				: null,
+			builder_type: isset( $row['builder_type'] ) && '' !== $row['builder_type']
+				? (string) $row['builder_type']
+				: null,
 		);
 	}
 
@@ -85,6 +90,7 @@ final class DiagnosticRecord {
 		$row = array(
 			'post_id'                    => $this->post_id,
 			'status'                     => $this->status,
+			'builder_type'               => $this->builder_type,
 			'matching_rules'             => self::encode_json( $this->matching_rules ),
 			'metrics'                    => self::encode_json( $this->metrics ),
 			'is_stale'                   => $this->is_stale ? 1 : 0,
@@ -113,6 +119,9 @@ final class DiagnosticRecord {
 			post_modified_at_diagnosis: array_key_exists( 'post_modified_at_diagnosis', $changes )
 				? $changes['post_modified_at_diagnosis']
 				: $this->post_modified_at_diagnosis,
+			builder_type: array_key_exists( 'builder_type', $changes )
+				? $changes['builder_type']
+				: $this->builder_type,
 		);
 	}
 

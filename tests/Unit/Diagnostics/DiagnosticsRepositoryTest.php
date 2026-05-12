@@ -165,31 +165,33 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$this->repo->list_paginated( null, 10, 0 );
 		$last_sql = end( $this->wpdb->query_log );
 		$this->assertStringNotContainsString( 'WHERE', $last_sql );
-		$this->assertStringContainsString( 'ORDER BY diagnosed_at DESC', $last_sql );
+		// Post-rc3 : la requête utilise désormais l'alias `d` (cf.
+		// `build_filter_clauses` qui partage le pattern entre list/count).
+		$this->assertStringContainsString( 'ORDER BY d.diagnosed_at DESC', $last_sql );
 	}
 
 	public function test_list_paginated_with_normal_status_excludes_stale(): void {
 		$this->wpdb->get_results_queue[] = array();
 		$this->repo->list_paginated( 'normal', 10, 0 );
 		$last_sql = end( $this->wpdb->query_log );
-		$this->assertStringContainsString( "status = 'normal'", $last_sql );
-		$this->assertStringContainsString( 'is_stale = 0', $last_sql );
+		$this->assertStringContainsString( "d.status = 'normal'", $last_sql );
+		$this->assertStringContainsString( 'd.is_stale = 0', $last_sql );
 	}
 
 	public function test_list_paginated_with_to_improve_status(): void {
 		$this->wpdb->get_results_queue[] = array();
 		$this->repo->list_paginated( 'to_improve', 10, 0 );
 		$last_sql = end( $this->wpdb->query_log );
-		$this->assertStringContainsString( "status = 'to_improve'", $last_sql );
-		$this->assertStringContainsString( 'is_stale = 0', $last_sql );
+		$this->assertStringContainsString( "d.status = 'to_improve'", $last_sql );
+		$this->assertStringContainsString( 'd.is_stale = 0', $last_sql );
 	}
 
 	public function test_list_paginated_with_stale_status_only_filters_stale_flag(): void {
 		$this->wpdb->get_results_queue[] = array();
 		$this->repo->list_paginated( 'stale', 10, 0 );
 		$last_sql = end( $this->wpdb->query_log );
-		$this->assertStringContainsString( 'is_stale = 1', $last_sql );
-		$this->assertStringNotContainsString( "status = 'normal'", $last_sql );
+		$this->assertStringContainsString( 'd.is_stale = 1', $last_sql );
+		$this->assertStringNotContainsString( "d.status = 'normal'", $last_sql );
 	}
 
 	public function test_list_paginated_with_unknown_status_returns_empty_without_query(): void {
@@ -210,7 +212,7 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$this->repo->count_paginated( 'to_improve' );
 		$last_sql = end( $this->wpdb->query_log );
 		$this->assertStringContainsString( 'COUNT(*)', $last_sql );
-		$this->assertStringContainsString( "status = 'to_improve'", $last_sql );
+		$this->assertStringContainsString( "d.status = 'to_improve'", $last_sql );
 	}
 
 	public function test_count_paginated_with_unknown_status_returns_zero_without_query(): void {

@@ -27,7 +27,7 @@ final class ActivatorTest extends TestCase {
 
 	public function test_db_version_constant_is_set(): void {
 		// Cohérence : la constante doit être bumpée a chaque évolution de schema.
-		$this->assertSame( '2.0.0', Activator::DB_VERSION );
+		$this->assertSame( '2.1.0', Activator::DB_VERSION );
 	}
 
 	public function test_activate_seeds_settings_option(): void {

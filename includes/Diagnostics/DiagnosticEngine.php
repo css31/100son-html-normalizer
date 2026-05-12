@@ -13,6 +13,7 @@ namespace Cent_Son\Html_Normalizer\Diagnostics;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use WP_Post;
@@ -37,12 +38,17 @@ use WP_Post;
 class DiagnosticEngine {
 
 	/**
-	 * @param PresetRegistry    $registry Source des règles activées.
-	 * @param MetricsCalculator $metrics  Calculateur de snapshot.
+	 * @param PresetRegistry    $registry   Source des règles activées.
+	 * @param MetricsCalculator $metrics    Calculateur de snapshot.
+	 * @param BuilderClassifier $classifier Classification constructeur (post-rc3,
+	 *                                       nullable pour rétro-compat avec
+	 *                                       l'ancien wiring 2-arg : si null, le
+	 *                                       record reçoit `builder_type=null`).
 	 */
 	public function __construct(
 		private readonly PresetRegistry $registry,
 		private readonly MetricsCalculator $metrics,
+		private readonly ?BuilderClassifier $classifier = null,
 	) {}
 
 	/**
@@ -75,6 +81,10 @@ class DiagnosticEngine {
 		$snapshot = $this->metrics->compute( $html );
 
 		$post_modified = trim( (string) ( $post->post_modified ?? '' ) );
+		$builder_type  = null !== $this->classifier
+			? $this->classifier->classify( $post->ID )
+			: null;
+
 		return new DiagnosticRecord(
 			id: null,
 			post_id: $post->ID,
@@ -84,6 +94,7 @@ class DiagnosticEngine {
 			is_stale: false,
 			diagnosed_at: gmdate( 'Y-m-d H:i:s' ),
 			post_modified_at_diagnosis: '' === $post_modified ? null : $post_modified,
+			builder_type: $builder_type,
 		);
 	}
 }

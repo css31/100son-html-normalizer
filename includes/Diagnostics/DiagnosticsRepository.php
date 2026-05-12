@@ -136,7 +136,8 @@ class DiagnosticsRepository {
 
 	/**
 	 * Liste paginée unifiée pour `GET /diagnostics` (F13). Filtre par status
-	 * optionnel : `null` retourne tous les diagnostics.
+	 * optionnel : `null` retourne tous les diagnostics. Filtres additionnels
+	 * (post-rc3) : `search` / `cat_id` / `year` / `month` / `builder`.
 	 *
 	 * Sémantique du filtre `status` :
 	 *  - `'normal'`     : `status = 'normal'` ET `is_stale = 0`.
@@ -145,43 +146,135 @@ class DiagnosticsRepository {
 	 *  - `null`         : pas de filtre, tous les diagnostics.
 	 *  - autre valeur   : liste vide (status inconnu — défense en profondeur).
 	 *
-	 * @param string|null $status Filtre status, ou null pour tous.
-	 * @param int         $limit  Nombre max.
-	 * @param int         $offset Décalage.
+	 * Sémantique du tableau `$filters` (toutes clés optionnelles) :
+	 *  - `search` (string)  : numérique → `post_id = N` exact ; sinon JOIN
+	 *                         `wp_posts` + `post_title LIKE %X%` (titre seul,
+	 *                         pas content/excerpt — alignement V0.1).
+	 *  - `cat_id` (int > 0) : JOIN `wp_term_relationships` + `wp_term_taxonomy`
+	 *                         sur `taxonomy = 'category'`.
+	 *  - `year`   (int > 0) : `YEAR(p.post_date) = N` (JOIN wp_posts).
+	 *  - `month`  (int 1-12): `MONTH(p.post_date) = N` (combiné avec year).
+	 *  - `builder` (string) : `siteorigin` (couvre siteorigin + siteorigin_flat) |
+	 *                         `gutenberg` | `other` | `out`. Autre → ignoré.
+	 *
+	 * @param string|null                                                                  $status  Filtre status, ou null pour tous.
+	 * @param int                                                                          $limit   Nombre max.
+	 * @param int                                                                          $offset  Décalage.
+	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string} $filters Filtres additionnels (post-rc3).
 	 * @return list<DiagnosticRecord>
 	 */
-	public function list_paginated( ?string $status, int $limit = 50, int $offset = 0 ): array {
-		$where = $this->build_status_clause( $status );
-		if ( null === $where ) {
+	public function list_paginated( ?string $status, int $limit = 50, int $offset = 0, array $filters = array() ): array {
+		$clauses = $this->build_filter_clauses( $status, $filters );
+		if ( null === $clauses ) {
 			return array();
 		}
-		$sql = "SELECT * FROM `{$this->table}`";
-		if ( '' !== $where ) {
-			$sql .= ' WHERE ' . $where;
+		$sql = "SELECT d.* FROM `{$this->table}` d" . $clauses['joins'];
+		if ( '' !== $clauses['where'] ) {
+			$sql .= ' WHERE ' . $clauses['where'];
 		}
-		$sql .= ' ORDER BY diagnosed_at DESC LIMIT %d OFFSET %d';
-		return $this->fetch_records(
-			$this->wpdb->prepare( $sql, max( 1, $limit ), max( 0, $offset ) )
-		);
+		$sql .= ' ORDER BY d.diagnosed_at DESC LIMIT %d OFFSET %d';
+		$params = array_merge( $clauses['params'], array( max( 1, $limit ), max( 0, $offset ) ) );
+		return $this->fetch_records( $this->wpdb->prepare( $sql, ...$params ) );
 	}
 
 	/**
 	 * Comptage paginé compagnon de `list_paginated()` — sert au calcul de
-	 * `total_pages` côté contrôleur REST.
+	 * `total_pages` côté contrôleur REST. Accepte les mêmes filtres.
 	 *
-	 * @param string|null $status Filtre status, ou null pour tous.
+	 * @param string|null                                                                  $status  Filtre status, ou null pour tous.
+	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string} $filters Filtres additionnels.
 	 * @return int
 	 */
-	public function count_paginated( ?string $status ): int {
-		$where = $this->build_status_clause( $status );
-		if ( null === $where ) {
+	public function count_paginated( ?string $status, array $filters = array() ): int {
+		$clauses = $this->build_filter_clauses( $status, $filters );
+		if ( null === $clauses ) {
 			return 0;
 		}
-		$sql = "SELECT COUNT(*) FROM `{$this->table}`";
-		if ( '' !== $where ) {
-			$sql .= ' WHERE ' . $where;
+		$sql = "SELECT COUNT(*) FROM `{$this->table}` d" . $clauses['joins'];
+		if ( '' !== $clauses['where'] ) {
+			$sql .= ' WHERE ' . $clauses['where'];
 		}
-		return (int) $this->wpdb->get_var( $sql );
+		if ( array() === $clauses['params'] ) {
+			return (int) $this->wpdb->get_var( $sql );
+		}
+		return (int) $this->wpdb->get_var( $this->wpdb->prepare( $sql, ...$clauses['params'] ) );
+	}
+
+	/**
+	 * Liste des années (4 chiffres) ayant au moins un diagnostic, triées
+	 * décroissant. Sert au populate du dropdown « Année » du filtre SPA.
+	 *
+	 * On dérive depuis `diagnosed_at` (DATETIME stocké côté custom table)
+	 * plutôt que `wp_posts.post_date` pour éviter le JOIN coûteux — la
+	 * date du diagnostic est toujours postérieure à la création du post,
+	 * donc cohérente comme axe temporel.
+	 *
+	 * @return list<int>
+	 */
+	public function list_distinct_years(): array {
+		$sql  = "SELECT DISTINCT YEAR(p.post_date) AS y
+		         FROM `{$this->table}` d
+		         INNER JOIN `{$this->wpdb->posts}` p ON p.ID = d.post_id
+		         ORDER BY y DESC";
+		$rows = $this->wpdb->get_results( $sql, 'ARRAY_A' );
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+		$years = array();
+		foreach ( $rows as $row ) {
+			$y = isset( $row['y'] ) ? (int) $row['y'] : 0;
+			if ( $y > 0 ) {
+				$years[] = $y;
+			}
+		}
+		return $years;
+	}
+
+	/**
+	 * Comptage de diagnostics par type de constructeur. Sert au populate
+	 * du dropdown « Constructeur » du filtre SPA avec des compteurs.
+	 *
+	 * Regroupe les 2 variants SiteOrigin (natif + aplati) sous la clé
+	 * `siteorigin` — alignement avec le filtre 4-valeurs côté UI.
+	 *
+	 * @return array<string, int> Map type → count (clés : siteorigin /
+	 *                            gutenberg / other / out / unknown).
+	 */
+	public function count_by_builder(): array {
+		$sql  = "SELECT builder_type, COUNT(*) AS c FROM `{$this->table}` GROUP BY builder_type";
+		$rows = $this->wpdb->get_results( $sql, 'ARRAY_A' );
+		$out  = array(
+			'siteorigin' => 0,
+			'gutenberg'  => 0,
+			'other'      => 0,
+			'out'        => 0,
+			'unknown'    => 0,
+		);
+		if ( ! is_array( $rows ) ) {
+			return $out;
+		}
+		foreach ( $rows as $row ) {
+			$type  = isset( $row['builder_type'] ) ? (string) $row['builder_type'] : '';
+			$count = isset( $row['c'] ) ? (int) $row['c'] : 0;
+			switch ( $type ) {
+				case 'siteorigin':
+				case 'siteorigin_flat':
+					$out['siteorigin'] += $count;
+					break;
+				case 'gutenberg':
+					$out['gutenberg'] += $count;
+					break;
+				case 'other':
+					$out['other'] += $count;
+					break;
+				case 'out':
+					$out['out'] += $count;
+					break;
+				default:
+					$out['unknown'] += $count;
+			}
+		}
+		return $out;
 	}
 
 	// =========================================================================
@@ -255,6 +348,10 @@ class DiagnosticsRepository {
 	 * Construit la clause WHERE pour le filtrage par status. Hardcodé car
 	 * limité à 4 valeurs whitelistées — pas de prepare() nécessaire.
 	 *
+	 * Préfixe avec `d.` (alias systématique de la table diagnostics dans
+	 * les requêtes filtrées) pour éviter toute ambiguïté avec d'éventuelles
+	 * colonnes `status` ou `is_stale` venant de tables JOINées.
+	 *
 	 * @param string|null $status Statut ou null.
 	 * @return string|null Clause WHERE (ou chaîne vide pour pas de filtre),
 	 *                     ou `null` pour signaler un status inconnu (le
@@ -263,11 +360,102 @@ class DiagnosticsRepository {
 	private function build_status_clause( ?string $status ): ?string {
 		return match ( $status ) {
 			null         => '',
-			'normal'     => "status = 'normal' AND is_stale = 0",
-			'to_improve' => "status = 'to_improve' AND is_stale = 0",
-			'stale'      => 'is_stale = 1',
+			'normal'     => "d.status = 'normal' AND d.is_stale = 0",
+			'to_improve' => "d.status = 'to_improve' AND d.is_stale = 0",
+			'stale'      => 'd.is_stale = 1',
 			default      => null,
 		};
+	}
+
+	/**
+	 * Compose les fragments JOIN + WHERE + params pour une requête filtrée.
+	 *
+	 * Pattern unique partagé par `list_paginated()` et `count_paginated()` :
+	 * les deux requêtes ont exactement les mêmes JOIN/WHERE, seul le
+	 * SELECT et le ORDER BY/LIMIT diffèrent. Centraliser ici garantit que
+	 * `list` et `count` restent cohérents (jamais de drift où count
+	 * retourne X mais list X+1 articles parce qu'un filtre a été oublié
+	 * dans un seul des deux).
+	 *
+	 * @param string|null                                                                  $status  Filtre status.
+	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string} $filters Filtres additionnels.
+	 * @return array{joins: string, where: string, params: list<mixed>}|null
+	 *   `null` = status invalide → caller retourne array vide / 0.
+	 *   `joins` est préfixé par espace si non vide (concaténable directement).
+	 *   `where` est sans `WHERE` (le caller ajoute si non vide).
+	 *   `params` est ordonné pour `$wpdb->prepare(..., ...$params)`.
+	 */
+	private function build_filter_clauses( ?string $status, array $filters ): ?array {
+		$status_clause = $this->build_status_clause( $status );
+		if ( null === $status_clause ) {
+			return null;
+		}
+
+		$where_parts = array();
+		if ( '' !== $status_clause ) {
+			$where_parts[] = $status_clause;
+		}
+		$joins  = array();
+		$params = array();
+
+		// search : numérique → post_id exact ; sinon → JOIN posts + LIKE titre.
+		$search = isset( $filters['search'] ) ? trim( (string) $filters['search'] ) : '';
+		if ( '' !== $search ) {
+			if ( ctype_digit( $search ) ) {
+				$where_parts[] = 'd.post_id = %d';
+				$params[]      = (int) $search;
+			} else {
+				$joins['posts'] = " INNER JOIN `{$this->wpdb->posts}` p ON p.ID = d.post_id";
+				$where_parts[]  = 'p.post_title LIKE %s';
+				$like_method    = method_exists( $this->wpdb, 'esc_like' ) ? array( $this->wpdb, 'esc_like' ) : null;
+				$escaped        = null !== $like_method ? ( $like_method )( $search ) : $search;
+				$params[]       = '%' . $escaped . '%';
+			}
+		}
+
+		// cat_id : JOIN term_relationships + term_taxonomy.
+		$cat_id = isset( $filters['cat_id'] ) ? (int) $filters['cat_id'] : 0;
+		if ( $cat_id > 0 ) {
+			$joins['terms'] = " INNER JOIN `{$this->wpdb->term_relationships}` tr ON tr.object_id = d.post_id"
+				. " INNER JOIN `{$this->wpdb->term_taxonomy}` tt ON tt.term_taxonomy_id = tr.term_taxonomy_id";
+			$where_parts[]  = "tt.taxonomy = 'category' AND tt.term_id = %d";
+			$params[]       = $cat_id;
+		}
+
+		// year + month : JOIN posts si pas déjà fait.
+		$year  = isset( $filters['year'] ) ? (int) $filters['year'] : 0;
+		$month = isset( $filters['month'] ) ? (int) $filters['month'] : 0;
+		if ( $year > 0 ) {
+			if ( ! isset( $joins['posts'] ) ) {
+				$joins['posts'] = " INNER JOIN `{$this->wpdb->posts}` p ON p.ID = d.post_id";
+			}
+			$where_parts[] = 'YEAR(p.post_date) = %d';
+			$params[]      = $year;
+			if ( $month >= 1 && $month <= 12 ) {
+				$where_parts[] = 'MONTH(p.post_date) = %d';
+				$params[]      = $month;
+			}
+		}
+
+		// builder : `siteorigin` couvre les 2 variants (natif + flat).
+		$builder = isset( $filters['builder'] ) ? (string) $filters['builder'] : '';
+		switch ( $builder ) {
+			case 'siteorigin':
+				$where_parts[] = "d.builder_type IN ('siteorigin', 'siteorigin_flat')";
+				break;
+			case 'gutenberg':
+			case 'other':
+			case 'out':
+				$where_parts[] = 'd.builder_type = %s';
+				$params[]      = $builder;
+				break;
+		}
+
+		return array(
+			'joins'  => implode( '', $joins ),
+			'where'  => implode( ' AND ', $where_parts ),
+			'params' => $params,
+		);
 	}
 
 	/**

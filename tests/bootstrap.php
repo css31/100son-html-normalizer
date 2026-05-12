@@ -129,6 +129,33 @@ if ( ! function_exists( 'get_post_meta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_post_field' ) ) {
+	function get_post_field( string $field, int $post_id ): mixed {
+		$post = \Son100_Htmln_Test_Posts_Registry::$posts[ $post_id ] ?? null;
+		if ( null === $post ) {
+			return '';
+		}
+		return property_exists( $post, $field ) ? $post->{$field} : '';
+	}
+}
+
+if ( ! function_exists( 'has_blocks' ) ) {
+	/**
+	 * Stub `has_blocks` — détection minimale du marqueur `<!-- wp:` qui suffit
+	 * pour les tests BuilderClassifier. La vraie WP fait un check plus
+	 * sophistiqué (vérifie la fin `-->`) mais l'esprit est le même.
+	 */
+	function has_blocks( mixed $post = null ): bool {
+		if ( is_string( $post ) ) {
+			return str_contains( $post, '<!-- wp:' );
+		}
+		if ( $post instanceof \WP_Post ) {
+			return str_contains( (string) $post->post_content, '<!-- wp:' );
+		}
+		return false;
+	}
+}
+
 if ( ! function_exists( 'update_post_meta' ) ) {
 	function update_post_meta( int $post_id, string $key, mixed $value, mixed $prev_value = '' ): int|bool {
 		\Son100_Htmln_Test_Posts_Registry::$meta[ $post_id ][ $key ] = $value;
