@@ -5,6 +5,122 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [1.0.0-rc4] — 2026-05-12
 
+**Portage dans la SPA des fonctionnalités V0.1 perdues** + **refontes UX finales rc4** (filtre Règles, pagination numérotée, refonte Diff & Métriques, badge orange « Gut + fossile »). Cible : parité fonctionnelle SPA ↔ V0.1 + qualité visuelle prête pour `1.0.0` final.
+
+---
+
+### Refontes UX finalisation rc4 (session du 12 mai après-midi)
+
+#### Filtre « Règles » multi-sélection dans FiltersBar
+
+- Nouveau sous-composant `RulesFilterDropdown` (`@wordpress/components` `Dropdown` + 9 `CheckboxControl` triés par `RULE_DISPLAY_ORDER`).
+- Sémantique **OR** : un article match si **au moins une** des règles cochées s'applique.
+- Compteur par règle « P2.1 (183) » à droite de chaque case, alimenté par la nouvelle facette `applicable_rules`.
+- Bouton « Tout désélectionner » conditionnel (visible dès 1 case cochée).
+- Toggle button labels adaptatifs : « Toutes » / « P2.1 » (1 sélectionnée) / « 3 sélectionnées ».
+- Tooltip au survol de chaque case (libellé humain de la règle).
+
+##### Backend
+
+- `DiagnosticsRepository::count_by_applicable_rule()` — nouvelle méthode, scan unique + agrégation PHP (≤ ~1000 rows, négligeable).
+- `DiagnosticsRepository::build_filter_clauses()` — filtre OR via `JSON_SEARCH(matching_rules, 'one', %s, NULL, '$[*].rule_id')`. Précis (P1 ≠ P10), MySQL 5.7+.
+- `DiagnosticsController::parse_filters()` — whitelist `PresetRegistry::PRESETS`, dédoublonnage, rejet silencieux des IDs inconnus.
+- `DiagnosticsController::get_facets()` — expose `applicable_rules` (map rule_id → count, 9 clés toujours présentes même à 0).
+
+#### Pagination numérotée cliquable
+
+- Remplace « page X sur Y » par « 1 2 3 … 14 15 16 » avec boutons WP `variant="primary"` (page courante) / `tertiary` (autres).
+- Algorithme adaptatif `buildPageRange(currentPage, totalPages)` :
+  - `totalPages ≤ 9` → toutes pages.
+  - Sinon : `[1, 2, 3, …, c-1, c, c+1, …, n-2, n-1, n]` avec ellipsis automatique aux gaps > 1.
+- ARIA `aria-current="page"`, `aria-label="Page N"`.
+- Page courante désactivée (clic redondant bloqué + `pointer-events: none`).
+
+#### Refonte `DiffModal` style V0.1
+
+- Titre enrichi : « Diff de l'article #ID — Titre de l'article » (prop `postTitle` remontée depuis les `items` paginés de `Normalize.jsx` — pas de fetch supplémentaire).
+- Colonne **Avant** : fond gris `#f6f7f7`, bordure neutre.
+- Colonne **Après** : fond bleu pâle `#f0f6fc`, bordure bleue `#72aee6`, titre coloré `#135e96`.
+- Suppression de `height: calc(100vh - 220px)` sur le pane Code (max-height: 500px sur les `<pre>`, scroll naturel).
+- Bloc « Avertissements » encadré (fond gris subtil + bordure).
+- Classes BEM `--before` / `--after` pour la sémantique.
+
+#### Refonte `MetricsDiffBar`
+
+- **Phrase « garde-fou »** en tête, verdict immédiat :
+  - vert « ✓ Aucune perte de contenu détectée. »
+  - orange « ⚠ Perte de X % de paragraphes (-N sur M). »
+  - Sélection auto de la pire perte en relatif (|%| max).
+- **Une ligne « Titres »** unique (somme h1+h2+h3+h4+h5+h6) au lieu des 6 lignes individuelles bruyantes.
+- **Masquage** des lignes neutres (`before=0 && after=0` → cachées). Réduit typique de 12 à 6-7 lignes affichées.
+- **Delta enrichi** : `+5 (+12 %)` au lieu de `+5` seul. Précision 1 décimale si |%| < 10, entier sinon. Cas spécial `+N` seul si `before=0` (% sans sens).
+- **Formatage local** des entiers : `4 532` (`Intl.NumberFormat('fr-FR')`).
+- **Tableau encadré** : bordure `--htmln-border-strong`, radius, quadrillage interne (séparateurs verticaux), zébrage `tbody:nth-child(even)` sur `#f0f0f1`, header `#dcdcde` nettement différencié, `width: auto` pour resserrer.
+- **Spécificité bumpée** `.htmln-metrics-diff.htmln-metrics-diff` (0,2,0) — bat les styles WP-components dans les modales.
+
+#### Section actions unifiée — Scanner + Appliquer côte-à-côte
+
+- Wrapper `.htmln-normalize__actions` au-dessus des filtres : panneau gris unique avec deux colonnes (gauche `ScanBar`, droite `ApplyStepBar`).
+- `ApplyStepFooter` renommé `ApplyStepBar` (plus un footer, déplacé en haut).
+- Layout interne : bouton primary + description en colonne verticale dans chaque côté.
+- Responsive : `flex-wrap: wrap` fait basculer la colonne droite sous la gauche sur petit écran.
+
+### Fix critique — BuilderClassifier (`panels_data` fossile)
+
+Bug rapporté sur l'article #19785 du corpus MMM-2 : tagué SiteOrigin alors qu'il est rédigé en Gutenberg pur.
+
+**Diagnostic** : article migré SO → Gut ayant gardé son ancien `panels_data` en post-meta. L'ancien ordre testait `panels_data non-vide → siteorigin` **avant** toute lecture du contenu effectif.
+
+**Impact** : 22 articles du corpus dans le même cas (IDs > 19000, tous post-migration).
+
+**Fix** : `has_blocks( $content )` prime maintenant sur `panels_data` fossile. Nouvel ordre :
+
+1. Override `out` → priorité absolue.
+2. `<!-- wp:siteorigin-panels` dans content → `siteorigin` (SO 2.10+).
+3. Classes `panel-layout` / `so-panel` :
+   - avec `panels_data` → `siteorigin` (SO actif natif) ;
+   - sans → `siteorigin_flat` (migration partielle).
+4. `has_blocks(content)` → `gutenberg`. **Prime sur `panels_data` fossile**.
+5. `panels_data` seul sans marqueur → `siteorigin` (cas dégénéré).
+6. → `other`.
+
+Tests : +4 cas dans `BuilderClassifierTest` pour les scénarios litigieux (fossile, SO + classes, panels_data seul, bloc SO + meta vide).
+
+### Pastille « Gut » orange — signal fossile
+
+- Nouvelle variante visuelle `htmln-builder-badge--gutenberg-fossil` (fond `--htmln-color-warning`).
+- Affichée pour les articles `builder_type = gutenberg` qui conservent un `panels_data` en post-meta.
+- Tooltip explicatif + commande WP-CLI de nettoyage : « `wp post meta delete <ID> panels_data` ».
+- Nouveau champ `has_fossil_panels_data` dans le payload REST `/diagnostics` (computed uniquement pour les rows Gut, ~5 lookups post-meta par page).
+- Tests : +4 `DiagnosticsControllerTest` (Gut+meta, Gut sans meta, SO+meta non flagué, Gut+`panels_data=[]`).
+
+### Renommage UI « pas » → « lot »
+
+Aligne le vocabulaire utilisateur sur le terme « lot » (préféré), tout en gardant « step » côté code (routes REST, table BDD, classes PHP/JS, hooks). Pattern « UI traduite, code stable ».
+
+Périmètre :
+- `README.md` (~9 occurrences : workflow, pipeline, checkbox, historique).
+- JSX strings via `__()` : `History.jsx`, `History/StepsTable.jsx`, `History/StepDetailDrawer.jsx`, `Normalize.jsx` (button label), `Normalize/StepProgressBanner.jsx`, `Normalize/StepResumeBanner.jsx`, `Rules.jsx`.
+- Titre H1 admin : `SpaPage.php` (« Normalisation par lots (V1.0) »).
+
+Inchangés : noms de classes, routes REST `/steps`, table `son100_htmln_steps`, hooks `htmln/step_*`, commandes WP-CLI `wp htmln steps …`, PHPDoc / JSDoc.
+
+### Fix cache navigateur — `filemtime()` sur le `?ver=` du CSS
+
+- L'enqueue CSS utilisait le hash de `admin-spa.asset.php` généré pour le **JS** uniquement. Sur une édition SCSS-only, ce hash ne bougeait pas → cache navigateur servi malgré rebuild.
+- Fix : `filemtime( $css_path )` comme `?ver=`. Timestamp change à chaque rebuild, cache invalidé sûrement. Fallback sur `SON100_HTMLN_VERSION` si filemtime indisponible.
+
+### Statistiques rc4 final
+
+- **635 tests PHPUnit verts** (+21 depuis rc3), **1 433 assertions**.
+- **PHPStan niveau 6** : 22 erreurs baseline préexistantes, aucune nouvelle.
+- **ESLint** : 0 erreur, 0 warning.
+- **Bundle SPA** : 88.2 KiB JS · 22.3 KiB CSS (compilé, hors RTL).
+
+---
+
+### Portage initial rc4 (matin du 12 mai)
+
 **Portage dans la SPA des fonctionnalités V0.1 perdues** — recherche (titre/ID), filtres catégorie / année / mois / constructeur, pastille constructeur dans le tableau. Cible : parité fonctionnelle entre la SPA et la page V0.1 « Normaliser » avant de retirer cette dernière en V1.1.
 
 ### Ajouts backend
