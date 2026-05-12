@@ -3,7 +3,7 @@
  * Plugin Name:       100son HTML Normalizer
  * Plugin URI:        https://100son.net/plugins/100son-html-normalizer
  * Description:       Moteur de normalisation HTML configurable pour WordPress — 8 présets + règles custom + API publique htmln/normalize.
- * Version:           1.0.0-rc3
+ * Version:           1.0.0-rc4
  * Requires at least: 6.8
  * Requires PHP:      8.3
  * Author:            Cyrille / 100son.net
@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
  * Constantes du plugin (cf. cahier §9 — toutes obligatoires).
  * ---------------------------------------------------------------------- */
 
-define( 'SON100_HTMLN_VERSION', '1.0.0-rc3' );
+define( 'SON100_HTMLN_VERSION', '1.0.0-rc4' );
 define( 'SON100_HTMLN_FILE',    __FILE__ );
 define( 'SON100_HTMLN_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'SON100_HTMLN_URL',     plugin_dir_url( __FILE__ ) );

@@ -19,6 +19,7 @@
 
 import { __, sprintf } from '@wordpress/i18n';
 import { Spinner, Button } from '@wordpress/components';
+import BuilderBadge from './BuilderBadge';
 
 /**
  * Calcule le total des occurrences à partir des règles applicables.
@@ -179,7 +180,20 @@ export default function ArticlesTable( {
 							{ __( 'ID', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
+							{ __( 'Titre', '100son-html-normalizer' ) }
+						</th>
+						<th scope="col" className="manage-column">
 							{ __( 'Statut', '100son-html-normalizer' ) }
+						</th>
+						<th
+							scope="col"
+							className="manage-column htmln-articles-table__col-builder"
+							title={ __(
+								'Constructeur',
+								'100son-html-normalizer'
+							) }
+						>
+							{ __( 'Constr.', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
 							{ __(
@@ -231,8 +245,19 @@ export default function ArticlesTable( {
 								/>
 							</th>
 							<td>{ item.post_id }</td>
+							<td className="htmln-articles-table__title">
+								{ item.post_title
+									? String( item.post_title )
+									: __(
+											'(sans titre)',
+											'100son-html-normalizer'
+									  ) }
+							</td>
 							<td>
 								<StatusBadge item={ item } />
+							</td>
+							<td className="htmln-articles-table__col-builder">
+								<BuilderBadge type={ item.builder_type } />
 							</td>
 							<td>{ formatRuleIds( item.matching_rules ) }</td>
 							<td>{ sumViolations( item.matching_rules ) }</td>

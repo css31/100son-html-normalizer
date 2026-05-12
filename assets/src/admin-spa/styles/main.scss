@@ -264,6 +264,116 @@
 }
 
 /* =============================================================================
+ *  Vue Normaliser — barre de filtres (post-rc3, sous ScanBar)
+ *
+ *  Recherche + 4 dropdowns (catégorie / année / mois / constructeur) +
+ *  bouton Effacer. Layout en flex row qui wrap aux écrans étroits.
+ * ========================================================================== */
+
+.htmln-filters-bar {
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+}
+
+.htmln-filters-bar__row {
+	display: flex;
+	align-items: flex-end;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+.htmln-filters-bar__field {
+	flex: 0 0 auto;
+	min-width: 140px;
+
+	/* Le label est rendu au-dessus par les composants WP — on compacte */
+	.components-base-control__label {
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var( --htmln-text-muted );
+		margin-bottom: 4px;
+	}
+}
+
+.htmln-filters-bar__field--search {
+	flex: 1 1 220px;
+	min-width: 200px;
+}
+
+.htmln-filters-bar__actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-left: auto;
+
+	/* Aligner avec les inputs : les inputs WP ont label au-dessus,
+	 * donc on pousse les boutons vers le bas pour aligner sur le input. */
+	margin-top: 18px;
+}
+
+/* =============================================================================
+ *  Pastille constructeur (BuilderBadge — V1.0 alignée sur la pastille V0.1)
+ * ========================================================================== */
+
+.htmln-builder-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: var( --htmln-radius );
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.4;
+	white-space: nowrap;
+
+	&--siteorigin {
+		background: var( --htmln-color-danger );
+		color: #fff;
+	}
+
+	&--siteorigin-flat {
+		background: var( --htmln-color-warning );
+		color: #fff;
+	}
+
+	&--gutenberg {
+		background: var( --htmln-color-success );
+		color: #fff;
+	}
+
+	&--other {
+		background: #f0b849;
+		color: var( --htmln-text );
+	}
+
+	&--out {
+		background: var( --htmln-color-muted );
+		color: #fff;
+	}
+
+	&--unknown {
+		background: transparent;
+		color: var( --htmln-text-faint );
+		font-weight: 400;
+		font-style: italic;
+	}
+}
+
+.htmln-articles-table__col-builder {
+	width: 60px;
+	text-align: center;
+}
+
+.htmln-articles-table__title {
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* =============================================================================
  *  Vue Normaliser — footer (post-rc1, remplace la sidebar)
  * ========================================================================== */
 

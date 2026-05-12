@@ -3,6 +3,99 @@
 Toutes les modifications notables de cette extension sont consignées ici.
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionning [SemVer](https://semver.org/lang/fr/).
 
+## [1.0.0-rc4] — 2026-05-12
+
+**Portage dans la SPA des fonctionnalités V0.1 perdues** — recherche (titre/ID), filtres catégorie / année / mois / constructeur, pastille constructeur dans le tableau. Cible : parité fonctionnelle entre la SPA et la page V0.1 « Normaliser » avant de retirer cette dernière en V1.1.
+
+### Ajouts backend
+
+#### Service `Core\Posts\BuilderClassifier`
+
+- Classification 5 types : `siteorigin`, `siteorigin_flat`, `gutenberg`, `other`, `out`.
+- Réplique fidèle de la logique V0.1 `PostsPage::classify_builder`, déplacée dans un service stateless pour devenir la source unique de vérité, partagée par la SPA REST et la page V0.1 (déjà en place côté V0.1 — non refactoré).
+- Ordre de précédence : override manuel → `panels_data` meta → bloc `<!-- wp:siteorigin-panels` → classes `panel-layout` / `so-panel` → `<!-- wp:` → fallback `other`.
+- Respect du toggle V0.1 `_son100_htmln_builder_override = 'out'` (priorité absolue).
+
+#### Schema 2.0.0 → 2.1.0
+
+- Ajout colonne `builder_type VARCHAR(20) NULL` + KEY sur `son100_htmln_diagnostics`. `dbDelta` idempotent — colonne ajoutée à NULL sur instances existantes, remplie au prochain scan.
+- `DiagnosticRecord` enrichi d'un champ `builder_type` nullable (rétro-compat avec rows pré-2.1.0).
+- `DiagnosticEngine` accepte un `BuilderClassifier` (3e arg constructeur, nullable pour backward-compat) et injecte `builder_type` dans le record lors de `diagnose()`.
+
+#### REST extensions sur `GET /diagnostics`
+
+Nouveaux paramètres query (post-rc3) :
+- `search` : numérique → `post_id` exact ; sinon JOIN `wp_posts` + `post_title LIKE` (alignement V0.1 : titre uniquement, pas content/excerpt).
+- `cat` : ID de catégorie WP (JOIN `wp_term_relationships` + `wp_term_taxonomy` sur `taxonomy = 'category'`).
+- `year` / `month` : `YEAR(post_date)` / `MONTH(post_date)`.
+- `builder` : `siteorigin` (couvre flat) / `gutenberg` / `other` / `out`.
+
+Payload enrichi : `post_title`, `post_date`, `builder_type` ajoutés à chaque item. Cache pré-chargé via `_prime_post_caches()` pour éviter N+1.
+
+#### Nouveau `GET /diagnostics/facets`
+
+Retourne les données des dropdowns SPA :
+- `years` : list<int> DESC.
+- `categories` : list<{id, name, count}>.
+- `builders` : map<string, int> (count par type, regroupés 4 valeurs UI).
+
+#### Implémentation `DiagnosticsRepository`
+
+- `list_paginated()` et `count_paginated()` étendus avec un 4e param `$filters` (signature backward-compat).
+- Nouveau helper privé `build_filter_clauses()` partagé entre list et count — évite drift de filtre (jamais de count qui diffère de la list).
+- SQL préfixé `d.` (alias systématique de la table diagnostics) pour cohabiter proprement avec les JOINs.
+- Nouvelles méthodes `list_distinct_years()` et `count_by_builder()` pour les facets.
+
+### Ajouts frontend
+
+#### Nouveau composant `FiltersBar`
+
+- 5 contrôles : `TextControl` recherche + 4 `SelectControl` (catégorie / année / mois / constructeur).
+- Search **debouncé à 250 ms** — sans debounce, taper « Hello » lancerait 5 requêtes REST.
+- Bouton « Effacer » qui reset tous les filtres en un clic.
+- Disabled state sur le dropdown Mois tant qu'aucune année n'est sélectionnée (le filtre month sans year n'a pas de sens).
+- Compteurs intégrés dans les labels : `Catégorie (12)`, `SiteOrigin (450)`, etc.
+- Positionnée entre `ScanBar` (action ponctuelle) et `TabsHeader` (onglets internes) — arbitrage UX du 2026-05-12.
+
+#### Nouveau composant `BuilderBadge`
+
+- Pastille colorée 5 variantes alignée sur la V0.1 :
+  - `SO` rouge — SiteOrigin natif (panels_data ou bloc)
+  - `SO~` orange — SiteOrigin aplati (HTML figé, normalisation à risque)
+  - `Gut` vert — Gutenberg
+  - `?` jaune — Constructeur inconnu (HTML libre)
+  - `Out` gris — Hors périmètre (override manuel)
+- Fallback `—` discret pour rows pré-2.1.0 sans `builder_type` calculé (rescan pour catégoriser).
+- Tooltip explicite sur chaque pastille.
+
+#### Tableau enrichi
+
+- Nouvelle colonne **Titre** entre ID et Statut (max-width avec ellipsis pour éviter le débordement sur titres longs).
+- Nouvelle colonne **Constr.** entre Statut et Règles applicables, avec `<BuilderBadge>`.
+
+#### Hooks
+
+- `useDiagnosticsFacets()` : fetch unique au mount + `refetch()` exposée (déclenchée par `handleScanComplete`).
+- `useDiagnosticsList()` accepte désormais un 4e param `filters` ; sérialisation stable via `JSON.stringify` pour éviter la boucle infinie de re-fetch sur recréation d'objet parent.
+
+### Tests + lint
+
+- 13 nouveaux tests `BuilderClassifierTest` (5 types, override out prioritaire, mixte SO+Gutenberg → SO, ALL_TYPES consistency, etc.).
+- Stubs bootstrap : `get_post_field` + `has_blocks` ajoutés.
+- Tests existants mis à jour pour signature filtres et alias SQL `d.` :
+  - `ActivatorTest` : DB_VERSION 2.0.0 → 2.1.0
+  - `DiagnosticsRepositoryTest` : assertions SQL avec `d.` préfix
+  - `DiagnosticsControllerTest` : signature stubs list/count_paginated, endpoint count 6 → 7, nouveaux stubs years/builders
+
+### Stats
+
+- **PHPUnit** : 602 → 614 tests verts (+12), 1354 → 1370 assertions
+- **Bundle SPA** : 71.0 → 78.7 KiB JS (+7.7 KiB pour FiltersBar + BuilderBadge + hook), CSS 14.7 → 15.5 KiB
+- **Lint JS** : 0 erreur, 0 warning
+- **PHPStan** : niveau 6, 22 erreurs (inchangé, aucune nouvelle)
+
+---
+
 ## [1.0.0-rc3] — 2026-05-12
 
 Ajout du **préréglage P9 — `UnwrapHeadingImage`** + bouton **« Scanner le corpus »** dans l'onglet Normaliser de la SPA.

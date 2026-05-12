@@ -43,12 +43,14 @@ import { Button } from '@wordpress/components';
 import TabsHeader from './Normalize/TabsHeader';
 import ArticlesTable from './Normalize/ArticlesTable';
 import ScanBar from './Normalize/ScanBar';
+import FiltersBar from './Normalize/FiltersBar';
 import StepProgressBanner from './Normalize/StepProgressBanner';
 import StepResumeBanner from './Normalize/StepResumeBanner';
 import DiffModal from './Normalize/DiffModal';
 import RegressionModal from './Normalize/RegressionModal';
 import { useDiagnosticsStats } from '../hooks/useDiagnosticsStats';
 import { useDiagnosticsList } from '../hooks/useDiagnosticsList';
+import { useDiagnosticsFacets } from '../hooks/useDiagnosticsFacets';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useScanBatch } from '../hooks/useScanBatch';
 import { useBeforeunload } from '../hooks/useBeforeunload';
@@ -68,6 +70,9 @@ export default function Normalize() {
 	const [ currentTab, setCurrentTab ] = useState( DEFAULT_TAB );
 	const [ currentPage, setCurrentPage ] = useState( 1 );
 	const [ selectedPostIds, setSelectedPostIds ] = useState( () => new Set() );
+	// Filtres post-rc3 (recherche + cat/year/month/builder). Conservés
+	// quand on bascule entre onglets internes (filtre croisé avec status).
+	const [ filters, setFilters ] = useState( {} );
 
 	// Sélection des règles : lue depuis le store (alimentée par l'onglet Règles).
 	const selectedRules = useSelect(
@@ -83,13 +88,19 @@ export default function Normalize() {
 	} = useDiagnosticsStats();
 
 	const {
+		facets,
+		isLoading: isFacetsLoading,
+		refetch: refetchFacets,
+	} = useDiagnosticsFacets();
+
+	const {
 		items,
 		total,
 		totalPages,
 		isLoading: isListLoading,
 		error: listError,
 		refetch: refetchList,
-	} = useDiagnosticsList( currentTab, currentPage, PER_PAGE );
+	} = useDiagnosticsList( currentTab, currentPage, PER_PAGE, filters );
 
 	// Callback partagé : après un pas, on doit re-récupérer compteurs + liste
 	// car les statuts ont pu changer (to_improve → normal sur les articles
@@ -111,14 +122,21 @@ export default function Normalize() {
 	} = useStepRunner( handleStepFinalized );
 
 	// Scan diagnostic : recompose la table `son100_htmln_diagnostics` pour
-	// tous les articles publiés. À la fin, on rafraîchit stats + liste —
-	// même callback que pour un pas car ce sont les mêmes données qui ont
-	// pu changer (status par article, matching_rules après activation de
-	// nouvelles règles, métriques après modif de seuils, etc.).
+	// tous les articles publiés. À la fin, on rafraîchit stats + liste +
+	// facets (les builders/années/categories peuvent évoluer si le scan a
+	// touché de nouveaux articles).
 	const handleScanComplete = useCallback( () => {
 		refetchStats();
 		refetchList();
-	}, [ refetchStats, refetchList ] );
+		refetchFacets();
+	}, [ refetchStats, refetchList, refetchFacets ] );
+
+	const handleFiltersChange = useCallback( ( nextFilters ) => {
+		setFilters( nextFilters );
+		// Tout changement de filtre remet à la page 1 — sinon on peut se
+		// retrouver hors plage si la nouvelle liste est plus courte.
+		setCurrentPage( 1 );
+	}, [] );
 
 	const {
 		isScanning,
@@ -213,6 +231,13 @@ export default function Normalize() {
 				disabled={ isRunning }
 				onScan={ startScan }
 				onDismissError={ dismissScanError }
+			/>
+
+			<FiltersBar
+				value={ filters }
+				onChange={ handleFiltersChange }
+				facets={ facets }
+				isLoading={ isFacetsLoading }
 			/>
 
 			<TabsHeader

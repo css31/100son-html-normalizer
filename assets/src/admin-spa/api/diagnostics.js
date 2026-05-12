@@ -9,12 +9,30 @@
 import { get, post, del } from './client';
 
 /**
- * `GET /diagnostics?status&page&per_page` — liste paginée filtrable.
+ * `GET /diagnostics?status&page&per_page&search&cat&year&month&builder` —
+ * liste paginée filtrable (post-rc3 : ajout search + cat/year/month/builder).
  *
- * @param {{status?: 'normal'|'to_improve'|'stale', page?: number, per_page?: number, post_type?: string[], search?: string}} [params] Paramètres de requête.
+ * @param {{
+ *   status?: 'normal'|'to_improve'|'stale',
+ *   page?: number,
+ *   per_page?: number,
+ *   search?: string,
+ *   cat?: number,
+ *   year?: number,
+ *   month?: number,
+ *   builder?: 'siteorigin'|'gutenberg'|'other'|'out',
+ * }} [params] Paramètres de requête.
  * @return {Promise<{items: Array, total: number, page: number, per_page: number, total_pages: number}>} Enveloppe paginée.
  */
 export const list = ( params = {} ) => get( '/diagnostics', params );
+
+/**
+ * `GET /diagnostics/facets` — données pour populer les dropdowns des
+ * filtres SPA (post-rc3).
+ *
+ * @return {Promise<{years: number[], categories: Array<{id: number, name: string, count: number}>, builders: Object<string, number>}>} Facets.
+ */
+export const facets = () => get( '/diagnostics/facets' );
 
 /**
  * `GET /diagnostics/<post_id>` — détail.
