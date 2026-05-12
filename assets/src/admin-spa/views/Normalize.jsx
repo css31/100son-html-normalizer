@@ -42,6 +42,7 @@ import { useSelect } from '@wordpress/data';
 import { Button } from '@wordpress/components';
 import TabsHeader from './Normalize/TabsHeader';
 import ArticlesTable from './Normalize/ArticlesTable';
+import ScanBar from './Normalize/ScanBar';
 import StepProgressBanner from './Normalize/StepProgressBanner';
 import StepResumeBanner from './Normalize/StepResumeBanner';
 import DiffModal from './Normalize/DiffModal';
@@ -49,6 +50,7 @@ import RegressionModal from './Normalize/RegressionModal';
 import { useDiagnosticsStats } from '../hooks/useDiagnosticsStats';
 import { useDiagnosticsList } from '../hooks/useDiagnosticsList';
 import { useStepRunner } from '../hooks/useStepRunner';
+import { useScanBatch } from '../hooks/useScanBatch';
 import { useBeforeunload } from '../hooks/useBeforeunload';
 import { STORE_NAME, ALL_RULE_IDS } from '../store';
 
@@ -107,6 +109,24 @@ export default function Normalize() {
 		confirmDecision,
 		abandonStep,
 	} = useStepRunner( handleStepFinalized );
+
+	// Scan diagnostic : recompose la table `son100_htmln_diagnostics` pour
+	// tous les articles publiés. À la fin, on rafraîchit stats + liste —
+	// même callback que pour un pas car ce sont les mêmes données qui ont
+	// pu changer (status par article, matching_rules après activation de
+	// nouvelles règles, métriques après modif de seuils, etc.).
+	const handleScanComplete = useCallback( () => {
+		refetchStats();
+		refetchList();
+	}, [ refetchStats, refetchList ] );
+
+	const {
+		isScanning,
+		progress: scanProgress,
+		error: scanError,
+		startScan,
+		reset: dismissScanError,
+	} = useScanBatch( handleScanComplete );
 
 	// Article ouvert dans DiffModal pour preview à la volée
 	// (bouton « Voir le diff » d'une ligne du tableau).
@@ -186,6 +206,15 @@ export default function Normalize() {
 
 	return (
 		<div className="htmln-spa-root htmln-normalize">
+			<ScanBar
+				isScanning={ isScanning }
+				progress={ scanProgress }
+				error={ scanError }
+				disabled={ isRunning }
+				onScan={ startScan }
+				onDismissError={ dismissScanError }
+			/>
+
 			<TabsHeader
 				stats={ stats }
 				isLoading={ isStatsLoading }

@@ -56,8 +56,7 @@ docker exec -u www-data devkinsta_fpm php8.3 /usr/local/bin/wp \
 # devkinsta_fpm — il ne voit pas le chemin hôte `/home/cyrille/…`.
 cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
 
-wp-sandbox db export \
-  /www/kinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer/sauvegardes/htmln-recette-$(date +%Y%m%d-%H%M).sql
+wp-sandbox db export /www/kinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer/sauvegardes/htmln-recette-$(date +%Y%m%d-%H%M).sql
 
 ls -lh sauvegardes/htmln-recette-*.sql | tail -1
 

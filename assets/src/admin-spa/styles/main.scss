@@ -205,6 +205,65 @@
 }
 
 /* =============================================================================
+ *  Vue Normaliser — barre de scan (au-dessus de TabsHeader)
+ *
+ *  Boutton `Scanner le corpus` + progression pendant un scan. Visuellement
+ *  séparée de TabsHeader par un margin pour ne pas se confondre avec les
+ *  compteurs d'onglets en dessous.
+ * ========================================================================== */
+
+.htmln-scan-bar {
+	margin: 0 0 16px;
+	padding: 12px 16px;
+	background: var( --htmln-bg-subtle );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+}
+
+.htmln-scan-bar__main {
+	display: flex;
+	align-items: center;
+	gap: var( --htmln-gap );
+	flex-wrap: wrap;
+}
+
+.htmln-scan-bar__status {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex: 1 1 240px;
+	min-width: 200px;
+}
+
+.htmln-scan-bar__count {
+	font-variant-numeric: tabular-nums;
+	color: var( --htmln-text-muted );
+	white-space: nowrap;
+}
+
+.htmln-scan-bar__progress {
+	flex: 1 1 auto;
+	height: 8px;
+	background: var( --htmln-border );
+	border-radius: 999px;
+	overflow: hidden;
+	min-width: 120px;
+}
+
+.htmln-scan-bar__progress-fill {
+	height: 100%;
+	background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	transition: width 0.25s ease;
+}
+
+.htmln-scan-bar__hint {
+	margin: 0;
+	color: var( --htmln-text-muted );
+	font-size: 12px;
+	flex: 1 1 200px;
+}
+
+/* =============================================================================
  *  Vue Normaliser — footer (post-rc1, remplace la sidebar)
  * ========================================================================== */
 
