@@ -8,17 +8,22 @@
  *             dédié. La sélection des règles est désormais dans le store
  *             `htmln/spa.selectedRules` (partagée entre onglets).
  *
- * Layout post-rc1 :
+ * Layout post-rc4 :
  *
  *   ┌──────────────────────────────────────────────────┐
+ *   │ ScanBar       [ Scanner… ]   hint                │
+ *   │ ApplyStepBar  [ Appliquer ce lot à K articles ]  │
+ *   │               N/9 règles sélectionnées — P1, …   │
+ *   │ FiltersBar    (search, cat, year, …, rules)      │
  *   │ TabsHeader                                       │
- *   │ StepResumeBanner (si pas non-finalisé en BDD)    │
- *   │ StepProgressBanner (pendant un pas)              │
+ *   │ StepResumeBanner (si lot non-finalisé en BDD)    │
+ *   │ StepProgressBanner (pendant un lot)              │
  *   │ ArticlesTable (avec checkboxes, plein largeur)   │
- *   │ ─────────────────────────────────────────────    │
- *   │ Récap : N règles sélectionnées (→ Règles)        │
- *   │ [ Appliquer ce pas à K articles ]                │
  *   └──────────────────────────────────────────────────┘
+ *
+ * Post-rc4 : `ApplyStepBar` (anciennement `ApplyStepFooter`) déplacé
+ * sous `ScanBar` pour regrouper les deux actions principales (scan
+ * du corpus + application des règles) dans une même zone haute.
  *
  * État local :
  *  - `currentTab`     — onglet actif (F13).
@@ -173,6 +178,18 @@ export default function Normalize() {
 		setDiffPostId( null );
 	}, [] );
 
+	// Retrouve le titre de l'article ouvert dans le diff (il est dans la
+	// page courante des items — la modale ne peut être ouverte que
+	// depuis une ligne visible). Fallback chaîne vide si introuvable.
+	const diffPostTitle =
+		null !== diffPostId
+			? String(
+					items.find(
+						( it ) => Number( it.post_id ) === Number( diffPostId )
+					)?.post_title ?? ''
+			  )
+			: '';
+
 	// Verrou onglet pendant un pas (cf. cahier §13 — beforeunload natif).
 	useBeforeunload( isRunning );
 
@@ -239,21 +256,30 @@ export default function Normalize() {
 
 	return (
 		<div className="htmln-spa-root htmln-normalize">
-			<ScanBar
-				isScanning={ isScanning }
-				progress={ scanProgress }
-				error={ scanError }
-				disabled={ isRunning }
-				selectedPostCount={ selectedPostIds.size }
-				onScan={ () =>
-					startScan(
-						selectedPostIds.size > 0
-							? Array.from( selectedPostIds )
-							: null
-					)
-				}
-				onDismissError={ dismissScanError }
-			/>
+			<div className="htmln-normalize__actions">
+				<ScanBar
+					isScanning={ isScanning }
+					progress={ scanProgress }
+					error={ scanError }
+					disabled={ isRunning }
+					selectedPostCount={ selectedPostIds.size }
+					onScan={ () =>
+						startScan(
+							selectedPostIds.size > 0
+								? Array.from( selectedPostIds )
+								: null
+						)
+					}
+					onDismissError={ dismissScanError }
+				/>
+
+				<ApplyStepBar
+					selectedRules={ selectedRules }
+					selectedPostCount={ selectedPostIds.size }
+					disabled={ isRunning }
+					onApplyStep={ handleApplyStep }
+				/>
+			</div>
 
 			<FiltersBar
 				value={ filters }
@@ -308,17 +334,11 @@ export default function Normalize() {
 				onViewDiff={ handleViewDiff }
 			/>
 
-			<ApplyStepFooter
-				selectedRules={ selectedRules }
-				selectedPostCount={ selectedPostIds.size }
-				disabled={ isRunning }
-				onApplyStep={ handleApplyStep }
-			/>
-
 			{ /* DiffModal — preview à la volée depuis le tableau (bouton ligne). */ }
 			{ null !== diffPostId && (
 				<DiffModal
 					postId={ diffPostId }
+					postTitle={ diffPostTitle }
 					ruleIds={ selectedRules }
 					onClose={ handleCloseDiff }
 				/>
@@ -337,20 +357,22 @@ export default function Normalize() {
 }
 
 /**
- * Bandeau récap + bouton « Appliquer ce pas » sous le tableau.
+ * Bandeau récap des règles + bouton « Appliquer ce lot » en zone haute,
+ * juste sous `ScanBar` (post-rc4 : déplacé depuis le footer pour
+ * regrouper les deux actions principales — scan et application — dans
+ * une même section visuelle).
  *
- * Remplace la sidebar latérale post-rc1 : la sélection des règles est
- * gérée depuis l'onglet Règles, on n'a plus qu'à rappeler l'état courant
- * et à offrir le déclencheur du pas.
+ * La sélection des règles est gérée depuis l'onglet Règles ; ce bandeau
+ * sert à rappeler l'état courant + déclencher le lot.
  *
  * @param {Object}     props
  * @param {string[]}   props.selectedRules     Règles cochées (store).
  * @param {number}     props.selectedPostCount Articles cochés dans le tableau.
- * @param {boolean}    props.disabled          Pas en cours.
- * @param {() => void} props.onApplyStep       Déclenche le pas.
- * @return {JSX.Element} Bloc footer.
+ * @param {boolean}    props.disabled          Lot en cours.
+ * @param {() => void} props.onApplyStep       Déclenche le lot.
+ * @return {JSX.Element} Bloc actions « apply ».
  */
-function ApplyStepFooter( {
+function ApplyStepBar( {
 	selectedRules,
 	selectedPostCount,
 	disabled,
@@ -366,8 +388,24 @@ function ApplyStepFooter( {
 	}, [] );
 
 	return (
-		<div className="htmln-normalize__footer">
-			<div className="htmln-normalize__footer-recap">
+		<div className="htmln-normalize__apply-bar">
+			<div className="htmln-normalize__apply-bar-action">
+				<Button
+					variant="primary"
+					onClick={ onApplyStep }
+					disabled={ ! canApply }
+				>
+					{ sprintf(
+						// translators: %d = nombre d'articles cochés.
+						__(
+							'Appliquer ce lot à %d article(s)',
+							'100son-html-normalizer'
+						),
+						selectedPostCount
+					) }
+				</Button>
+			</div>
+			<div className="htmln-normalize__apply-bar-recap">
 				<strong>
 					{ sprintf(
 						// translators: 1 = règles sélectionnées, 2 = total.
@@ -382,7 +420,7 @@ function ApplyStepFooter( {
 				{ ruleCount > 0 && (
 					<>
 						{ ' — ' }
-						<span className="htmln-normalize__footer-rules">
+						<span className="htmln-normalize__apply-bar-rules">
 							{ formatRuleIdList( selectedRules ) }
 						</span>
 					</>
@@ -392,22 +430,6 @@ function ApplyStepFooter( {
 					{ __( 'modifier dans Règles', '100son-html-normalizer' ) }
 				</a>
 				{ ')' }
-			</div>
-			<div className="htmln-normalize__footer-action">
-				<Button
-					variant="primary"
-					onClick={ onApplyStep }
-					disabled={ ! canApply }
-				>
-					{ sprintf(
-						// translators: %d = nombre d'articles cochés.
-						__(
-							'Appliquer ce pas à %d article(s)',
-							'100son-html-normalizer'
-						),
-						selectedPostCount
-					) }
-				</Button>
 			</div>
 		</div>
 	);

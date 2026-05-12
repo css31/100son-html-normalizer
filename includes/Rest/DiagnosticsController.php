@@ -14,6 +14,7 @@ namespace Cent_Son\Html_Normalizer\Rest;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
+use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticBatchRunner;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticRecord;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
@@ -147,6 +148,9 @@ final class DiagnosticsController extends BaseController {
 	 *  - `year` (int > 0)   : année (sur `wp_posts.post_date`).
 	 *  - `month` (int 1-12) : mois (combiné avec year).
 	 *  - `builder` (string) : `siteorigin` (couvre flat) | `gutenberg` | `other` | `out`.
+	 *  - `rule_ids[]` (list<string>) : IDs internes (`P1`…`P9`), filtre OR
+	 *                                   sur les règles applicables (au moins
+	 *                                   une match dans le JSON `matching_rules`).
 	 *
 	 * Réponse 200 : `{ items, total, page, per_page, total_pages }`.
 	 * Réponse 400 si `status` est fourni mais hors whitelist.
@@ -223,9 +227,13 @@ final class DiagnosticsController extends BaseController {
 	 *    réel du diagnostic.
 	 *  - `builders` : map<string, int>, count par type (siteorigin / gutenberg
 	 *    / other / out / unknown).
+	 *  - `applicable_rules` : map<string, int>, count d'articles par règle
+	 *    applicable. Clés : 9 préréglages `PresetRegistry::PRESETS`. Tout
+	 *    rule_id est présent même à 0 (UX stable côté SPA).
 	 *
 	 * Pas paginé — les volumes sont faibles (catégories : <100 typique,
-	 * années : <30, builders : 5). Cache HTTP côté WP-REST suffit.
+	 * années : <30, builders : 5, applicable_rules : 9). Cache HTTP côté
+	 * WP-REST suffit.
 	 *
 	 * @param WP_REST_Request $request Requête (inutilisée).
 	 * @return WP_REST_Response
@@ -233,14 +241,16 @@ final class DiagnosticsController extends BaseController {
 	public function get_facets( WP_REST_Request $request ): WP_REST_Response {
 		unset( $request );
 
-		$years     = $this->repo->list_distinct_years();
-		$builders  = $this->repo->count_by_builder();
-		$categories = $this->fetch_categories_with_counts();
+		$years            = $this->repo->list_distinct_years();
+		$builders         = $this->repo->count_by_builder();
+		$categories       = $this->fetch_categories_with_counts();
+		$applicable_rules = $this->repo->count_by_applicable_rule();
 
 		return $this->respond( array(
-			'years'      => $years,
-			'categories' => $categories,
-			'builders'   => $builders,
+			'years'            => $years,
+			'categories'       => $categories,
+			'builders'         => $builders,
+			'applicable_rules' => $applicable_rules,
 		) );
 	}
 
@@ -398,17 +408,20 @@ final class DiagnosticsController extends BaseController {
 	}
 
 	/**
-	 * Parse les 5 filtres optionnels de `GET /diagnostics` (post-rc3).
+	 * Parse les 6 filtres optionnels de `GET /diagnostics` (post-rc4).
 	 *
 	 * Sanitization stricte par clé :
-	 *  - `search`  : trim + sanitize_text_field ; refuse les chaînes vides.
-	 *  - `cat`     : absint ; ignoré si ≤ 0.
-	 *  - `year`    : absint ; ignoré si ≤ 0 (et si > 2200 — sécurité bidon).
-	 *  - `month`   : absint ; ignoré si hors [1,12].
-	 *  - `builder` : sanitize_key ; whitelist 4 valeurs (post-arbitrage UX).
+	 *  - `search`     : trim + sanitize_text_field ; refuse les chaînes vides.
+	 *  - `cat`        : absint ; ignoré si ≤ 0.
+	 *  - `year`       : absint ; ignoré si ≤ 0 (et si > 2200 — sécurité bidon).
+	 *  - `month`      : absint ; ignoré si hors [1,12].
+	 *  - `builder`    : sanitize_key ; whitelist 4 valeurs (post-arbitrage UX).
+	 *  - `rule_ids[]` : tableau de strings, whitelist `PresetRegistry::PRESETS`
+	 *                   (9 préréglages), dédoublonné. Tout ID inconnu est
+	 *                   silencieusement ignoré.
 	 *
 	 * @param WP_REST_Request $request Requête.
-	 * @return array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string}
+	 * @return array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string, rule_ids?: list<string>}
 	 */
 	private function parse_filters( WP_REST_Request $request ): array {
 		$filters = array();
@@ -450,6 +463,26 @@ final class DiagnosticsController extends BaseController {
 			$builder = sanitize_key( (string) $builder_raw );
 			if ( in_array( $builder, array( 'siteorigin', 'gutenberg', 'other', 'out' ), true ) ) {
 				$filters['builder'] = $builder;
+			}
+		}
+
+		// rule_ids[] : accepte un array de strings, whitelist `PresetRegistry::PRESETS`.
+		// WP-REST parse `?rule_ids[]=P1&rule_ids[]=P5` en array natif PHP.
+		$rule_ids_raw = $request->get_param( 'rule_ids' );
+		if ( is_array( $rule_ids_raw ) ) {
+			$allowed  = PresetRegistry::PRESETS;
+			$filtered = array();
+			foreach ( $rule_ids_raw as $raw ) {
+				if ( ! is_scalar( $raw ) ) {
+					continue;
+				}
+				$rid = sanitize_text_field( (string) $raw );
+				if ( in_array( $rid, $allowed, true ) && ! in_array( $rid, $filtered, true ) ) {
+					$filtered[] = $rid;
+				}
+			}
+			if ( array() !== $filtered ) {
+				$filters['rule_ids'] = $filtered;
 			}
 		}
 
@@ -553,6 +586,30 @@ final class DiagnosticsController extends BaseController {
 			$builder_type = $this->classifier->classify( $record->post_id );
 		}
 
+		// Signal « fossile SiteOrigin » (rc4) : un article classé Gutenberg
+		// peut conserver un ancien `panels_data` en post-meta — vestige
+		// d'une migration sans nettoyage. Inerte au front (le rendu utilise
+		// `post_content`) mais utile à signaler à l'admin pour :
+		//   - décider d'un nettoyage manuel (`delete_post_meta`) ;
+		//   - se souvenir que l'article a un passé SO si une régression
+		//     éditoriale apparaît à la normalisation.
+		// On ne calcule que pour les rows Gutenberg — pour les SO, la
+		// présence de `panels_data` est attendue et n'a aucun caractère
+		// fossile. Coût : 1 post-meta read par row Gut (post cache déjà
+		// primé). Pour 50 articles/page dont ~10 % de Gut, ≈ 5 lookups.
+		$has_fossil_panels_data = false;
+		if (
+			BuilderClassifier::TYPE_GUTENBERG === $builder_type
+			&& function_exists( 'get_post_meta' )
+		) {
+			$panels = get_post_meta( $record->post_id, 'panels_data', true );
+			if ( null !== $panels && false !== $panels && '' !== $panels ) {
+				$has_fossil_panels_data = is_array( $panels )
+					? ! empty( $panels )
+					: true;
+			}
+		}
+
 		return array(
 			'id'                          => $record->id,
 			'post_id'                     => $record->post_id,
@@ -562,6 +619,7 @@ final class DiagnosticsController extends BaseController {
 			'edit_url'                    => $edit_url,
 			'status'                      => $record->status,
 			'builder_type'                => $builder_type,
+			'has_fossil_panels_data'      => $has_fossil_panels_data,
 			'matching_rules'              => $record->matching_rules,
 			'metrics'                     => $record->metrics,
 			'is_stale'                    => $record->is_stale,

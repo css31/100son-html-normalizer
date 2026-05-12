@@ -16,9 +16,10 @@ import * as api from '../api';
 
 /**
  * @typedef {Object} Facets
- * @property {number[]}                                         years      Années disponibles (DESC).
- * @property {Array<{id: number, name: string, count: number}>} categories Catégories WP avec count.
- * @property {Object<string, number>}                           builders   Map type → count.
+ * @property {number[]}                                         years            Années disponibles (DESC).
+ * @property {Array<{id: number, name: string, count: number}>} categories       Catégories WP avec count.
+ * @property {Object<string, number>}                           builders         Map type → count.
+ * @property {Object<string, number>}                           applicable_rules Map rule_id → count d'articles concernés.
  */
 
 /**
@@ -33,6 +34,7 @@ const EMPTY = Object.freeze( {
 	years: [],
 	categories: [],
 	builders: {},
+	applicable_rules: {},
 } );
 
 /**
@@ -59,6 +61,11 @@ export function useDiagnosticsFacets() {
 				builders:
 					result.builders && typeof result.builders === 'object'
 						? result.builders
+						: {},
+				applicable_rules:
+					result.applicable_rules &&
+					typeof result.applicable_rules === 'object'
+						? result.applicable_rules
 						: {},
 			} );
 		} catch ( err ) {

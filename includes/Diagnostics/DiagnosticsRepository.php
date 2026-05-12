@@ -13,6 +13,8 @@ namespace Cent_Son\Html_Normalizer\Diagnostics;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+
 /**
  * Repository CRUD sur `{$wpdb->prefix}son100_htmln_diagnostics`.
  *
@@ -160,7 +162,7 @@ class DiagnosticsRepository {
 	 * @param string|null                                                                  $status  Filtre status, ou null pour tous.
 	 * @param int                                                                          $limit   Nombre max.
 	 * @param int                                                                          $offset  Décalage.
-	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string} $filters Filtres additionnels (post-rc3).
+	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string, rule_ids?: list<string>} $filters Filtres additionnels (post-rc3).
 	 * @return list<DiagnosticRecord>
 	 */
 	public function list_paginated( ?string $status, int $limit = 50, int $offset = 0, array $filters = array() ): array {
@@ -182,7 +184,7 @@ class DiagnosticsRepository {
 	 * `total_pages` côté contrôleur REST. Accepte les mêmes filtres.
 	 *
 	 * @param string|null                                                                  $status  Filtre status, ou null pour tous.
-	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string} $filters Filtres additionnels.
+	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string, rule_ids?: list<string>} $filters Filtres additionnels.
 	 * @return int
 	 */
 	public function count_paginated( ?string $status, array $filters = array() ): int {
@@ -334,6 +336,68 @@ class DiagnosticsRepository {
 		return $out;
 	}
 
+	/**
+	 * Comptage d'articles diagnostiqués par règle applicable (clé du JSON
+	 * `matching_rules`). Sert au populate du dropdown « Règles » du filtre
+	 * SPA avec compteur « (N) » par règle.
+	 *
+	 * Sémantique du compteur : nombre d'articles ayant **au moins une**
+	 * occurrence de la règle (pas la somme des occurrences). C'est aligné
+	 * avec le filtre lui-même qui retourne « les articles où cette règle
+	 * s'applique ».
+	 *
+	 * Stratégie : un seul SELECT plein de la colonne `matching_rules`,
+	 * agrégation PHP. Plus simple que 9 `JSON_SEARCH(... COUNT)` séparés,
+	 * et le volume reste borné (≤ ~1000 rows typique).
+	 *
+	 * @return array<string, int> Map rule_id → count. Toutes les clés
+	 *                            `PresetRegistry::PRESETS` présentes,
+	 *                            même celles à 0 (UX stable pour la SPA).
+	 */
+	public function count_by_applicable_rule(): array {
+		$out = array();
+		foreach ( PresetRegistry::PRESETS as $rule_id ) {
+			$out[ $rule_id ] = 0;
+		}
+
+		$sql  = "SELECT matching_rules FROM `{$this->table}` WHERE matching_rules IS NOT NULL AND matching_rules != ''";
+		$rows = $this->wpdb->get_results( $sql, 'ARRAY_A' );
+		if ( ! is_array( $rows ) ) {
+			return $out;
+		}
+
+		foreach ( $rows as $row ) {
+			$json = isset( $row['matching_rules'] ) ? (string) $row['matching_rules'] : '';
+			if ( '' === $json ) {
+				continue;
+			}
+			$decoded = json_decode( $json, true );
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+
+			// Dédoublonnage par row : si la même règle apparaît deux fois
+			// (ne devrait pas, mais le format n'interdit pas), on compte
+			// l'article une seule fois.
+			$seen = array();
+			foreach ( $decoded as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$rid = isset( $entry['rule_id'] ) ? (string) $entry['rule_id'] : '';
+				if ( '' === $rid || isset( $seen[ $rid ] ) ) {
+					continue;
+				}
+				$seen[ $rid ] = true;
+				if ( isset( $out[ $rid ] ) ) {
+					$out[ $rid ]++;
+				}
+			}
+		}
+
+		return $out;
+	}
+
 	// =========================================================================
 	//  Écriture
 	// =========================================================================
@@ -435,7 +499,7 @@ class DiagnosticsRepository {
 	 * dans un seul des deux).
 	 *
 	 * @param string|null                                                                  $status  Filtre status.
-	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string} $filters Filtres additionnels.
+	 * @param array{search?: string, cat_id?: int, year?: int, month?: int, builder?: string, rule_ids?: list<string>} $filters Filtres additionnels.
 	 * @return array{joins: string, where: string, params: list<mixed>}|null
 	 *   `null` = status invalide → caller retourne array vide / 0.
 	 *   `joins` est préfixé par espace si non vide (concaténable directement).
@@ -506,6 +570,27 @@ class DiagnosticsRepository {
 				$where_parts[] = 'd.builder_type = %s';
 				$params[]      = $builder;
 				break;
+		}
+
+		// rule_ids : filtre OR sur le JSON `matching_rules`.
+		// Format stocké : `[{"rule_id":"P1","occurrences":12}, …]`.
+		// `JSON_SEARCH(... 'one', %s, NULL, '$[*].rule_id')` retourne le
+		// chemin trouvé (ex. `"$[0].rule_id"`) ou NULL — précis et sans
+		// faux positifs (`P1` ne matche pas `P10`). Disponible MySQL 5.7+
+		// que WordPress 6.8 exige déjà.
+		//
+		// Sémantique : OR (au moins une des règles cochées s'applique à
+		// l'article). Pas d'AND en V1.0 (cf. décision UX).
+		$rule_ids = isset( $filters['rule_ids'] ) && is_array( $filters['rule_ids'] )
+			? array_values( array_filter( $filters['rule_ids'], 'is_string' ) )
+			: array();
+		if ( array() !== $rule_ids ) {
+			$rule_clauses = array();
+			foreach ( $rule_ids as $rid ) {
+				$rule_clauses[] = "JSON_SEARCH(d.matching_rules, 'one', %s, NULL, '$[*].rule_id') IS NOT NULL";
+				$params[]       = $rid;
+			}
+			$where_parts[] = '(' . implode( ' OR ', $rule_clauses ) . ')';
 		}
 
 		return array(

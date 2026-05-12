@@ -10,7 +10,8 @@
  *
  *  - **Gauche** : dropdown « Par page » (20 / 50 / 100 / 200 max).
  *  - **Centre** : compte total des articles (`N article(s)`).
- *  - **Droite** : Précédent | « page X / Y » | Suivant.
+ *  - **Droite** : Précédent | 1 2 3 … 14 15 16 | Suivant
+ *                (rc4 : pagination numérotée cliquable, cf. `buildPageRange`).
  *
  * Boutons désactivés intelligemment :
  *  - Précédent désactivé sur la page 1.
@@ -38,6 +39,69 @@ const PER_PAGE_OPTIONS = [
 ];
 
 /**
+ * Sentinelle d'ellipsis dans la liste de pages — `Number.NaN` permettrait
+ * mais il complique l'égalité ; on prend une string explicite.
+ *
+ * @type {string}
+ */
+const ELLIPSIS = '…';
+
+/**
+ * Calcule la liste des items à afficher dans la pagination numérotée.
+ *
+ * Algorithme :
+ *  - `totalPages ≤ 9` : on affiche toutes les pages, pas d'ellipsis.
+ *  - sinon : on inclut **toujours** les pages 1, 2, 3 et n−2, n−1, n
+ *    + la page courante ± 1. Les écarts > 1 entre deux pages
+ *    consécutives produisent une ellipsis « … ».
+ *
+ * Exemples (total = 16) :
+ *  - current = 1  → [1, 2, 3, …, 14, 15, 16]
+ *  - current = 8  → [1, 2, 3, …, 7, 8, 9, …, 14, 15, 16]
+ *  - current = 14 → [1, 2, 3, …, 13, 14, 15, 16]
+ *  - current = 16 → [1, 2, 3, …, 14, 15, 16]
+ *
+ * Le rendu garde une largeur quasi-stable (7 à 11 items) — l'œil ne
+ * « danse » pas à mesure qu'on navigue.
+ *
+ * @param {number} currentPage Page courante (≥ 1).
+ * @param {number} totalPages  Nombre total de pages (≥ 1).
+ * @return {Array<number|string>} Items à rendre — entier = page cliquable, `ELLIPSIS` = `…` inerte.
+ */
+function buildPageRange( currentPage, totalPages ) {
+	if ( totalPages <= 1 ) {
+		return [];
+	}
+	if ( totalPages <= 9 ) {
+		return Array.from( { length: totalPages }, ( _, i ) => i + 1 );
+	}
+
+	const pages = new Set( [
+		1,
+		2,
+		3,
+		totalPages - 2,
+		totalPages - 1,
+		totalPages,
+	] );
+	for ( let i = currentPage - 1; i <= currentPage + 1; i++ ) {
+		if ( i >= 1 && i <= totalPages ) {
+			pages.add( i );
+		}
+	}
+
+	const sorted = [ ...pages ].sort( ( a, b ) => a - b );
+	const out = [];
+	for ( let i = 0; i < sorted.length; i++ ) {
+		out.push( sorted[ i ] );
+		if ( i < sorted.length - 1 && sorted[ i + 1 ] - sorted[ i ] > 1 ) {
+			out.push( ELLIPSIS );
+		}
+	}
+	return out;
+}
+
+/**
  * @param {Object}              props
  * @param {number}              props.page            Page courante (≥ 1).
  * @param {number}              props.totalPages      Nombre total de pages.
@@ -60,6 +124,7 @@ export default function PaginationBar( {
 	onChangePerPage,
 } ) {
 	const safeTotalPages = Math.max( 1, totalPages );
+	const pageItems = buildPageRange( page, safeTotalPages );
 
 	return (
 		<div className={ `htmln-pagination htmln-pagination--${ position }` }>
@@ -70,13 +135,10 @@ export default function PaginationBar( {
 				 *   « Par page » en « Par pa… »). On passe
 				 *   `hideLabelFromVision` pour garder l'accessibilité
 				 *   (label-for via le `id` que le SelectControl génère
-				 *   automatiquement). */ }
-				<span
-					className="htmln-pagination__per-page-label"
-					aria-hidden="true"
-				>
-					{ __( 'Par page', '100son-html-normalizer' ) }
-				</span>
+				 *   automatiquement). Le label est rendu **après** le
+				 *   SelectControl (flex row) pour suivre la convention
+				 *   « 50 articles par page » plus lisible que la
+				 *   variante « par page : 50 ». */ }
 				<SelectControl
 					label={ __( 'Par page', '100son-html-normalizer' ) }
 					hideLabelFromVision
@@ -86,6 +148,12 @@ export default function PaginationBar( {
 					disabled={ isLoading }
 					__nextHasNoMarginBottom
 				/>
+				<span
+					className="htmln-pagination__per-page-label"
+					aria-hidden="true"
+				>
+					{ __( 'Par page', '100son-html-normalizer' ) }
+				</span>
 			</div>
 
 			<div className="htmln-pagination__count">
@@ -114,15 +182,56 @@ export default function PaginationBar( {
 					) }
 				>
 					{ __( '« Précédent', '100son-html-normalizer' ) }
-				</Button>{ ' ' }
-				<span className="paging-input">
-					{ sprintf(
-						// translators: 1 = page courante, 2 = total de pages.
-						__( 'page %1$d sur %2$d', '100son-html-normalizer' ),
-						page,
-						safeTotalPages
+				</Button>
+				<span
+					className="htmln-pagination__pages"
+					role="navigation"
+					aria-label={ __(
+						'Navigation entre les pages',
+						'100son-html-normalizer'
 					) }
-				</span>{ ' ' }
+				>
+					{ pageItems.map( ( item, idx ) => {
+						if ( ELLIPSIS === item ) {
+							// Clé indexée OK : la liste est dérivée d'un calcul
+							// déterministe sur (page, totalPages) — pas de
+							// réordonnancement de keys entre renders qui pose
+							// problème à React.
+							return (
+								<span
+									// eslint-disable-next-line react/no-array-index-key
+									key={ `gap-${ idx }` }
+									className="htmln-pagination__ellipsis"
+									aria-hidden="true"
+								>
+									{ ELLIPSIS }
+								</span>
+							);
+						}
+						const isCurrent = item === page;
+						return (
+							<Button
+								key={ item }
+								variant={ isCurrent ? 'primary' : 'tertiary' }
+								className={
+									isCurrent
+										? 'htmln-pagination__page htmln-pagination__page--current'
+										: 'htmln-pagination__page'
+								}
+								onClick={ () => onChangePage( item ) }
+								disabled={ isCurrent || isLoading }
+								aria-current={ isCurrent ? 'page' : undefined }
+								aria-label={ sprintf(
+									// translators: %d = numéro de page.
+									__( 'Page %d', '100son-html-normalizer' ),
+									item
+								) }
+							>
+								{ item }
+							</Button>
+						);
+					} ) }
+				</span>
 				<Button
 					variant="secondary"
 					disabled={ page >= totalPages || isLoading }

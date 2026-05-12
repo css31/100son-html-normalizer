@@ -50,6 +50,7 @@ const VIEW = {
 /**
  * @param {Object}       props
  * @param {number}       props.postId           Article concerné.
+ * @param {string}       [props.postTitle]      Titre de l'article (affiché après l'ID dans le header).
  * @param {string[]}     props.ruleIds          Règles à appliquer pour le diff.
  * @param {?DiffPayload} [props.initialPayload] Si fourni, court-circuite le fetch (RegressionModal).
  * @param {() => void}   props.onClose          Callback fermeture.
@@ -57,6 +58,7 @@ const VIEW = {
  */
 export default function DiffModal( {
 	postId,
+	postTitle = '',
 	ruleIds,
 	initialPayload = null,
 	onClose,
@@ -152,14 +154,18 @@ export default function DiffModal( {
 
 				{ VIEW.CODE === view && (
 					<div className="htmln-diff-modal__pane htmln-diff-modal__pane--code">
-						<div className="htmln-diff-modal__col">
-							<h3>{ __( 'Avant', '100son-html-normalizer' ) }</h3>
+						<div className="htmln-diff-modal__col htmln-diff-modal__col--before">
+							<h3 className="htmln-diff-modal__col-title">
+								{ __( 'Avant', '100son-html-normalizer' ) }
+							</h3>
 							<pre className="htmln-diff-modal__code">
 								{ payload.html_before }
 							</pre>
 						</div>
-						<div className="htmln-diff-modal__col">
-							<h3>{ __( 'Après', '100son-html-normalizer' ) }</h3>
+						<div className="htmln-diff-modal__col htmln-diff-modal__col--after">
+							<h3 className="htmln-diff-modal__col-title">
+								{ __( 'Après', '100son-html-normalizer' ) }
+							</h3>
 							<pre className="htmln-diff-modal__code">
 								{ payload.html_after }
 							</pre>
@@ -169,8 +175,10 @@ export default function DiffModal( {
 
 				{ VIEW.RENDER === view && (
 					<div className="htmln-diff-modal__pane htmln-diff-modal__pane--render">
-						<div className="htmln-diff-modal__col">
-							<h3>{ __( 'Avant', '100son-html-normalizer' ) }</h3>
+						<div className="htmln-diff-modal__col htmln-diff-modal__col--before">
+							<h3 className="htmln-diff-modal__col-title">
+								{ __( 'Avant', '100son-html-normalizer' ) }
+							</h3>
 							<iframe
 								title={ __(
 									'Rendu avant normalisation',
@@ -183,8 +191,10 @@ export default function DiffModal( {
 								className="htmln-diff-modal__iframe"
 							/>
 						</div>
-						<div className="htmln-diff-modal__col">
-							<h3>{ __( 'Après', '100son-html-normalizer' ) }</h3>
+						<div className="htmln-diff-modal__col htmln-diff-modal__col--after">
+							<h3 className="htmln-diff-modal__col-title">
+								{ __( 'Après', '100son-html-normalizer' ) }
+							</h3>
 							<iframe
 								title={ __(
 									'Rendu après normalisation',
@@ -223,13 +233,29 @@ export default function DiffModal( {
 		);
 	};
 
-	return (
-		<Modal
-			title={ sprintf(
+	// Titre composé : « Diff de l'article #ID — Titre de l'article »
+	// (post-rc4 : on enrichit avec le titre pour aligner sur la page
+	// V0.1 « Aperçu » qui le montrait déjà). Si le titre est absent
+	// (cas dégradé), on retombe sur la version `#ID` seul.
+	const modalTitle = postTitle
+		? sprintf(
+				// translators: 1 = identifiant article, 2 = titre de l'article.
+				__(
+					"Diff de l'article #%1$d — %2$s",
+					'100son-html-normalizer'
+				),
+				postId,
+				postTitle
+		  )
+		: sprintf(
 				// translators: %d = identifiant article.
 				__( "Diff de l'article #%d", '100son-html-normalizer' ),
 				postId
-			) }
+		  );
+
+	return (
+		<Modal
+			title={ modalTitle }
 			onRequestClose={ onClose }
 			isFullScreen
 			className="htmln-diff-modal"

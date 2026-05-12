@@ -18,6 +18,7 @@ use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use Cent_Son\Html_Normalizer\Rest\DiagnosticsController;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use PHPUnit\Framework\TestCase;
+use Son100_Htmln_Test_Posts_Registry;
 use Son100_Htmln_Test_Wpdb;
 use WP_REST_Request;
 
@@ -27,6 +28,7 @@ final class DiagnosticsControllerTest extends TestCase {
 		$GLOBALS['son100_htmln_test_rest_routes'] = array();
 		$GLOBALS['son100_htmln_test_caps']        = array();
 		$GLOBALS['son100_htmln_test_can_default'] = true;
+		Son100_Htmln_Test_Posts_Registry::reset();
 	}
 
 	// =========================================================================
@@ -102,6 +104,7 @@ final class DiagnosticsControllerTest extends TestCase {
 				return $this->by_post_id[ $post_id ] ?? null;
 			}
 			public function list_paginated( ?string $status, int $limit = 50, int $offset = 0, array $filters = array() ): array {
+				$this->last_filters = $filters;
 				return array_slice( $this->list, $offset, $limit );
 			}
 			public function count_paginated( ?string $status, array $filters = array() ): int {
@@ -119,6 +122,20 @@ final class DiagnosticsControllerTest extends TestCase {
 					'unknown'    => 0,
 				);
 			}
+			public function count_by_applicable_rule(): array {
+				// Aligné sur PresetRegistry::PRESETS — toutes clés présentes (UX stable).
+				return array(
+					'P3' => 0, 'P4' => 0, 'P8' => 0, 'P6' => 0,
+					'P7' => 0, 'P5' => 0, 'P9' => 0, 'P1' => 0, 'P2' => 0,
+				);
+			}
+			/**
+			 * Capture le dernier `$filters` reçu par list_paginated() pour
+			 * permettre aux tests de vérifier le parsing du contrôleur.
+			 *
+			 * @var array<string, mixed>|null
+			 */
+			public ?array $last_filters = null;
 			public function count_null_builder_types(): int {
 				return 0;
 			}
@@ -417,5 +434,164 @@ final class DiagnosticsControllerTest extends TestCase {
 			$this->make_request( 'POST', array( 'chunk_post_ids' => array( 100 ) ) )
 		);
 		$this->assertSame( '', $response->get_data()['job_id'] );
+	}
+
+	// =========================================================================
+	//  rule_ids[] (rc4 — filtre multi-règles depuis FiltersBar SPA)
+	// =========================================================================
+
+	public function test_list_forwards_valid_rule_ids_to_repo_filter(): void {
+		$repo       = $this->repo_stub( array(), array(), 0 );
+		$controller = $this->make_controller( null, $repo );
+		$response   = $controller->list_diagnostics(
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'P1', 'P5' ) ) )
+		);
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( 'P1', 'P5' ), $repo->last_filters['rule_ids'] ?? null );
+	}
+
+	public function test_list_filters_out_unknown_rule_ids(): void {
+		$repo       = $this->repo_stub( array(), array(), 0 );
+		$controller = $this->make_controller( null, $repo );
+		// `INVALID` n'est pas dans PresetRegistry::PRESETS → ignoré ;
+		// `P9` reste → tableau non vide donc clé `rule_ids` présente.
+		$controller->list_diagnostics(
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'INVALID', 'P9' ) ) )
+		);
+		$this->assertSame( array( 'P9' ), $repo->last_filters['rule_ids'] ?? null );
+	}
+
+	public function test_list_omits_rule_ids_filter_when_only_invalid_values(): void {
+		$repo       = $this->repo_stub( array(), array(), 0 );
+		$controller = $this->make_controller( null, $repo );
+		$controller->list_diagnostics(
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'INVALID', 'Pxxx' ) ) )
+		);
+		// Tous les IDs filtrés → clé `rule_ids` absente du filtre (UX :
+		// équivalent « pas de filtre rule_ids », pas « zéro résultat »).
+		$this->assertArrayNotHasKey( 'rule_ids', $repo->last_filters ?? array() );
+	}
+
+	public function test_list_ignores_non_array_rule_ids(): void {
+		$repo       = $this->repo_stub( array(), array(), 0 );
+		$controller = $this->make_controller( null, $repo );
+		// Une string nue ne doit pas être interprétée comme un ID — l'API
+		// est volontairement strict sur le contrat « tableau ou rien ».
+		$controller->list_diagnostics(
+			$this->make_request( 'GET', array( 'rule_ids' => 'P1' ) )
+		);
+		$this->assertArrayNotHasKey( 'rule_ids', $repo->last_filters ?? array() );
+	}
+
+	public function test_list_dedupes_rule_ids(): void {
+		$repo       = $this->repo_stub( array(), array(), 0 );
+		$controller = $this->make_controller( null, $repo );
+		$controller->list_diagnostics(
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'P1', 'P1', 'P5' ) ) )
+		);
+		$this->assertSame( array( 'P1', 'P5' ), $repo->last_filters['rule_ids'] ?? null );
+	}
+
+	public function test_facets_includes_applicable_rules_key(): void {
+		$controller = $this->make_controller();
+		$response   = $controller->get_facets( $this->make_request() );
+		$this->assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'applicable_rules', $data );
+		$this->assertIsArray( $data['applicable_rules'] );
+		// Toutes les clés PresetRegistry::PRESETS présentes pour UX stable.
+		foreach ( array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' ) as $rid ) {
+			$this->assertArrayHasKey( $rid, $data['applicable_rules'] );
+		}
+	}
+
+	// =========================================================================
+	//  has_fossil_panels_data (rc4 — signal Gutenberg + vestige SO)
+	// =========================================================================
+
+	/**
+	 * Helper : fabrique un record + l'enregistre côté registry de posts.
+	 *
+	 * @param int    $post_id      Identifiant.
+	 * @param string $builder_type Type persisté (`gutenberg`, `siteorigin`…).
+	 * @param array  $meta         Post-meta à associer.
+	 * @return DiagnosticRecord
+	 */
+	private function record_with_meta(
+		int $post_id,
+		string $builder_type,
+		array $meta = array()
+	): DiagnosticRecord {
+		$post              = new \WP_Post();
+		$post->ID          = $post_id;
+		$post->post_title  = '';
+		$post->post_content = '';
+		$post->post_date   = '2026-05-12 09:00:00';
+		Son100_Htmln_Test_Posts_Registry::$posts[ $post_id ] = $post;
+		Son100_Htmln_Test_Posts_Registry::$meta[ $post_id ]  = $meta;
+
+		return new DiagnosticRecord(
+			id: 1,
+			post_id: $post_id,
+			status: 'normal',
+			matching_rules: array(),
+			metrics: array(),
+			is_stale: false,
+			diagnosed_at: '2026-05-12 10:00:00',
+			post_modified_at_diagnosis: '2026-05-12 09:00:00',
+			builder_type: $builder_type,
+		);
+	}
+
+	public function test_gutenberg_with_panels_data_meta_flags_fossil_true(): void {
+		$record = $this->record_with_meta(
+			100,
+			'gutenberg',
+			array( 'panels_data' => array( 'widgets' => array( 'x' ) ) )
+		);
+		$controller = $this->make_controller( null, $this->repo_stub( array(), array( $record ), 1 ) );
+		$response   = $controller->list_diagnostics( $this->make_request() );
+		$item       = $response->get_data()['items'][0];
+
+		$this->assertArrayHasKey( 'has_fossil_panels_data', $item );
+		$this->assertTrue( $item['has_fossil_panels_data'] );
+	}
+
+	public function test_gutenberg_without_panels_data_flags_fossil_false(): void {
+		$record = $this->record_with_meta( 101, 'gutenberg', array() );
+		$controller = $this->make_controller( null, $this->repo_stub( array(), array( $record ), 1 ) );
+		$response   = $controller->list_diagnostics( $this->make_request() );
+		$item       = $response->get_data()['items'][0];
+
+		$this->assertFalse( $item['has_fossil_panels_data'] );
+	}
+
+	public function test_siteorigin_with_panels_data_does_not_flag_fossil(): void {
+		// Pour un article SO, `panels_data` est attendu — pas un fossile.
+		// Le flag doit rester false (signal réservé au cas Gut + vestige).
+		$record = $this->record_with_meta(
+			102,
+			'siteorigin',
+			array( 'panels_data' => array( 'widgets' => array( 'x' ) ) )
+		);
+		$controller = $this->make_controller( null, $this->repo_stub( array(), array( $record ), 1 ) );
+		$response   = $controller->list_diagnostics( $this->make_request() );
+		$item       = $response->get_data()['items'][0];
+
+		$this->assertFalse( $item['has_fossil_panels_data'] );
+	}
+
+	public function test_gutenberg_with_empty_panels_data_array_is_not_fossil(): void {
+		// `panels_data = []` est considéré comme absent (cf. `panels_data_is_non_empty`).
+		$record = $this->record_with_meta(
+			103,
+			'gutenberg',
+			array( 'panels_data' => array() )
+		);
+		$controller = $this->make_controller( null, $this->repo_stub( array(), array( $record ), 1 ) );
+		$response   = $controller->list_diagnostics( $this->make_request() );
+		$item       = $response->get_data()['items'][0];
+
+		$this->assertFalse( $item['has_fossil_panels_data'] );
 	}
 }

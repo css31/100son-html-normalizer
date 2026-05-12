@@ -9,8 +9,9 @@
 import { get, post, del } from './client';
 
 /**
- * `GET /diagnostics?status&page&per_page&search&cat&year&month&builder` —
- * liste paginée filtrable (post-rc3 : ajout search + cat/year/month/builder).
+ * `GET /diagnostics?status&page&per_page&search&cat&year&month&builder&rule_ids[]` —
+ * liste paginée filtrable (post-rc3 : search + cat/year/month/builder ;
+ * post-rc4 : `rule_ids[]` multi-sélection sur règles applicables, OR).
  *
  * @param {{
  *   status?: 'normal'|'to_improve'|'stale',
@@ -21,6 +22,7 @@ import { get, post, del } from './client';
  *   year?: number,
  *   month?: number,
  *   builder?: 'siteorigin'|'gutenberg'|'other'|'out',
+ *   rule_ids?: string[],
  * }} [params] Paramètres de requête.
  * @return {Promise<{items: Array, total: number, page: number, per_page: number, total_pages: number}>} Enveloppe paginée.
  */
@@ -28,9 +30,9 @@ export const list = ( params = {} ) => get( '/diagnostics', params );
 
 /**
  * `GET /diagnostics/facets` — données pour populer les dropdowns des
- * filtres SPA (post-rc3).
+ * filtres SPA (post-rc3, étendu post-rc4 avec `applicable_rules`).
  *
- * @return {Promise<{years: number[], categories: Array<{id: number, name: string, count: number}>, builders: Object<string, number>}>} Facets.
+ * @return {Promise<{years: number[], categories: Array<{id: number, name: string, count: number}>, builders: Object<string, number>, applicable_rules: Object<string, number>}>} Facets.
  */
 export const facets = () => get( '/diagnostics/facets' );
 

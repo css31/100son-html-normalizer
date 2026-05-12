@@ -250,4 +250,96 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$last = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
 		$this->assertStringContainsString( 'is_stale = 1', $last );
 	}
+
+	// =========================================================================
+	//  rule_ids filter (rc4 — filtre multi-règles dans FiltersBar SPA)
+	// =========================================================================
+
+	public function test_list_paginated_with_rule_ids_emits_json_search_or(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array( 'P9', 'P7' ) ) );
+		$last_sql = end( $this->wpdb->query_log );
+
+		// JSON_SEARCH précis (évite faux positifs P1/P10) et OR entre les règles.
+		$this->assertStringContainsString( 'JSON_SEARCH(d.matching_rules', $last_sql );
+		$this->assertStringContainsString( "'$[*].rule_id'", $last_sql );
+		$this->assertStringContainsString( ' OR ', $last_sql );
+		// Les valeurs sont injectées via prepare — on les retrouve quotées.
+		$this->assertStringContainsString( "'P9'", $last_sql );
+		$this->assertStringContainsString( "'P7'", $last_sql );
+	}
+
+	public function test_list_paginated_with_single_rule_id_no_or(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array( 'P1' ) ) );
+		$last_sql = end( $this->wpdb->query_log );
+
+		$this->assertStringContainsString( 'JSON_SEARCH(d.matching_rules', $last_sql );
+		$this->assertStringContainsString( "'P1'", $last_sql );
+		// Une seule clause => pas de ` OR ` (mais l'enrobage `(…)` reste).
+		$this->assertStringNotContainsString( ' OR ', $last_sql );
+	}
+
+	public function test_list_paginated_with_empty_rule_ids_array_ignores_filter(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array() ) );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringNotContainsString( 'JSON_SEARCH', $last_sql );
+	}
+
+	public function test_list_paginated_with_non_string_rule_ids_are_filtered_out(): void {
+		$this->wpdb->get_results_queue[] = array();
+		// Mix valid string + entier (`is_string` doit retirer 42).
+		$this->repo->list_paginated(
+			null,
+			10,
+			0,
+			array( 'rule_ids' => array( 'P1', 42, 'P5' ) )
+		);
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringContainsString( "'P1'", $last_sql );
+		$this->assertStringContainsString( "'P5'", $last_sql );
+		$this->assertStringNotContainsString( '42', $last_sql );
+	}
+
+	public function test_count_by_applicable_rule_returns_all_presets_with_zero(): void {
+		// Aucune ligne en BDD → toutes les clés présentes à 0 (UX stable SPA).
+		$this->wpdb->get_results_queue[] = array();
+		$counts = $this->repo->count_by_applicable_rule();
+		$expected_keys = \Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry::PRESETS;
+		foreach ( $expected_keys as $rule_id ) {
+			$this->assertArrayHasKey( $rule_id, $counts );
+			$this->assertSame( 0, $counts[ $rule_id ] );
+		}
+	}
+
+	public function test_count_by_applicable_rule_aggregates_articles_per_rule(): void {
+		$this->wpdb->get_results_queue[] = array(
+			// Article 1 : P1 + P6
+			array( 'matching_rules' => '[{"rule_id":"P1","occurrences":3},{"rule_id":"P6","occurrences":5}]' ),
+			// Article 2 : P1 seul
+			array( 'matching_rules' => '[{"rule_id":"P1","occurrences":1}]' ),
+			// Article 3 : P9
+			array( 'matching_rules' => '[{"rule_id":"P9","occurrences":2}]' ),
+			// Bruit : JSON invalide → ignoré sans crash
+			array( 'matching_rules' => 'not-a-json' ),
+			// Bruit : array décodable mais entrée non-array → ignoré
+			array( 'matching_rules' => '[null,{"rule_id":"P6","occurrences":1}]' ),
+		);
+		$counts = $this->repo->count_by_applicable_rule();
+		$this->assertSame( 2, $counts['P1'] );
+		$this->assertSame( 2, $counts['P6'] );
+		$this->assertSame( 1, $counts['P9'] );
+		$this->assertSame( 0, $counts['P3'] );
+		$this->assertSame( 0, $counts['P8'] );
+	}
+
+	public function test_count_by_applicable_rule_dedupes_per_article(): void {
+		// Même règle 2× dans le même JSON → article compté 1× seulement.
+		$this->wpdb->get_results_queue[] = array(
+			array( 'matching_rules' => '[{"rule_id":"P1","occurrences":1},{"rule_id":"P1","occurrences":2}]' ),
+		);
+		$counts = $this->repo->count_by_applicable_rule();
+		$this->assertSame( 1, $counts['P1'] );
+	}
 }
