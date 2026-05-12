@@ -13,6 +13,7 @@ namespace Cent_Son\Html_Normalizer\Rest;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticBatchRunner;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticRecord;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
@@ -64,12 +65,19 @@ final class DiagnosticsController extends BaseController {
 	private const ALLOWED_STATUSES = array( 'normal', 'to_improve', 'stale' );
 
 	/**
-	 * @param DiagnosticBatchRunner $runner Orchestrateur scan batch (F12 — Phase 3.3).
-	 * @param DiagnosticsRepository $repo   Persistance diagnostics (F12 — Phase 2.2).
+	 * @param DiagnosticBatchRunner $runner     Orchestrateur scan batch (F12 — Phase 3.3).
+	 * @param DiagnosticsRepository $repo       Persistance diagnostics (F12 — Phase 2.2).
+	 * @param ?BuilderClassifier    $classifier Fallback classification au render
+	 *                                          pour les rows pré-2.1.0 sans
+	 *                                          `builder_type` persisté. Optionnel
+	 *                                          (rétro-compat) — si null, les
+	 *                                          builder_type null restent null
+	 *                                          (badge `—` côté SPA).
 	 */
 	public function __construct(
 		private readonly DiagnosticBatchRunner $runner,
 		private readonly DiagnosticsRepository $repo,
+		private readonly ?BuilderClassifier $classifier = null,
 	) {}
 
 	/**
@@ -492,13 +500,25 @@ final class DiagnosticsController extends BaseController {
 				$post_date  = (string) $post->post_date;
 			}
 		}
+
+		// Fallback classification au render pour les rows pré-2.1.0 (où la
+		// colonne `builder_type` n'avait pas encore été migrée et reste NULL
+		// jusqu'au prochain scan). On classifie à la volée pour que la SPA
+		// affiche tout de suite la bonne pastille, sans forcer un rescan
+		// préalable. Au prochain scan complet, `DiagnosticEngine::diagnose`
+		// persiste la valeur et ce fallback ne se déclenche plus.
+		$builder_type = $record->builder_type;
+		if ( null === $builder_type && null !== $this->classifier ) {
+			$builder_type = $this->classifier->classify( $record->post_id );
+		}
+
 		return array(
 			'id'                          => $record->id,
 			'post_id'                     => $record->post_id,
 			'post_title'                  => $post_title,
 			'post_date'                   => $post_date,
 			'status'                      => $record->status,
-			'builder_type'                => $record->builder_type,
+			'builder_type'                => $builder_type,
 			'matching_rules'              => $record->matching_rules,
 			'metrics'                     => $record->metrics,
 			'is_stale'                    => $record->is_stale,

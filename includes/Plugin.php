@@ -195,7 +195,7 @@ final class Plugin {
 				self::make_step_runner(),
 				new StepsRepository(),
 			),
-			new DiagnosticsController( $batch_runner, $diag_repo ),
+			new DiagnosticsController( $batch_runner, $diag_repo, new BuilderClassifier() ),
 			new PostsController( $settings, $post_normalizer, $so_detector ),
 			new DiffController( $preset_registry, $pipeline, $metrics ),
 			new SettingsController( $settings ),
