@@ -105,6 +105,13 @@ final class Plugin {
 		}
 		$this->booted = true;
 
+		// Vérifie la version DB stockée vs celle du code et déclenche
+		// `Activator::activate()` (idempotent) si une migration de schéma
+		// est nécessaire. Couvre les mises à jour de plugin sans
+		// désactivation/réactivation explicite — `dbDelta` rajoute les
+		// colonnes manquantes en place.
+		$this->maybe_run_db_upgrade();
+
 		// Composition root : assemblage des dépendances Core.
 		$settings        = new SettingsRepository();
 		$preset_registry = new PresetRegistry( $settings );
@@ -160,6 +167,39 @@ final class Plugin {
 			$assets = new Assets();
 			$assets->register();
 		}
+	}
+
+	/**
+	 * Compare la version DB stockée (`son100_htmln_db_version`) à
+	 * `Activator::DB_VERSION` du code. Si la stockée est inférieure
+	 * (ou absente), déclenche `Activator::activate()` qui exécute
+	 * `dbDelta` — opération idempotente, ajoute les colonnes/tables
+	 * manquantes sans toucher aux données existantes.
+	 *
+	 * Sans ce hook, une mise à jour du plugin par téléchargement ne
+	 * déclencherait pas la migration jusqu'à ce que l'utilisateur fasse
+	 * une désactivation/réactivation manuelle — d'où le bug observé
+	 * post-2.0.0 → 2.1.0 (colonne `builder_type` absente, filtre
+	 * Constructeur retournant page vide à cause de l'erreur SQL 1054
+	 * silencieusement avalée par wpdb).
+	 *
+	 * Coût : 1 lecture option (autoloaded) + 1 version_compare. Le
+	 * dbDelta n'est lancé que quand effectivement nécessaire.
+	 *
+	 * @return void
+	 */
+	private function maybe_run_db_upgrade(): void {
+		if ( ! function_exists( 'get_option' ) ) {
+			return;
+		}
+		$stored = get_option( 'son100_htmln_db_version', '0.0.0' );
+		$stored = is_string( $stored ) ? $stored : '0.0.0';
+		if ( version_compare( $stored, Activator::DB_VERSION, '>=' ) ) {
+			return; // À jour, rien à faire.
+		}
+		// Migration requise — Activator::activate() est idempotent (seeds
+		// vérifient l'existence, dbDelta gère les schemas en place).
+		Activator::activate();
 	}
 
 	/**
