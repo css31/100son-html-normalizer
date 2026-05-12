@@ -119,6 +119,16 @@ final class DiagnosticsControllerTest extends TestCase {
 					'unknown'    => 0,
 				);
 			}
+			public function count_null_builder_types(): int {
+				return 0;
+			}
+			public function backfill_builder_types_batch(
+				object $classifier,
+				int $batch_size = 500
+			): int {
+				unset( $classifier, $batch_size );
+				return 0;
+			}
 			public function count_by_status(): array {
 				return $this->stats_override ?? array(
 					'normal' => 0, 'to_improve' => 0, 'stale' => 0, 'total' => 0,

@@ -169,6 +169,31 @@ final class DiagnosticsController extends BaseController {
 		[ 'page' => $page, 'per_page' => $per_page, 'offset' => $offset ] = $this->parse_pagination( $request );
 		$filters = $this->parse_filters( $request );
 
+		// Backfill `builder_type` si filtre builder posé sur des rows
+		// encore non classifiées (cas typique post-migration 2.1.0 sans
+		// rescan préalable). Le SQL `WHERE builder_type = 'gutenberg'`
+		// retournerait 0 résultat tant que la colonne est NULL, d'où le
+		// besoin de combler avant la query. One-shot : après ce premier
+		// passage, la colonne est persistée et les filtres suivants
+		// touchent directement la BDD.
+		if ( null !== $this->classifier
+			&& isset( $filters['builder'] )
+			&& $this->repo->count_null_builder_types() > 0
+		) {
+			// Boucle bornée à 50 batches (× 500 rows = max 25 000) pour
+			// éviter tout risque de boucle infinie si classify retourne
+			// quelque chose d'inattendu.
+			for ( $i = 0; $i < 50; $i++ ) {
+				$done = $this->repo->backfill_builder_types_batch(
+					$this->classifier,
+					500
+				);
+				if ( 0 === $done ) {
+					break;
+				}
+			}
+		}
+
 		$total = $this->repo->count_paginated( $status, $filters );
 		$items = $this->repo->list_paginated( $status, $per_page, $offset, $filters );
 

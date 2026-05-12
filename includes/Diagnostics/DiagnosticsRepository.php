@@ -231,6 +231,63 @@ class DiagnosticsRepository {
 	}
 
 	/**
+	 * Compte les diagnostics dont `builder_type` est NULL (rows pré-2.1.0
+	 * qui n'ont pas encore été classifiées). Sert au DiagnosticsController
+	 * pour décider s'il faut déclencher un backfill avant un filtrage par
+	 * builder.
+	 *
+	 * @return int
+	 */
+	public function count_null_builder_types(): int {
+		$sql = "SELECT COUNT(*) FROM `{$this->table}` WHERE builder_type IS NULL";
+		return (int) $this->wpdb->get_var( $sql );
+	}
+
+	/**
+	 * Backfill un batch de rows à `builder_type IS NULL` en classifiant
+	 * via le classifier passé en argument. Retourne le nombre de rows
+	 * effectivement mises à jour — 0 si plus rien à backfiller.
+	 *
+	 * Itéré par le caller jusqu'à retour 0 pour couvrir tout le corpus.
+	 * Le batching évite une grosse transaction sur un corpus large ;
+	 * 500 rows par batch ≈ 1 seconde sur DevKinsta.
+	 *
+	 * @param object $classifier Doit implémenter `classify(int): string`
+	 *                           — typiquement `Core\Posts\BuilderClassifier`.
+	 *                           Typé `object` pour permettre l'injection
+	 *                           d'un stub en test.
+	 * @param int    $batch_size Limit de la requête SELECT. Default 500.
+	 * @return int Nombre de rows backfillées dans ce batch.
+	 */
+	public function backfill_builder_types_batch( object $classifier, int $batch_size = 500 ): int {
+		$sql = $this->wpdb->prepare(
+			"SELECT post_id FROM `{$this->table}` WHERE builder_type IS NULL LIMIT %d",
+			max( 1, $batch_size )
+		);
+		$post_ids = $this->wpdb->get_col( $sql );
+		if ( ! is_array( $post_ids ) || array() === $post_ids ) {
+			return 0;
+		}
+		$count = 0;
+		foreach ( $post_ids as $pid_raw ) {
+			$pid  = (int) $pid_raw;
+			$type = $classifier->classify( $pid );
+			if ( ! is_string( $type ) || '' === $type ) {
+				continue;
+			}
+			$result = $this->wpdb->update(
+				$this->table,
+				array( 'builder_type' => $type ),
+				array( 'post_id' => $pid ),
+			);
+			if ( false !== $result ) {
+				$count++;
+			}
+		}
+		return $count;
+	}
+
+	/**
 	 * Comptage de diagnostics par type de constructeur. Sert au populate
 	 * du dropdown « Constructeur » du filtre SPA avec des compteurs.
 	 *
