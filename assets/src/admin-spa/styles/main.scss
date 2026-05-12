@@ -192,8 +192,12 @@
 }
 
 /* Pagination post-rc4 : barre haut + bas avec 3 zones (per-page à gauche,
- * compteur au centre, nav droite). Override des règles WP `tablenav` qui
- * appliqueraient un layout par défaut peu adapté à notre flexbox 3-cols. */
+ * compteur au centre, nav droite).
+ *
+ * On évite volontairement la classe WP `tablenav` qui appliquerait des
+ * styles natifs incompatibles (`height: 30px` fixe, `margin: 6px 0 4px`,
+ * `clear: both`) — d'où le rendu cassé observé initialement (superposition
+ * avec le TabsHeader du dessus). */
 .htmln-pagination {
 	display: flex;
 	align-items: center;
@@ -201,21 +205,20 @@
 	gap: var( --htmln-gap );
 	flex-wrap: wrap;
 	padding: 8px 0;
+	margin: 0;
+	height: auto;
+	clear: none;
 
 	&--top {
-		margin-bottom: 8px;
+		margin: 16px 0 8px;
+		padding-bottom: 8px;
 		border-bottom: 1px solid var( --htmln-border );
 	}
 
 	&--bottom {
-		margin-top: 8px;
+		margin: 8px 0 0;
+		padding-top: 8px;
 		border-top: 1px solid var( --htmln-border );
-	}
-
-	/* Reset des padding/margin que WP impose sur `.tablenav`. */
-	&::before,
-	&::after {
-		display: none;
 	}
 }
 
@@ -224,32 +227,31 @@
 	align-items: center;
 	gap: 8px;
 	flex: 0 0 auto;
+}
 
-	/* Compactage du SelectControl WP pour qu'il rentre dans la barre
-	 * sans dominer visuellement. */
-	.components-base-control {
-		margin-bottom: 0;
-	}
+.htmln-pagination__per-page-label {
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var( --htmln-text-muted );
+	font-weight: 600;
+	white-space: nowrap;
+}
 
-	.components-base-control__field {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin-bottom: 0;
-	}
+/* Compactage du SelectControl WP — le label est rendu en dehors
+ * (hideLabelFromVision), donc on n'a qu'à styler le control lui-même. */
+.htmln-pagination__per-page .components-base-control {
+	margin-bottom: 0;
+}
 
-	.components-base-control__label {
-		font-size: 12px;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var( --htmln-text-muted );
-		margin-bottom: 0;
-	}
+.htmln-pagination__per-page .components-input-control__container,
+.htmln-pagination__per-page .components-select-control__input {
+	min-height: 32px;
+	font-size: 13px;
+}
 
-	.components-select-control__input {
-		min-height: 32px;
-		font-size: 13px;
-	}
+.htmln-pagination__per-page select {
+	min-width: 70px;
 }
 
 .htmln-pagination__count {

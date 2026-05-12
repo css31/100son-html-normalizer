@@ -62,12 +62,24 @@ export default function PaginationBar( {
 	const safeTotalPages = Math.max( 1, totalPages );
 
 	return (
-		<div
-			className={ `tablenav ${ position } htmln-pagination htmln-pagination--${ position }` }
-		>
+		<div className={ `htmln-pagination htmln-pagination--${ position }` }>
 			<div className="htmln-pagination__per-page">
+				{ /* Label rendu hors du SelectControl pour éviter la
+				 *   troncature interne du « floating label » de
+				 *   `__next40pxDefaultSize` (max-width fixe qui coupe
+				 *   « Par page » en « Par pa… »). On passe
+				 *   `hideLabelFromVision` pour garder l'accessibilité
+				 *   (label-for via le `id` que le SelectControl génère
+				 *   automatiquement). */ }
+				<span
+					className="htmln-pagination__per-page-label"
+					aria-hidden="true"
+				>
+					{ __( 'Par page', '100son-html-normalizer' ) }
+				</span>
 				<SelectControl
 					label={ __( 'Par page', '100son-html-normalizer' ) }
+					hideLabelFromVision
 					value={ String( perPage ) }
 					options={ PER_PAGE_OPTIONS }
 					onChange={ ( raw ) => onChangePerPage( Number( raw ) ) }
