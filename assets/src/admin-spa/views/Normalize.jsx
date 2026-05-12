@@ -56,7 +56,7 @@ import { useScanBatch } from '../hooks/useScanBatch';
 import { useBeforeunload } from '../hooks/useBeforeunload';
 import { STORE_NAME, ALL_RULE_IDS } from '../store';
 
-const PER_PAGE = 50;
+const DEFAULT_PER_PAGE = 50;
 
 /**
  * @type {'to_improve'|'normal'|'stale'}
@@ -69,6 +69,7 @@ const DEFAULT_TAB = 'to_improve';
 export default function Normalize() {
 	const [ currentTab, setCurrentTab ] = useState( DEFAULT_TAB );
 	const [ currentPage, setCurrentPage ] = useState( 1 );
+	const [ perPage, setPerPage ] = useState( DEFAULT_PER_PAGE );
 	const [ selectedPostIds, setSelectedPostIds ] = useState( () => new Set() );
 	// Filtres post-rc3 (recherche + cat/year/month/builder). Conservés
 	// quand on bascule entre onglets internes (filtre croisé avec status).
@@ -100,7 +101,7 @@ export default function Normalize() {
 		isLoading: isListLoading,
 		error: listError,
 		refetch: refetchList,
-	} = useDiagnosticsList( currentTab, currentPage, PER_PAGE, filters );
+	} = useDiagnosticsList( currentTab, currentPage, perPage, filters );
 
 	// Callback partagé : après un pas, on doit re-récupérer compteurs + liste
 	// car les statuts ont pu changer (to_improve → normal sur les articles
@@ -135,6 +136,19 @@ export default function Normalize() {
 		setFilters( nextFilters );
 		// Tout changement de filtre remet à la page 1 — sinon on peut se
 		// retrouver hors plage si la nouvelle liste est plus courte.
+		setCurrentPage( 1 );
+	}, [] );
+
+	const handleChangePerPage = useCallback( ( nextPerPage ) => {
+		// Borne [1, MAX_PER_PAGE=200] côté REST de toute façon, mais on
+		// défend ici aussi pour la cohérence UI.
+		const clamped = Math.max(
+			1,
+			Math.min( 200, Number( nextPerPage ) || 50 )
+		);
+		setPerPage( clamped );
+		// Tout changement de per-page remet à la page 1 — l'offset
+		// précédent n'a plus de sens après changement de taille de page.
 		setCurrentPage( 1 );
 	}, [] );
 
@@ -280,11 +294,12 @@ export default function Normalize() {
 				items={ items }
 				total={ total }
 				page={ currentPage }
-				perPage={ PER_PAGE }
+				perPage={ perPage }
 				totalPages={ totalPages }
 				isLoading={ isListLoading }
 				error={ listError }
 				onChangePage={ handleChangePage }
+				onChangePerPage={ handleChangePerPage }
 				selectedIds={ selectedPostIds }
 				onToggleArticle={ handleToggleArticle }
 				onToggleAllOnPage={ handleToggleAllOnPage }

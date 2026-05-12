@@ -20,6 +20,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { Spinner, Button } from '@wordpress/components';
 import BuilderBadge from './BuilderBadge';
+import PaginationBar from './PaginationBar';
 
 /**
  * Calcule le total des occurrences à partir des règles applicables.
@@ -87,6 +88,7 @@ function StatusBadge( { item } ) {
  * @param {boolean}                                props.isLoading         Vrai durant le fetch.
  * @param {?string}                                props.error             Message d'erreur ou null.
  * @param {(p: number) => void}                    props.onChangePage      Callback changement de page.
+ * @param {(n: number) => void}                    props.onChangePerPage   Callback changement de per-page (dropdown PaginationBar).
  * @param {Set<number>}                            props.selectedIds       IDs sélectionnés (F14.1).
  * @param {(id: number, checked: boolean) => void} props.onToggleArticle   Toggle d'un article.
  * @param {(checked: boolean) => void}             props.onToggleAllOnPage Toggle de tous les articles de la page.
@@ -103,6 +105,7 @@ export default function ArticlesTable( {
 	isLoading,
 	error,
 	onChangePage,
+	onChangePerPage,
 	selectedIds,
 	onToggleArticle,
 	onToggleAllOnPage,
@@ -152,8 +155,19 @@ export default function ArticlesTable( {
 		);
 	}
 
+	const paginationProps = {
+		page,
+		totalPages,
+		total,
+		perPage,
+		isLoading,
+		onChangePage,
+		onChangePerPage,
+	};
+
 	return (
 		<div className="htmln-table-wrap">
+			<PaginationBar { ...paginationProps } position="top" />
 			<table className="wp-list-table widefat striped htmln-articles-table">
 				<thead>
 					<tr>
@@ -293,54 +307,7 @@ export default function ArticlesTable( {
 				</tbody>
 			</table>
 
-			<div className="tablenav bottom htmln-pagination">
-				<div className="tablenav-pages">
-					<span className="displaying-num">
-						{ sprintf(
-							// translators: %d = nombre total d'articles.
-							__(
-								'%d article(s) au total',
-								'100son-html-normalizer'
-							),
-							total
-						) }
-					</span>
-					<span className="pagination-links">
-						<Button
-							variant="secondary"
-							disabled={ page <= 1 || isLoading }
-							onClick={ () => onChangePage( page - 1 ) }
-						>
-							{ __( '« Précédent', '100son-html-normalizer' ) }
-						</Button>{ ' ' }
-						<span className="paging-input">
-							{ sprintf(
-								// translators: 1 = page courante, 2 = total de pages.
-								__(
-									'page %1$d sur %2$d',
-									'100son-html-normalizer'
-								),
-								page,
-								Math.max( 1, totalPages )
-							) }
-						</span>{ ' ' }
-						<Button
-							variant="secondary"
-							disabled={ page >= totalPages || isLoading }
-							onClick={ () => onChangePage( page + 1 ) }
-						>
-							{ __( 'Suivant »', '100son-html-normalizer' ) }
-						</Button>
-					</span>
-				</div>
-				{ isLoading && (
-					<span className="htmln-pagination__spinner">
-						<Spinner />
-					</span>
-				) }
-			</div>
-			{ /* perPage est passé pour cohérence d'API mais non utilisé en V1.0 */ }
-			<input type="hidden" value={ perPage } />
+			<PaginationBar { ...paginationProps } position="bottom" />
 		</div>
 	);
 }

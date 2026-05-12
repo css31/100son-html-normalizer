@@ -191,12 +191,90 @@
 	white-space: nowrap;
 }
 
+/* Pagination post-rc4 : barre haut + bas avec 3 zones (per-page à gauche,
+ * compteur au centre, nav droite). Override des règles WP `tablenav` qui
+ * appliqueraient un layout par défaut peu adapté à notre flexbox 3-cols. */
 .htmln-pagination {
-	margin-top: 12px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: var( --htmln-gap );
+	flex-wrap: wrap;
+	padding: 8px 0;
+
+	&--top {
+		margin-bottom: 8px;
+		border-bottom: 1px solid var( --htmln-border );
+	}
+
+	&--bottom {
+		margin-top: 8px;
+		border-top: 1px solid var( --htmln-border );
+	}
+
+	/* Reset des padding/margin que WP impose sur `.tablenav`. */
+	&::before,
+	&::after {
+		display: none;
+	}
+}
+
+.htmln-pagination__per-page {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 0 auto;
+
+	/* Compactage du SelectControl WP pour qu'il rentre dans la barre
+	 * sans dominer visuellement. */
+	.components-base-control {
+		margin-bottom: 0;
+	}
+
+	.components-base-control__field {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: 0;
+	}
+
+	.components-base-control__label {
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var( --htmln-text-muted );
+		margin-bottom: 0;
+	}
+
+	.components-select-control__input {
+		min-height: 32px;
+		font-size: 13px;
+	}
+}
+
+.htmln-pagination__count {
+	flex: 1 1 auto;
+	text-align: center;
+	color: var( --htmln-text-muted );
+	font-size: 13px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+
+.htmln-pagination__nav {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 0 0 auto;
+	flex-wrap: nowrap;
+
+	.paging-input {
+		font-variant-numeric: tabular-nums;
+		color: var( --htmln-text );
+		white-space: nowrap;
+	}
 }
 
 .htmln-pagination__spinner {
