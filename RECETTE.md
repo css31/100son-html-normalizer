@@ -43,8 +43,12 @@ docker ps --filter "name=devkinsta" --format "{{.Names}}\t{{.Status}}"
 docker exec -u www-data devkinsta_fpm php8.3 /usr/local/bin/wp \
   --path=/www/kinsta/public/ma-maison-mag-2 plugin status 100son-html-normalizer
 
-# Backup BDD sandbox AVANT toute écriture (Phase F écrira en base)
-wp-sandbox db export ~/htmln-recette-$(date +%Y%m%d-%H%M).sql
+# Backup BDD sandbox AVANT toute écriture (Phase F écrira en base).
+# `-` = sortie sur stdout ; sans ça, mysqldump (qui tourne *dans* le
+# container devkinsta_fpm) essaye d'écrire dans `/home/cyrille/...`
+# qui n'existe pas côté container — d'où une erreur ENOENT. Le pipe
+# `>` côté hôte récupère le dump et l'écrit dans le bon dossier.
+wp-sandbox db export - > ~/htmln-recette-$(date +%Y%m%d-%H%M).sql
 
 # État de référence
 cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
@@ -326,8 +330,11 @@ wp-sandbox db query "SELECT option_name FROM wp_options WHERE option_name LIKE '
 wp-sandbox db query "SELECT meta_key FROM wp_postmeta WHERE meta_key LIKE '_son100_htmln_%' LIMIT 1"
 # → vide
 
-# Restaurer depuis le backup phase A
-wp-sandbox db import ~/htmln-recette-YYYYMMDD-HHMM.sql
+# Restaurer depuis le backup phase A.
+# Idem que pour `db export` : on pipe le fichier hôte sur stdin pour
+# que mysql (dans le container) le lise depuis le pipe — il n'a pas
+# accès direct à `/home/cyrille/`.
+wp-sandbox db import - < ~/htmln-recette-YYYYMMDD-HHMM.sql
 
 # Reinstall pour repartir
 cd /home/cyrille/DevKinsta/public/ma-maison-mag-2/wp-content/plugins/100son-html-normalizer
