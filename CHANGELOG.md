@@ -3,6 +3,63 @@
 Toutes les modifications notables de cette extension sont consignées ici.
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionning [SemVer](https://semver.org/lang/fr/).
 
+## [1.0.0-rc3] — 2026-05-12
+
+Ajout du **préréglage P9 — `UnwrapHeadingImage`** + bouton **« Scanner le corpus »** dans l'onglet Normaliser de la SPA.
+
+### Ajouts
+
+#### P9 — UnwrapHeadingImage (nouveau préréglage)
+
+- **`Core\Rules\UnwrapHeadingImageRule`** — désencapsule les `<h1>` à `<h6>` qui ne contiennent qu'une image (sans texte). Cas typique des contenus WP migrés où un éditeur visuel a wrappé une image dans un titre par erreur :
+
+  ```html
+  <h2><img src="..." class="aligncenter wp-image-14157" ...></h2>
+  ```
+
+  devient :
+
+  ```html
+  <img src="..." class="aligncenter wp-image-14157" ...>
+  ```
+
+- **Wrappers internes préservés** : `<h2><a href><img></a></h2>` → `<a href><img></a>`, idem pour `<figure>`. Seules les balises de titre sont retirées.
+- **Symétrique de P2** : P2 préserve volontairement les titres contenant un `<img>` (élément structurel), P9 les nettoie.
+- **NBSP** (`&nbsp;`, U+00A0) traité comme blanc — `<h2>&nbsp;<img>&nbsp;</h2>` matché.
+- **Attribut `alt` non bloquant** : `<h2><img alt="Description"></h2>` matché car `alt` est un attribut, pas dans `textContent`.
+
+#### Pipeline + Registry
+
+- **`PresetRegistry::PRESETS`** : ordre canonique mis à jour `P3 → P4 → P8 → P6 → P7 → P5 → P9 → P1 → P2` (P9 inséré entre P5 et P1 : opération structurelle avant cleanup final).
+- **`Activator::seed_presets()`** : P9 ajouté avec `enabled: true` par défaut (consistance avec les 8 autres).
+- **`Rest\PresetsController`** : `KNOWN_IDS` et regex route `/presets/(?P<id>P[1-9])` étendus à P9.
+
+#### SPA — bouton « Scanner le corpus »
+
+- **Nouveau composant** `views/Normalize/ScanBar.jsx` au-dessus de `TabsHeader` dans l'onglet Normaliser. Bouton qui déclenche le scan diagnostic complet — équivalent UI du `wp htmln scan` CLI, utile après modification des règles activées pour rafraîchir la colonne « Règles applicables ».
+- **Nouveau hook** `hooks/useScanBatch.js` : pilote `POST /diagnostics/run` puis boucle séquentielle des chunks via `POST /diagnostics/run/chunk`. Cumul `progress.processed` maintenu côté client (le serveur retourne `processed` = count du chunk courant).
+- **États visuels** : idle (bouton + hint) / scanning (barre de progression avec compteur `X / N articles`). Bouton désactivé pendant un pas (`isRunning`) pour éviter scan concurrent qui fausserait les métriques pre/post.
+- **À la fin du scan** : refetch automatique de `stats` + `list` (mêmes données que post-pas finalisé).
+
+#### Tests
+
+- **17 tests** `UnwrapHeadingImageRuleTest` : id, label, désencapsulation h1-h6, préservation wrappers `<a>`/`<figure>`, négatives (texte présent, vide sans img, vide tout court), NBSP, alt-only, `countMatches` cohérent avec `apply`, idempotence, malformé.
+- **Fixtures** : `unwrap-heading-image-input.html` / `-expected.html`.
+- **Tests existants** mis à jour pour passer de 8 à 9 préréglages : `ActivatorTest`, `PresetsControllerTest` (assertCount + regex route).
+
+#### Désinstallation
+
+- `uninstall.php` : pas de purge supplémentaire requise (P9 partage l'option `son100_htmln_presets` déjà nettoyée).
+
+### Stats
+
+- **PHPUnit** : 581 → 601 tests verts (+20), 1299 → 1349 assertions
+- **Bundle SPA** : 68.5 → 71.0 KiB JS (scan button), CSS 14.2 → 14.7 KiB
+- **Lint JS** : 0 erreur, 0 warning
+- **PHPStan** : niveau 6, 22 erreurs (inchangé)
+
+---
+
 ## [1.0.0-rc2] — 2026-05-12
 
 Ajout de l'**onglet Notes** dans la SPA d'administration — éditeur Gutenberg restreint pour saisir des notes libres persistées côté serveur. Cohabite avec la zone de notes plain-text de la page Journal V0.1 (stockages séparés) jusqu'à la disparition de cette dernière en V1.1.

@@ -42,12 +42,12 @@ use WP_REST_Response;
 final class PresetsController extends BaseController {
 
 	/**
-	 * Liste fixe des 8 ids attendus (P1..P8). Permet de valider l'id
+	 * Liste fixe des 9 ids attendus (P1..P9). Permet de valider l'id
 	 * URL en O(1) et de garantir l'ordre stable du listing.
 	 *
 	 * @var list<string>
 	 */
-	private const KNOWN_IDS = array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8' );
+	private const KNOWN_IDS = array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' );
 
 	/**
 	 * Defaults par règle. Source de vérité dupliquée depuis
@@ -85,6 +85,7 @@ final class PresetsController extends BaseController {
 				'italic' => true,
 			),
 		),
+		'P9' => array(),
 	);
 
 	/**
@@ -111,7 +112,7 @@ final class PresetsController extends BaseController {
 			'permission_callback' => $cap,
 		) );
 
-		register_rest_route( $ns, '/presets/(?P<id>P[1-8])', array(
+		register_rest_route( $ns, '/presets/(?P<id>P[1-9])', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'update_preset' ),
 			'permission_callback' => $cap,

@@ -41,8 +41,8 @@ final class ActivatorTest extends TestCase {
 		Activator::activate();
 		$presets = $GLOBALS['son100_htmln_options']['son100_htmln_presets'] ?? null;
 		$this->assertIsArray( $presets );
-		// Les 8 presets doivent etre presents et actives par defaut.
-		foreach ( [ 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8' ] as $id ) {
+		// Les 9 presets doivent etre presents et actives par defaut.
+		foreach ( [ 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' ] as $id ) {
 			$this->assertArrayHasKey( $id, $presets, "Preset $id manquant" );
 			$this->assertTrue( $presets[ $id ]['enabled'] );
 		}

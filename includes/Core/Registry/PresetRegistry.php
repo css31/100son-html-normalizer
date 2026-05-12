@@ -23,6 +23,7 @@ use Cent_Son\Html_Normalizer\Core\Rules\RecoverSemanticStylesRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RemoveInlineStylesRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 use Cent_Son\Html_Normalizer\Core\Rules\ShareaholicShortcodeRule;
+use Cent_Son\Html_Normalizer\Core\Rules\UnwrapHeadingImageRule;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
@@ -38,9 +39,13 @@ class PresetRegistry {
 	/**
 	 * Ordre canonique des presets dans le pipeline (cf. cahier 4.4).
 	 *
+	 * P9 (ajouté post-rc2) est inséré entre P5 et P1 : il désencapsule les
+	 * `<hN>` autour d'images, opération structurelle qu'on veut faire avant
+	 * le cleanup final P1/P2 (paragraphes/titres vides).
+	 *
 	 * @var list<string>
 	 */
-	public const PRESETS = array( 'P3', 'P4', 'P8', 'P6', 'P7', 'P5', 'P1', 'P2' );
+	public const PRESETS = array( 'P3', 'P4', 'P8', 'P6', 'P7', 'P5', 'P9', 'P1', 'P2' );
 
 	/**
 	 * Repository de configuration des presets.
@@ -164,6 +169,11 @@ class PresetRegistry {
 				'description' => __( 'Convertit les déclarations de présentation en balises HTML sémantiques AVANT que P6 ne strippe le style : <code>font-weight: bold</code> (ou ≥ 700) → <code>&lt;strong&gt;</code>, <code>font-style: italic</code> → <code>&lt;em&gt;</code>. Comportement chirurgical : seules ces déclarations sont retirées du <code>style</code>, les autres (<code>text-align</code>, <code>color</code>…) restent intactes pour P6.', '100son-html-normalizer' ),
 				'has_options' => true,
 			),
+			'P9' => array(
+				'label'       => __( 'Titres autour d\'images', '100son-html-normalizer' ),
+				'description' => __( 'Désencapsule les <code>&lt;h1&gt;</code>-<code>&lt;h6&gt;</code> qui ne contiennent qu\'une image (sans texte). Le <code>&lt;img&gt;</code> et son éventuel wrapper (<code>&lt;a&gt;</code>, <code>&lt;figure&gt;</code>…) sont préservés intacts, seules les balises de titre sont retirées. Typique des contenus migrés où un éditeur visuel a wrappé une image dans un titre par erreur. Symétrique de P2 (qui préserve volontairement ces titres).', '100son-html-normalizer' ),
+				'has_options' => false,
+			),
 		);
 	}
 
@@ -216,6 +226,9 @@ class PresetRegistry {
 				$bold     = ! isset( $mappings['bold'] ) || (bool) $mappings['bold'];
 				$italic   = ! isset( $mappings['italic'] ) || (bool) $mappings['italic'];
 				return new RecoverSemanticStylesRule( $bold, $italic );
+
+			case 'P9':
+				return new UnwrapHeadingImageRule();
 
 			default:
 				return null;

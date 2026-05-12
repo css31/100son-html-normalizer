@@ -166,6 +166,7 @@ final class Activator {
 					'italic' => true,
 				),
 			),
+			'P9' => array( 'enabled' => true ),
 		);
 
 		add_option( 'son100_htmln_presets', $defaults, '', 'no' );

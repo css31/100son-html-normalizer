@@ -29,7 +29,7 @@ qu'on réécrit habituellement à coups de `preg_replace` éparpillés. Il a ét
 
 ## Ce que fait l'extension
 
-### Les 8 préréglages
+### Les 9 préréglages
 
 | Code | Nom | Action |
 |:---:|---|---|
@@ -41,8 +41,9 @@ qu'on réécrit habituellement à coups de `preg_replace` éparpillés. Il a ét
 | **P6** | `RemoveInlineStyles` | Supprime tout `style="…"` en ligne (option `keep_text_align` pour préserver les alignements) |
 | **P7** | `AsciiList` | Convertit les listes ASCII (`* item`, `- item`) en vraies `<ul><li>` |
 | **P8** | `RecoverSemanticStyles` | Récupère le sens : `<span style="font-weight:bold">` → `<strong>`, etc., **avant** que P6 ne tape |
+| **P9** | `UnwrapHeadingImage` | Désencapsule les `<hN>` autour d'images (`<h2><img></h2>` → `<img>`). Préserve les wrappers internes (`<a>`, `<figure>`). Symétrique de P2. |
 
-**Pipeline canonique :** P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2.
+**Pipeline canonique :** P3 → P4 → P8 → P6 → P7 → P5 → P9 → P1 → P2.
 L'ordre est figé pour préserver le sens : on récupère la sémantique avant de purger les styles, on enlève le shortcode avant qu'il génère des paragraphes vides, etc. Chaque préréglage est **activable / désactivable indépendamment** depuis l'admin.
 
 ### Workflow par pas (V1.0)
