@@ -402,16 +402,8 @@ export default function Settings() {
  * @return {JSX.Element} Fieldset URLs + boutons.
  */
 function ExternalSitesSection() {
-	const {
-		sites,
-		defaults,
-		isLoading,
-		isSaving,
-		error,
-		isDirty,
-		save,
-		clearStatus,
-	} = useExternalSites();
+	const { sites, isLoading, isSaving, error, isDirty, save, clearStatus } =
+		useExternalSites();
 
 	// String state pour les inputs texte (URL + label) + boolean state pour
 	// les toggles. Le même `formValues` héberge les 6 clés ; le booléen
@@ -449,14 +441,6 @@ function ExternalSitesSection() {
 		},
 		[ isDirty, error, clearStatus ]
 	);
-
-	const handleRestore = useCallback( () => {
-		if ( ! defaults ) {
-			return;
-		}
-		setFormValues( initFromSites( defaults ) );
-		clearStatus();
-	}, [ defaults, clearStatus ] );
 
 	const handleSave = useCallback(
 		async ( event ) => {
@@ -499,7 +483,7 @@ function ExternalSitesSection() {
 				<h2>{ __( 'Domaines externes', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'URLs des sites où ouvrir un article depuis l’onglet Normaliser. Pour chaque site, configurez l’URL, le libellé du bouton (5 caractères max) et si le bouton doit s’afficher. Schéma http:// ou https:// requis ; le slash final est retiré automatiquement. Une valeur invalide est remplacée par la valeur par défaut.',
+						'Cette section vous permet d’afficher un ou deux boutons dans la liste des articles afin d’ouvrir la version de l’article en production « prod », sur un autre site de « dev » ou encore sur un site « old ».',
 						'100son-html-normalizer'
 					) }
 				</p>
@@ -527,23 +511,15 @@ function ExternalSitesSection() {
 			<form onSubmit={ handleSave } className="htmln-settings__form">
 				<ExternalSiteFieldset
 					prefix="old"
-					legend={ __(
-						'Ancien site (« Old »)',
-						'100son-html-normalizer'
-					) }
+					legend={ __( 'Site 1 (dev)', '100son-html-normalizer' ) }
 					formValues={ formValues }
-					defaults={ defaults }
 					isSaving={ isSaving }
 					onChange={ handleChange }
 				/>
 				<ExternalSiteFieldset
 					prefix="prod"
-					legend={ __(
-						'Site de production (« Prod »)',
-						'100son-html-normalizer'
-					) }
+					legend={ __( 'Site 2 (prod)', '100son-html-normalizer' ) }
 					formValues={ formValues }
-					defaults={ defaults }
 					isSaving={ isSaving }
 					onChange={ handleChange }
 				/>
@@ -556,17 +532,6 @@ function ExternalSitesSection() {
 						isBusy={ isSaving }
 					>
 						{ __( 'Enregistrer', '100son-html-normalizer' ) }
-					</Button>{ ' ' }
-					<Button
-						type="button"
-						variant="secondary"
-						onClick={ handleRestore }
-						disabled={ isSaving || ! defaults }
-					>
-						{ __(
-							'Restaurer les valeurs par défaut',
-							'100son-html-normalizer'
-						) }
 					</Button>
 				</div>
 			</form>
@@ -575,14 +540,13 @@ function ExternalSitesSection() {
 }
 
 /**
- * Fieldset par site (Old / Prod) — 3 contrôles : toggle d'affichage,
+ * Fieldset par site (Site 1 / Site 2) — 3 contrôles : toggle d'affichage,
  * libellé du bouton (5 chars max), URL.
  *
  * @param {Object}                                     props
- * @param {'old'|'prod'}                               props.prefix     Préfixe des clés (`old_*` ou `prod_*`).
+ * @param {'old'|'prod'}                               props.prefix     Préfixe des clés interne BDD (`old_*` ou `prod_*` — noms historiques conservés pour ne pas migrer l'option).
  * @param {string}                                     props.legend     Légende du fieldset.
  * @param {Object<string, string|boolean>}             props.formValues State partagé.
- * @param {?Object<string, string|boolean>}            props.defaults   Defaults exposés par le serveur (pour helpText).
  * @param {boolean}                                    props.isSaving   Désactive les inputs durant le POST.
  * @param {(key: string, raw: string|boolean) => void} props.onChange   Handler unique.
  * @return {JSX.Element} Fieldset.
@@ -591,7 +555,6 @@ function ExternalSiteFieldset( {
 	prefix,
 	legend,
 	formValues,
-	defaults,
 	isSaving,
 	onChange,
 } ) {
@@ -604,7 +567,7 @@ function ExternalSiteFieldset( {
 			{ /* Une seule ligne : `[Toggle Afficher] [Libellé court]
 			     [URL flexible]`. Cf. SCSS `.htmln-settings__external-site-row`
 			     qui pose le flex layout + les contraintes de largeur par
-			     enfant (100 px max sur le libellé, flex 1 sur l'URL). */ }
+			     enfant (70 px sur le libellé, 300 px sur l'URL). */ }
 			<div className="htmln-settings__external-site-row">
 				<div className="htmln-settings__external-site-toggle">
 					<ToggleControl
@@ -624,11 +587,6 @@ function ExternalSiteFieldset( {
 						onChange={ ( raw ) => onChange( labelKey, raw ) }
 						disabled={ isSaving }
 						maxLength={ 5 }
-						help={ sprintf(
-							// translators: %s = libellé par défaut.
-							__( 'Default : %s.', '100son-html-normalizer' ),
-							String( defaults?.[ labelKey ] ?? '' )
-						) }
 						__nextHasNoMarginBottom
 						__next40pxDefaultSize
 					/>
@@ -639,11 +597,6 @@ function ExternalSiteFieldset( {
 						value={ formValues[ urlKey ] ?? '' }
 						onChange={ ( raw ) => onChange( urlKey, raw ) }
 						disabled={ isSaving }
-						help={ sprintf(
-							// translators: %s = URL par défaut.
-							__( 'Default : %s.', '100son-html-normalizer' ),
-							String( defaults?.[ urlKey ] ?? '' )
-						) }
 						type="url"
 						__nextHasNoMarginBottom
 						__next40pxDefaultSize

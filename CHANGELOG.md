@@ -5,6 +5,13 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Réglages — section Domaines externes : titres génériques, description, simplifications
+
+- Renommage des fieldsets : **« Ancien site (« Old ») » → « Site 1 (dev) »** et **« Site de production (« Prod ») » → « Site 2 (prod) »** — titres génériques qui collent mieux à l'usage (les deux boutons sont configurables librement pour pointer vers n'importe quel environnement). Les clés internes côté backend (`old_url`, `prod_url`, etc.) restent inchangées pour ne pas migrer l'option BDD.
+- **Nouvelle description** sous le titre « Domaines externes » : « Cette section vous permet d'afficher un ou deux boutons dans la liste des articles afin d'ouvrir la version de l'article en production « prod », sur un autre site de « dev » ou encore sur un site « old ». »
+- **Suppression** des helpText « Default : … » sur les inputs Libellé et URL (les valeurs par défaut sont déjà affichées dans les champs eux-mêmes au premier chargement).
+- **Suppression** du bouton « Restaurer les valeurs par défaut » et du callback `handleRestore` correspondant. Le `defaults` retourné par `useExternalSites` n'est plus consommé côté UI (le hook continue de l'exposer pour rester compatible avec une éventuelle utilisation future).
+
 ### Réglages — refonte du design de la page
 
 Trois ajustements visuels sur l'onglet Réglages (zéro impact fonctionnel) :
