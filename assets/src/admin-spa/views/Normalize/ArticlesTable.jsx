@@ -323,7 +323,10 @@ export default function ArticlesTable( {
 						</th>
 						{ showOpenOnColumn && (
 							<th scope="col" className="manage-column">
-								{ __( 'Ouvrir sur', '100son-html-normalizer' ) }
+								{ __(
+									'Ouvrir sur…',
+									'100son-html-normalizer'
+								) }
 							</th>
 						) }
 						<th scope="col" className="manage-column">
