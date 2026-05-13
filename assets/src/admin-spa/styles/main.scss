@@ -1006,8 +1006,15 @@
  *  Onglet Réglages
  * ========================================================================== */
 
+/* Header de section : titre + description. `max-width: 542px` aligne
+ * le bord droit du `<p class="description">` sur le bord droit d'un
+ * fieldset « Seuils » ou « Domaine externe » de la rangée en dessous
+ * (chaque fieldset fait ~542 px quand deux sont posés côte à côte dans
+ * un form de 1100 px via `.htmln-settings__columns`). Largeur de lecture
+ * confortable au passage (~80 caractères). */
 .htmln-settings__header {
 	margin-bottom: 16px;
+	max-width: 542px;
 
 	h2 {
 		margin: 0 0 4px;
@@ -1017,7 +1024,6 @@
 	.description {
 		color: var( --htmln-text-muted );
 		margin: 0;
-		max-width: 80ch;
 	}
 }
 
@@ -1128,20 +1134,14 @@
 /* Section secondaire dans la page Réglages (ex. « Domaines externes »),
  * séparée du formulaire principal par un trait léger + marge. Le trait
  * `border-top` reste full-width pour matcher visuellement le header de
- * la page. Le `<header>` (titre + `<p class="description">`) est limité
- * à 542 px — soit la largeur d'un fieldset « Domaine externe » sur la
- * rangée en dessous : le bord droit de la description s'aligne ainsi
- * sur le bord droit du premier fieldset. Le `<form>` hérite de sa
- * `max-width: 1100px` par défaut pour accueillir les deux fieldsets
- * côte à côte (cf. `.htmln-settings__columns`). */
+ * la page. La contrainte de largeur du `<header>` (542 px) est posée
+ * globalement sur `.htmln-settings__header` plus haut. Le `<form>`
+ * hérite de sa `max-width: 1100px` par défaut pour accueillir les deux
+ * fieldsets côte à côte (cf. `.htmln-settings__columns`). */
 .htmln-settings__section {
 	margin-top: 32px;
 	padding-top: 24px;
 	border-top: 1px solid var( --htmln-border );
-
-	> .htmln-settings__header {
-		max-width: 542px;
-	}
 }
 
 /* Fieldset « Domaines externes » : deux rangées empilées. La rangée du
