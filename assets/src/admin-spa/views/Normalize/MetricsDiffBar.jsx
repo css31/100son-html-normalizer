@@ -42,7 +42,13 @@ const NUMBER_FORMAT = new Intl.NumberFormat( 'fr-FR' );
  */
 function getRowDefs() {
 	return [
-		{ key: 'chars', label: __( 'Caractères', '100son-html-normalizer' ) },
+		{
+			key: 'chars',
+			label: __(
+				'Caractères (espaces inclus)',
+				'100son-html-normalizer'
+			),
+		},
 		{ key: 'words', label: __( 'Mots', '100son-html-normalizer' ) },
 		{
 			key: 'paragraphs',

@@ -1465,7 +1465,7 @@ final class PostsPage {
 
 		$rows = array(
 			array( __( 'Mots', '100son-html-normalizer' ), 'word_count', 'word_delta', 'word_pct' ),
-			array( __( 'Caractères', '100son-html-normalizer' ), 'char_count', 'char_delta', 'char_pct' ),
+			array( __( 'Caractères (espaces inclus)', '100son-html-normalizer' ), 'char_count', 'char_delta', 'char_pct' ),
 			array( __( 'Images', '100son-html-normalizer' ), 'image_count', 'image_delta', null ),
 		);
 		foreach ( $rows as $row ) {

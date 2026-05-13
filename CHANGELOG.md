@@ -5,6 +5,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Label `Caractères` clarifié → `Caractères (espaces inclus)`
+
+Le bandeau métriques affichait « Caractères » sans préciser que les espaces sont comptés — source de confusion avec des outils externes (gedit, Word…) qui distinguent en général « caractères avec espaces » vs « sans espaces ». Comme la métrique du plugin est calculée via `mb_strlen()` du `textContent` (espaces inclus, mais NBSP normalisés en espaces simples), on clarifie le libellé partout où il apparaît côté utilisateur :
+
+- `MetricsDiffBar.jsx` (table métriques de la modale Diff).
+- `Settings.jsx` (seuil γ « Caractères — perte tolérée » → « Caractères (espaces inclus) — perte tolérée »).
+- `Admin/Pages/PostsPage.php` (page V0.1 — pour cohérence, même si la page est masquée du menu).
+
+Note : la métrique du plugin ne compte pas les attributs `alt` des images, alors que le presse-papier d'un navigateur les inclut en collant vers une cible texte simple — ce qui peut expliquer un écart de quelques dizaines de mots et plusieurs centaines de caractères vs un copier-coller dans gedit. Comportement délibéré (le `alt` n'est pas du « contenu de lecture » au sens régression structurelle).
+
 ### Fix P6 — préserve le `style` du `<img>` dans les blocs Gutenberg `core/image`
 
 La règle **P6 (Styles inline)** strippait l'attribut `style="aspect-ratio:…;width:…;height:…;object-fit:…"` du `<img>` à l'intérieur d'un bloc `core/image` Gutenberg. Or ce `style` est **synchronisé** avec :

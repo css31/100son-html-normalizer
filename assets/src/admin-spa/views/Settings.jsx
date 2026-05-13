@@ -36,7 +36,10 @@ import { useExternalSites } from '../hooks/useExternalSites';
 const FIELDS = [
 	{
 		key: 'text_loss_pct',
-		label: __( 'Caractères — perte tolérée', '100son-html-normalizer' ),
+		label: __(
+			'Caractères (espaces inclus) — perte tolérée',
+			'100son-html-normalizer'
+		),
 		unit: 'pct',
 		max: 100,
 		hint: __(
