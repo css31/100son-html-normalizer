@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Rest;
 
 use Cent_Son\Html_Normalizer\Core\Pipeline;
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
@@ -53,13 +54,22 @@ final class DiffControllerTest extends TestCase {
 		};
 	}
 
-	private function seed_post( int $id, string $content ): void {
+	private function seed_post(
+		int $id,
+		string $content,
+		string $date = '',
+		array $categories = array()
+	): void {
 		$p                = new WP_Post();
 		$p->ID            = $id;
 		$p->post_content  = $content;
 		$p->post_type     = 'post';
 		$p->post_status   = 'publish';
-		Son100_Htmln_Test_Posts_Registry::$posts[ $id ] = $p;
+		if ( '' !== $date ) {
+			$p->post_date = $date;
+		}
+		Son100_Htmln_Test_Posts_Registry::$posts[ $id ]      = $p;
+		Son100_Htmln_Test_Posts_Registry::$categories[ $id ] = $categories;
 	}
 
 	private function make_request( array $params ): WP_REST_Request {
@@ -75,6 +85,7 @@ final class DiffControllerTest extends TestCase {
 			$this->registry_with( $rules ),
 			new Pipeline(),
 			new MetricsCalculator(),
+			new BuilderClassifier(),
 		);
 	}
 
@@ -167,5 +178,108 @@ final class DiffControllerTest extends TestCase {
 		);
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertTrue( $response->get_data()['unchanged'] );
+	}
+
+	// =========================================================================
+	//  Métadonnées article — header modale Diff (post-rc4)
+	// =========================================================================
+
+	public function test_compute_diff_exposes_post_date(): void {
+		$this->seed_post( 100, '<p>x</p>', '2024-03-12 14:30:00' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertSame( '2024-03-12 14:30:00', $response->get_data()['post_date'] );
+	}
+
+	public function test_compute_diff_exposes_categories(): void {
+		$this->seed_post(
+			100,
+			'<p>x</p>',
+			'2024-01-01 00:00:00',
+			array( 'Animaux', 'Maison' )
+		);
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertSame( array( 'Animaux', 'Maison' ), $response->get_data()['categories'] );
+	}
+
+	public function test_compute_diff_exposes_empty_categories_when_none(): void {
+		$this->seed_post( 100, '<p>x</p>' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertSame( array(), $response->get_data()['categories'] );
+	}
+
+	public function test_compute_diff_exposes_builder_type(): void {
+		// Contenu Gutenberg → classifier doit retourner `gutenberg`.
+		$this->seed_post( 100, '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertSame( 'gutenberg', $response->get_data()['builder_type'] );
+	}
+
+	public function test_compute_diff_flags_fossil_panels_data_on_gutenberg(): void {
+		// Article classifié Gutenberg (via has_blocks) ET portant un vestige
+		// `panels_data` en post-meta — la pastille SPA doit afficher l'état
+		// orange « Gut + fossile ».
+		$this->seed_post( 100, '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' );
+		Son100_Htmln_Test_Posts_Registry::$meta[100]['panels_data'] = array(
+			'widgets' => array( array( 'panels_info' => array() ) ),
+		);
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$body = $response->get_data();
+		$this->assertSame( 'gutenberg', $body['builder_type'] );
+		$this->assertTrue( $body['has_fossil_panels_data'] );
+	}
+
+	public function test_compute_diff_no_fossil_flag_on_pure_gutenberg(): void {
+		// Article Gutenberg sans aucun vestige SO en meta — flag false.
+		$this->seed_post( 100, '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertFalse( $response->get_data()['has_fossil_panels_data'] );
+	}
+
+	public function test_compute_diff_no_fossil_flag_on_siteorigin(): void {
+		// `panels_data` non-vide sur un article SO classique ≠ fossile.
+		// Le flag fossile est scope au type Gutenberg uniquement.
+		$this->seed_post( 100, '<div class="panel-layout"><div class="so-panel">x</div></div>' );
+		Son100_Htmln_Test_Posts_Registry::$meta[100]['panels_data'] = array(
+			'widgets' => array( array( 'panels_info' => array() ) ),
+		);
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$body = $response->get_data();
+		$this->assertSame( 'siteorigin', $body['builder_type'] );
+		$this->assertFalse( $body['has_fossil_panels_data'] );
 	}
 }

@@ -25,6 +25,8 @@
         "@wordpress/element": "^6.0.0",
         "@wordpress/format-library": "^5.0.0",
         "@wordpress/i18n": "^5.0.0",
-        "@wordpress/notices": "^5.0.0"
+        "@wordpress/icons": "^13.0.0",
+        "@wordpress/notices": "^5.0.0",
+        "prismjs": "^1.29.0"
     }
 }

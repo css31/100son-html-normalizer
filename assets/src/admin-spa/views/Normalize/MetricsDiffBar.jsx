@@ -220,13 +220,17 @@ function buildSummary( rows ) {
 }
 
 /**
- * @param {Object}  props
- * @param {?Object} props.before MetricsSnapshot avant.
- * @param {?Object} props.after  MetricsSnapshot après.
- * @return {JSX.Element|null} Bandeau ou null si les snapshots sont vides.
+ * Calcule les lignes du tableau métriques (rows non-nulles avant/après) pour
+ * un couple de snapshots. Logique extraite du composant pour partager entre
+ * les exports `MetricsDiffSummary` et `MetricsDiffTable` (qui peuvent être
+ * rendus séparément côté caller, ex. layout 2 colonnes dans `DiffModal`).
+ *
+ * @param {?Object} before MetricsSnapshot avant ou null.
+ * @param {?Object} after  MetricsSnapshot après ou null.
+ * @return {RowData[]} Lignes prêtes à être rendues, dans l'ordre canonique.
  */
-export default function MetricsDiffBar( { before, after } ) {
-	const rows = getRowDefs()
+function computeRows( before, after ) {
+	return getRowDefs()
 		.map( ( { key, label } ) =>
 			buildRow(
 				key,
@@ -235,67 +239,119 @@ export default function MetricsDiffBar( { before, after } ) {
 				getValue( after, key )
 			)
 		)
-		// Cache les lignes où la métrique est nulle avant et après — réduit
-		// le bruit visuel (typique : pas d'images, pas de listes).
 		.filter( ( r ) => ! ( 0 === r.before && 0 === r.after ) );
+}
 
+/**
+ * Phrase « garde-fou » au-dessus du tableau métriques, exportée séparément
+ * pour qu'un caller (ex. `DiffModal`) puisse la placer dans une colonne
+ * adjacente au tableau plutôt qu'au-dessus — gain de hauteur verticale qui
+ * laisse plus d'espace à l'affichage du code source / rendu HTML.
+ *
+ * @param {Object}  props
+ * @param {?Object} props.before MetricsSnapshot avant.
+ * @param {?Object} props.after  MetricsSnapshot après.
+ * @return {JSX.Element|null} `<p>` summary ou null si rien à montrer.
+ */
+export function MetricsDiffSummary( { before, after } ) {
+	const rows = computeRows( before, after );
 	if ( 0 === rows.length ) {
 		return null;
 	}
-
 	const summary = buildSummary( rows );
+	return (
+		<p
+			className={ `htmln-metrics-diff__summary htmln-metrics-diff__summary--${ summary.kind }` }
+			role="status"
+		>
+			{ summary.message }
+		</p>
+	);
+}
 
+/**
+ * Tableau des métriques avant/après seul (sans la phrase summary), exporté
+ * pour la même raison que `MetricsDiffSummary` — composer un layout 2
+ * colonnes côté caller.
+ *
+ * @param {Object}  props
+ * @param {?Object} props.before MetricsSnapshot avant.
+ * @param {?Object} props.after  MetricsSnapshot après.
+ * @return {JSX.Element|null} `<table>` ou null si rien à montrer.
+ */
+export function MetricsDiffTable( { before, after } ) {
+	const rows = computeRows( before, after );
+	if ( 0 === rows.length ) {
+		return null;
+	}
+	return (
+		<table
+			className="htmln-metrics-diff"
+			aria-label={ __(
+				'Métriques avant / après',
+				'100son-html-normalizer'
+			) }
+		>
+			<thead>
+				<tr>
+					<th scope="col">
+						{ __( 'Métrique', '100son-html-normalizer' ) }
+					</th>
+					<th scope="col" className="htmln-metrics-diff__num">
+						{ __( 'Avant', '100son-html-normalizer' ) }
+					</th>
+					<th scope="col" className="htmln-metrics-diff__num">
+						{ __( 'Après', '100son-html-normalizer' ) }
+					</th>
+					<th scope="col" className="htmln-metrics-diff__num">
+						{ __( 'Δ', '100son-html-normalizer' ) }
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+				{ rows.map( ( row ) => (
+					<tr key={ row.key }>
+						<th scope="row">{ row.label }</th>
+						<td className="htmln-metrics-diff__num">
+							{ NUMBER_FORMAT.format( row.before ) }
+						</td>
+						<td className="htmln-metrics-diff__num">
+							{ NUMBER_FORMAT.format( row.after ) }
+						</td>
+						<td
+							className={ `htmln-metrics-diff__num htmln-metrics-diff__delta htmln-metrics-diff__delta--${ row.sev }` }
+						>
+							{ formatDelta( row ) }
+						</td>
+					</tr>
+				) ) }
+			</tbody>
+		</table>
+	);
+}
+
+/**
+ * Composé par défaut : summary au-dessus, tableau en-dessous, dans un wrapper.
+ * Layout vertical historique conservé pour `RegressionModal` qui n'a pas
+ * besoin de la disposition 2 colonnes.
+ *
+ * Pour le layout 2 colonnes (ex. `DiffModal` post-rc4), consommer
+ * `MetricsDiffSummary` et `MetricsDiffTable` séparément.
+ *
+ * @param {Object}  props
+ * @param {?Object} props.before MetricsSnapshot avant.
+ * @param {?Object} props.after  MetricsSnapshot après.
+ * @return {JSX.Element|null} Bandeau ou null si les snapshots sont vides.
+ */
+export default function MetricsDiffBar( { before, after } ) {
+	const rows = computeRows( before, after );
+	if ( 0 === rows.length ) {
+		return null;
+	}
 	return (
 		<div className="htmln-metrics-diff-wrap">
-			<p
-				className={ `htmln-metrics-diff__summary htmln-metrics-diff__summary--${ summary.kind }` }
-				role="status"
-			>
-				{ summary.message }
-			</p>
-
-			<table
-				className="htmln-metrics-diff"
-				aria-label={ __(
-					'Métriques avant / après',
-					'100son-html-normalizer'
-				) }
-			>
-				<thead>
-					<tr>
-						<th scope="col">
-							{ __( 'Métrique', '100son-html-normalizer' ) }
-						</th>
-						<th scope="col" className="htmln-metrics-diff__num">
-							{ __( 'Avant', '100son-html-normalizer' ) }
-						</th>
-						<th scope="col" className="htmln-metrics-diff__num">
-							{ __( 'Après', '100son-html-normalizer' ) }
-						</th>
-						<th scope="col" className="htmln-metrics-diff__num">
-							{ __( 'Δ', '100son-html-normalizer' ) }
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{ rows.map( ( row ) => (
-						<tr key={ row.key }>
-							<th scope="row">{ row.label }</th>
-							<td className="htmln-metrics-diff__num">
-								{ NUMBER_FORMAT.format( row.before ) }
-							</td>
-							<td className="htmln-metrics-diff__num">
-								{ NUMBER_FORMAT.format( row.after ) }
-							</td>
-							<td
-								className={ `htmln-metrics-diff__num htmln-metrics-diff__delta htmln-metrics-diff__delta--${ row.sev }` }
-							>
-								{ formatDelta( row ) }
-							</td>
-						</tr>
-					) ) }
-				</tbody>
-			</table>
+			<MetricsDiffSummary before={ before } after={ after } />
+			<MetricsDiffTable before={ before } after={ after } />
 		</div>
 	);
 }

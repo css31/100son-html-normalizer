@@ -16,9 +16,17 @@
  *  Variables d'apparence locales (V1.0 — pas un design system, juste des
  *  raccourcis pour cohérence interne. Reposent sur les CSS vars WP existantes
  *  quand pertinent).
+ *
+ *  Scope `:root` (et non `.htmln-spa-root`) parce que les composants
+ *  `@wordpress/components` Modal / Popover utilisent un portail React au
+ *  niveau de `document.body`, **hors** de l'arbre `.htmln-spa-root`. Si on
+ *  scope les vars à la racine SPA, toute pastille `BuilderBadge` rendue
+ *  dans une modale tombe sur un `background: <var invalide>` → transparent
+ *  avec texte blanc → invisible. Préfixe `--htmln-*` suffit à éviter
+ *  toute collision globale.
  * ========================================================================== */
 
-.htmln-spa-root {
+:root {
 	--htmln-radius: 4px;
 	--htmln-radius-lg: 6px;
 	--htmln-border: #dcdcde;
@@ -1063,13 +1071,150 @@
  *  Modales — DiffModal, RegressionModal, StepDetailDrawer
  * ========================================================================== */
 
-/* Toggle « Code source / Rendu HTML » : segmented bar discrète sous
- * le bandeau métriques. Pas de bordure inférieure pleine — un simple
- * espacement suffit, l'œil ne s'arrête pas dessus. */
+/* En-tête de modale Diff (post-rc4) — métadonnées injectées **à la suite
+ * immédiate du titre** via le slot `headerActions` du composant `Modal` de
+ * `@wordpress/components`.
+ *
+ * Le header WP par défaut a une structure
+ * `[heading-container][headerActions?][Spacer][button.close]` avec
+ * `justify-content: space-between` qui éparpille tout. On bascule en
+ * `flex-start` + un petit gap pour coller les métadonnées au titre, et on
+ * pousse l'ensemble `[Spacer + bouton fermer]` tout à droite en cible-
+ * `:nth-last-child(2)` (= le Spacer, peu importe que `headerActions` soit
+ * présent ou non — il reste l'avant-dernier).
+ *
+ * Pas de `flex-wrap` : on garde tout sur une ligne. Si le titre est trop
+ * long, le `<h1>` se laisse comprimer et tronque en ellipsis (cf. règle
+ * sur `__header-heading` plus bas) plutôt que de pousser les métadonnées
+ * à la ligne.
+ *
+ * La pastille `BuilderBadge` est rendue telle quelle (mêmes classes
+ * `.htmln-builder-badge--<modifier>` que dans la liste des articles) —
+ * mêmes couleurs (les CSS vars sont scopées `:root` pour traverser le
+ * portail React du Modal). */
+.htmln-diff-modal .components-modal__header {
+	justify-content: flex-start;
+	gap: 12px;
+
+	> :nth-last-child(2) {
+		margin-left: auto;
+	}
+}
+
+/* Coupable identifié dans `node_modules/@wordpress/components/build-style/style.css` :
+ *
+ *   .components-modal__header-heading-container { flex-grow: 1; }
+ *
+ * Ce `flex-grow: 1` faisait que le `<h1>` s'étirait sur **toute la largeur
+ * dispo** du header, refoulant les métadonnées + le bouton de fermeture à
+ * droite. On le ramène à 0 pour que le titre reste à sa largeur intrinsèque,
+ * laissant les métadonnées s'aligner juste à sa suite via le gap du header.
+ *
+ * `min-width: 0` + `flex-shrink: 1` permettent au titre de se laisser
+ * comprimer (et l'ellipsis ci-dessous de prendre le relais) plutôt que de
+ * pousser le reste hors écran sur un titre très long. */
+.htmln-diff-modal .components-modal__header-heading-container {
+	flex-grow: 0;
+	flex-shrink: 1;
+	min-width: 0;
+}
+
+.htmln-diff-modal .components-modal__header-heading {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.htmln-diff-modal__header-meta {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 13px;
+	font-weight: 400;
+	color: var( --htmln-text-muted );
+	flex-shrink: 0;
+
+	/* Tiret cadratin entre le titre et le 1er item de métadonnées. Posé en
+	 * `::before` du container (et non du 1er `__header-meta-item`) pour
+	 * rester cohérent quand la catégorie est absente — c'est toujours le
+	 * 1er item présent qui suit le tiret. */
+	&::before {
+		content: "—";
+	}
+}
+
+.htmln-diff-modal__header-meta-item {
+	display: inline-flex;
+	align-items: center;
+}
+
+/* Séparateur « · » discret entre chaque item, sauf devant le premier. */
+.htmln-diff-modal__header-meta-item + .htmln-diff-modal__header-meta-item {
+	&::before {
+		content: "·";
+		margin-right: 10px;
+		color: var( --htmln-text-muted );
+	}
+}
+
+/* Ligne « bandeau métriques » de DiffModal (post-rc4) — layout 2 colonnes
+ * pour libérer un maximum de hauteur verticale en faveur de l'affichage du
+ * code en dessous. La table métriques occupe la gauche à sa largeur
+ * intrinsèque ; la colonne droite empile la phrase summary (taux de perte),
+ * la notice « Aucun changement » et les boutons « Code source / Rendu HTML ».
+ *
+ * Pas de `align-items: flex-start` — on garde la valeur par défaut `stretch`
+ * pour que la colonne aside s'étire à la pleine hauteur du tableau, ce qui
+ * permet ensuite à `margin-top: auto` sur le `view-toggle` d'aligner les
+ * boutons sur le bas du tableau. `flex-wrap: wrap` pour replier verticale-
+ * ment sur écran étroit ou modale rétrécie. */
+.htmln-diff-modal__metrics-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 20px;
+	margin: 0 0 16px;
+}
+
+.htmln-diff-modal__metrics-aside {
+	flex: 1 1 280px;
+	min-width: 240px;
+	display: flex;
+	flex-direction: column;
+	/* `align-items: flex-start` (et non `stretch` par défaut) pour que la
+	 * phrase summary, la notice et la barre des boutons « Code source /
+	 * Rendu HTML » prennent chacune la largeur de leur contenu au lieu de
+	 * filer jusqu'au bord droit de la modale. Le `flex: 1 1 280px` de
+	 * cette colonne sert juste à consommer la place horizontale disponible
+	 * dans la rangée — pas à dilater ses enfants. */
+	align-items: flex-start;
+	gap: 10px;
+
+	/* Le summary porte `margin: 0 0 12px` quand consommé via le wrapper
+	 * `MetricsDiffBar` (RegressionModal) — on neutralise ici pour que la
+	 * respiration soit donnée par le `gap` du flex parent uniquement. Idem
+	 * pour la notice WP qui a ses propres marges natives. */
+	.htmln-metrics-diff__summary,
+	.notice {
+		margin: 0;
+	}
+
+	/* Pousse le toggle « Code source / Rendu HTML » tout en bas de la
+	 * colonne aside pour qu'il s'aligne sur le bas du tableau métriques
+	 * adjacent. `margin-top: auto` consomme tout l'espace résiduel entre
+	 * le bloc summary (+ notice éventuelle) et les boutons. */
+	.htmln-diff-modal__view-toggle {
+		margin-top: auto;
+	}
+}
+
+/* Toggle « Code source / Rendu HTML » : segmented bar discrète. Avant rc4
+ * la barre était placée sous le bandeau métriques, occupant sa propre ligne
+ * verticale ; elle vit désormais dans `__metrics-aside` à côté du tableau,
+ * d'où le reset des marges hautes/basses. */
 .htmln-diff-modal__view-toggle {
 	display: flex;
 	gap: 8px;
-	margin: 12px 0 16px;
+	margin: 0;
 }
 
 /* Deux colonnes côte-à-côte, sans hauteur fixe : le scroll naturel
@@ -1150,6 +1295,72 @@
 	line-height: 1.55;
 	white-space: pre-wrap;
 	word-break: break-word;
+
+	/* Le `<code>` interne, généré par `HighlightedCode`, hérite du flux
+	 * inline du `<pre>` parent — pas de display block pour ne pas casser
+	 * `white-space: pre-wrap`. */
+	> code {
+		display: block;
+		font-family: inherit;
+		font-size: inherit;
+		line-height: inherit;
+		background: transparent;
+		padding: 0;
+	}
+
+	/* === Coloration syntaxique Prism (classes `.token.<kind>`) ===
+	 *
+	 * On évite volontairement d'importer `prismjs/themes/prism.css` qui
+	 * imposerait son propre background sur `pre[class*="language-"]` et
+	 * écraserait les backgrounds `#f6f7f7` / `#f0f6fc` qui distinguent
+	 * visuellement les colonnes Avant/Après. Palette alignée WP-Admin :
+	 *
+	 *  - tags         : bleu admin `#2271b1`
+	 *  - punctuation  : gris foncé `var(--htmln-text-muted)`
+	 *  - attr-name    : violet `#8a46f0` (cohérent avec `--htmln-color-confirmed`)
+	 *  - attr-value   : vert `#00a32a` (= `--htmln-color-success`)
+	 *  - comments     : gris muted, italique
+	 *  - doctype/cdata: gris faint
+	 *  - entities     : orange `#dba617` (= `--htmln-color-warning`)
+	 */
+	.token.tag {
+		color: var( --htmln-color-info );
+	}
+
+	.token.tag .token.punctuation,
+	.token.punctuation {
+		color: var( --htmln-text-muted );
+	}
+
+	.token.attr-name {
+		color: var( --htmln-color-confirmed );
+	}
+
+	.token.attr-value,
+	.token.attr-value .token.punctuation {
+		color: var( --htmln-color-success );
+	}
+
+	.token.attr-value .token.punctuation.attr-equals {
+		color: var( --htmln-text-muted );
+	}
+
+	.token.comment,
+	.token.prolog,
+	.token.doctype,
+	.token.cdata {
+		color: var( --htmln-text-faint );
+		font-style: italic;
+	}
+
+	.token.entity {
+		color: var( --htmln-color-warning );
+		cursor: help;
+	}
+
+	.token.namespace {
+		opacity: 0.7;
+	}
 }
 
 .htmln-diff-modal__iframe {

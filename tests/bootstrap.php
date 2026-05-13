@@ -61,6 +61,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public string $post_status     = 'publish';
 		public string $post_type       = 'post';
 		public string $post_modified   = '';
+		public string $post_date       = '';
 	}
 }
 
@@ -107,12 +108,15 @@ final class Son100_Htmln_Test_Posts_Registry {
 	public static array $revisions_created = [];
 	/** @var array<int, string> */
 	public static array $updates = [];
+	/** @var array<int, list<string>> Catégories par post_id — noms simples (utilisé par le stub `wp_get_post_categories`). */
+	public static array $categories = [];
 
 	public static function reset(): void {
 		self::$posts             = [];
 		self::$meta              = [];
 		self::$revisions_created = [];
 		self::$updates           = [];
+		self::$categories        = [];
 	}
 }
 
@@ -136,6 +140,23 @@ if ( ! function_exists( 'get_post_field' ) ) {
 			return '';
 		}
 		return property_exists( $post, $field ) ? $post->{$field} : '';
+	}
+}
+
+if ( ! function_exists( 'wp_get_post_categories' ) ) {
+	/**
+	 * Stub minimal : lit `Son100_Htmln_Test_Posts_Registry::$categories[$post_id]`,
+	 * un simple `list<string>` de noms. Ne supporte que l'argument
+	 * `fields => 'names'` (utilisé par `DiffController`) ; autres modes
+	 * renvoient le même résultat — suffisant pour la couverture actuelle.
+	 *
+	 * @param int                  $post_id Identifiant de l'article.
+	 * @param array<string, mixed> $args    Options (ignorées hormis 'fields').
+	 * @return list<string>
+	 */
+	function wp_get_post_categories( int $post_id, array $args = array() ): array {
+		unset( $args );
+		return \Son100_Htmln_Test_Posts_Registry::$categories[ $post_id ] ?? array();
 	}
 }
 

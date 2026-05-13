@@ -5,6 +5,73 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — refonte UX complète post-rc4
+
+Cinq évolutions livrées en une seule passe sur la modale Diff (F14.3) pour rendre la lecture du diff radicalement plus rapide. Toutes intriquées sur `DiffModal.jsx` + `styles/main.scss`, donc regroupées ici.
+
+#### 1. Métadonnées injectées à la suite du titre
+
+Le header de la modale regroupe sur **une seule ligne** : titre (« Diff de l'article #ID — Titre »), tiret cadratin, `Cat. : <catégorie(s)>`, date de publication en français (`12 mars 2024`), pastille constructeur — réutilisant le composant `<BuilderBadge>` du tableau Normaliser avec sa couleur (vert Gut / rouge SO / orange « Gut + fossile » / etc.). Pas de label « Constructeur : » — la pastille parle d'elle-même. Données récupérées en un seul fetch via le payload `/posts/<id>/diff` enrichi côté serveur.
+
+- `DiffController::compute_diff()` retourne 4 clés additionnelles : `post_date` (`Y-m-d H:i:s`), `categories` (`list<string>` via `wp_get_post_categories` mode `'names'`), `builder_type` (`BuilderClassifier::classify`), `has_fossil_panels_data` (booléen scope Gutenberg uniquement, parité avec `DiagnosticsController::diagnostic_to_array()`).
+- `BuilderClassifier` injecté dans le constructeur de `DiffController` (mis à jour côté `Plugin::build_rest_controllers()`).
+- `DiffModal.jsx` :
+  - Métadonnées passées via le slot officiel `headerActions` de `<Modal>` de `@wordpress/components` — rendu nativement à la suite du `<h1>` du header, à gauche du bouton fermer.
+  - Helper `formatPostDate` (split SQL `' '` → ISO `'T'` pour la compat Safari, fallback gracieux).
+  - `<BuilderBadge type={builder_type} hasFossilPanelsData={...} />` consommé tel quel — couleur et tooltip identiques à la liste Normaliser.
+- `styles/main.scss` :
+  - `.htmln-diff-modal .components-modal__header-heading-container { flex-grow: 0 }` — **fix décisif** : WP applique `flex-grow: 1` sur le wrapper du titre qui faisait que le `<h1>` s'étirait sur toute la largeur dispo, refoulant les métadonnées contre le bouton fermer. Override à 0 → le titre reste à sa largeur intrinsèque, les métadonnées s'alignent juste à sa suite.
+  - Header repassé en `justify-content: flex-start` + gap 12px ; bouton fermer poussé à droite via `> :nth-last-child(2) { margin-left: auto }` ciblant le `Spacer` WP.
+  - `.htmln-diff-modal__header-meta` (inline-flex, gap 10, font 13px, couleur muted) + tiret cadratin en `::before` du container + séparateur `·` discret entre items.
+
+#### 2. Fix critique — variables CSS hissées au `:root`
+
+Bug identifié pendant la livraison de la pastille constructeur : les modales `@wordpress/components` rendent via un **portail React** au niveau de `document.body`, **hors** de l'arbre `.htmln-spa-root`. Les variables CSS (`--htmln-color-success`, `--htmln-color-danger`, etc.) étaient scopées à ce root → dans la modale elles tombaient en `<invalid>`, et la pastille avait `background: <invalide>` (= transparent) avec `color: #fff` → **blanc sur blanc, donc invisible**.
+
+Fix : variables hissées de `.htmln-spa-root` vers `:root`. Préfixe `--htmln-*` suffit à garantir zéro collision globale. La pastille retrouve sa couleur dans la modale (et n'importe quel autre portail futur).
+
+#### 3. Layout 2 colonnes du bandeau métriques
+
+Ancien empilement vertical `[summary → table → view-toggle]` (~9 lignes de hauteur) → nouveau layout 2 colonnes `[table | summary + view-toggle empilés]` (~7 lignes). Gain de ~2 lignes pour l'affichage du code en dessous. `flex-wrap` rebascule en empilement vertical sur écran étroit.
+
+- `MetricsDiffBar.jsx` refactoré : extraction d'une fonction pure `computeRows()`, puis exports nommés `MetricsDiffSummary` et `MetricsDiffTable`. Le default export inchangé compose les deux verticalement — `RegressionModal` n'est pas impacté.
+- Largeur du summary limitée à son contenu via `align-items: flex-start` sur la colonne aside (au lieu du `stretch` par défaut qui faisait filer la phrase jusqu'au bord droit).
+- Boutons « Code source / Rendu HTML » alignés sur le bas du tableau via `margin-top: auto` sur le `view-toggle` (`align-items` du parent revenu à `stretch` pour étirer la hauteur de l'aside).
+
+#### 4. Verrou de synchronisation du défilement vertical
+
+Bouton avec icône cadenas (`lock` / `unlock` de `@wordpress/icons`) dans la barre `view-toggle`, qui active/désactive la synchronisation du `scrollTop` entre les panneaux Avant et Après — sur les deux vues (code source ET rendu HTML). Défaut désactivé.
+
+- State local `scrollSync` + refs partagées `beforeScrollerRef` / `afterScrollerRef` qui pointent soit vers le `<pre>` (mode CODE) soit vers l'`<iframe>` (mode RENDER).
+- Drapeau anti-boucle `syncingRef` levé avant chaque écriture programmée de `scrollTop`, abaissé au prochain `requestAnimationFrame`.
+- Mode CODE : `onScroll` direct sur les `<pre>`.
+- Mode RENDER : `useEffect` qui attache `addEventListener('scroll', ...)` sur le `contentDocument` de chaque iframe, avec re-attachement au `load` pour couvrir les re-renders. Cleanup propre au démontage.
+- `@wordpress/icons ^13.0.0` ajouté à `package.json` (déjà installé en transitif, simplement listé explicitement).
+
+#### 5. Coloration syntaxique HTML (Prism.js)
+
+Les panneaux `<pre>` du mode « Code source » sont désormais coloriés via Prism.js — tags en bleu, attributs en violet, valeurs en vert, commentaires (incluant les blocs Gutenberg `<!-- wp:* -->`) en gris italique, ponctuation en gris foncé. Palette alignée WP-Admin via les CSS vars du plugin, pas de thème Prism par défaut importé (qui aurait écrasé les backgrounds `#f6f7f7` Avant / `#f0f6fc` Après).
+
+- `prismjs ^1.29.0` ajouté à `package.json` (v1.30 installée).
+- Nouveau helper `utils/highlightHtml.js` — appelle `Prism.highlight(raw, Prism.languages.markup, 'markup')`. Le core + le composant `markup` uniquement (pas de thème CSS, pas d'autres langues).
+- Nouveau composant `views/Normalize/HighlightedCode.jsx` — `<pre><code>` avec `forwardRef` (pour le scroll sync), `useMemo` (pour ne pas re-tokeniser à chaque render), injection via `dangerouslySetInnerHTML` (Prism échappe les caractères spéciaux lui-même).
+- `DiffModal.jsx` : les 2 `<pre>` du mode CODE remplacés par 2 `<HighlightedCode>`, le scroll-sync continue de fonctionner via la ref forwardée.
+- `styles/main.scss` : ~70 lignes de styles `.token.*` ajoutés à `.htmln-diff-modal__code`.
+
+#### Tests
+
+- +7 tests `DiffControllerTest` (post_date exposée, catégories liste + cas vide, builder_type calculé, has_fossil_panels_data sur 3 scénarios).
+- `make_controller()` factory mis à jour pour injecter `BuilderClassifier`.
+- `seed_post()` factory étendue avec `post_date` et `categories` optionnels.
+- Stub `wp_get_post_categories` ajouté à `tests/bootstrap.php` (mode `fields => 'names'`).
+- Propriété `post_date` ajoutée au stub `WP_Post` — **fix au passage** la dépréciation PHP 8.3 préexistante (« Creation of dynamic property WP_Post::$post_date is deprecated ») qui apparaissait sur `DiagnosticsControllerTest`.
+
+#### Métriques
+
+- **648 PHPUnit verts** (vs 641 — +7 nouveaux, 1465 assertions), 9 intégration verts, **plus aucune dépréciation**.
+- PHPStan 22 baseline inchangée (fichiers édités propres).
+- Bundle JS 121 KiB minified / 31.9 KiB gzip (vs 88 / 24 en rc4 — +33 KiB minified, dont ~20 KiB pour Prism). CSS 24.5 KiB (vs 22.3).
+
 ### Masquage des pages admin V0.1 — la SPA devient le point d'entrée unique
 
 La SPA `1.0.0-rc4` couvre désormais l'essentiel des besoins fonctionnels V0.1 (Normalisation par lots, Règles, Historique, Notes, Réglages). Pour éviter à l'utilisateur de devoir choisir entre deux UI et clarifier le cap vers `v1.0.0`, les pages V0.1 sortent du menu admin — **sans être supprimées** : leurs URLs `?page=…-<sub>` restent fonctionnelles pour du rollback / non-régression, mais aucune entrée n'apparaît plus dans le sidebar.
