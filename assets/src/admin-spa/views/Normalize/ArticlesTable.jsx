@@ -81,6 +81,64 @@ function renderRuleIds( matchingRules ) {
  * @param {{status: string, is_stale: boolean}} item Diagnostic.
  * @return {JSX.Element} Pastille statut + drapeau stale.
  */
+/**
+ * Boutons « Old » / « Prod » de la colonne « Ouvrir sur » — ouvrent
+ * l'article sur les domaines configurés en Réglages. Pour chaque site
+ * on n'affiche le bouton que si (a) le toggle `<site>_enabled` est
+ * `true` en config, (b) le permalien local est valide → URL composable.
+ * Le label est lui aussi configurable (`<site>_label`, 5 chars max),
+ * avec fallback `Old` / `Prod` si l'option n'est pas encore chargée.
+ *
+ * @param {Object}                                                                                                                   props
+ * @param {{permalink?: string}}                                                                                                     props.item          Article courant (besoin du permalien local).
+ * @param {?{old_url: string, old_label: string, old_enabled: boolean, prod_url: string, prod_label: string, prod_enabled: boolean}} props.externalSites Config Réglages (null tant que pas chargée).
+ * @return {JSX.Element} Cellule wrapper flex avec 0 à 2 boutons.
+ */
+function OpenOnButtons( { item, externalSites } ) {
+	const oldHref =
+		false !== ( externalSites?.old_enabled ?? true )
+			? buildExternalUrl( item.permalink, externalSites?.old_url ?? '' )
+			: null;
+	const prodHref =
+		false !== ( externalSites?.prod_enabled ?? true )
+			? buildExternalUrl( item.permalink, externalSites?.prod_url ?? '' )
+			: null;
+	return (
+		<div className="htmln-articles-table__open-on-cell">
+			{ oldHref && (
+				<a
+					href={ oldHref }
+					target="_blank"
+					rel="noopener noreferrer"
+					className="button button-small htmln-articles-table__site-btn"
+					title={ __(
+						'Ouvrir sur l’ancien site (nouvel onglet)',
+						'100son-html-normalizer'
+					) }
+				>
+					{ String( externalSites?.old_label ?? '' ).trim() ||
+						__( 'Old', '100son-html-normalizer' ) }
+				</a>
+			) }
+			{ prodHref && (
+				<a
+					href={ prodHref }
+					target="_blank"
+					rel="noopener noreferrer"
+					className="button button-small htmln-articles-table__site-btn"
+					title={ __(
+						'Ouvrir sur le site de prod (nouvel onglet)',
+						'100son-html-normalizer'
+					) }
+				>
+					{ String( externalSites?.prod_label ?? '' ).trim() ||
+						__( 'Prod', '100son-html-normalizer' ) }
+				</a>
+			) }
+		</div>
+	);
+}
+
 function StatusBadge( { item } ) {
 	const status = String( item.status );
 	const isStale = Boolean( item.is_stale );
@@ -252,6 +310,9 @@ export default function ArticlesTable( {
 							{ __( 'Titre', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
+							{ __( 'Ouvrir sur', '100son-html-normalizer' ) }
+						</th>
+						<th scope="col" className="manage-column">
 							{ __( 'Statut', '100son-html-normalizer' ) }
 						</th>
 						<th
@@ -361,81 +422,13 @@ export default function ArticlesTable( {
 												  ) }
 										</span>
 									) }
-									{ /* Boutons Old / Prod — ouvrent l'article
-									     sur les domaines configurés en Réglages.
-									     Pour chaque site : on n'affiche le bouton
-									     que si (a) le toggle `<site>_enabled`
-									     est `true` en config, (b) le permalien
-									     local est valide → URL composable. Le
-									     label est lui aussi configurable
-									     (`<site>_label`, 5 chars max), avec
-									     fallback `Old` / `Prod` si l'option n'est
-									     pas encore chargée. */ }
-									{ false !==
-										( externalSites?.old_enabled ??
-											true ) &&
-										( () => {
-											const oldHref = buildExternalUrl(
-												item.permalink,
-												externalSites?.old_url ?? ''
-											);
-											return (
-												oldHref && (
-													<a
-														href={ oldHref }
-														target="_blank"
-														rel="noopener noreferrer"
-														className="button button-small htmln-articles-table__site-btn"
-														title={ __(
-															'Ouvrir sur l’ancien site (nouvel onglet)',
-															'100son-html-normalizer'
-														) }
-													>
-														{ String(
-															externalSites?.old_label ??
-																''
-														).trim() ||
-															__(
-																'Old',
-																'100son-html-normalizer'
-															) }
-													</a>
-												)
-											);
-										} )() }
-									{ false !==
-										( externalSites?.prod_enabled ??
-											true ) &&
-										( () => {
-											const prodHref = buildExternalUrl(
-												item.permalink,
-												externalSites?.prod_url ?? ''
-											);
-											return (
-												prodHref && (
-													<a
-														href={ prodHref }
-														target="_blank"
-														rel="noopener noreferrer"
-														className="button button-small htmln-articles-table__site-btn"
-														title={ __(
-															'Ouvrir sur le site de prod (nouvel onglet)',
-															'100son-html-normalizer'
-														) }
-													>
-														{ String(
-															externalSites?.prod_label ??
-																''
-														).trim() ||
-															__(
-																'Prod',
-																'100son-html-normalizer'
-															) }
-													</a>
-												)
-											);
-										} )() }
 								</div>
+							</td>
+							<td>
+								<OpenOnButtons
+									item={ item }
+									externalSites={ externalSites }
+								/>
 							</td>
 							<td>
 								<StatusBadge item={ item } />

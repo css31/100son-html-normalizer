@@ -663,6 +663,17 @@
 	text-decoration: none;
 }
 
+/* Cellule « Ouvrir sur » — flex row qui aligne les boutons Old / Prod
+ * (0 à 2 selon la config Réglages). Petit gap entre les deux. Aligné
+ * en flex-start pour rester contre le bord gauche de la cellule
+ * (les autres cellules `<td>` étant alignées à gauche par défaut). */
+.htmln-articles-table__open-on-cell {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
 /* Boutons « Old » / « Prod » : même gabarit compact que « Éditer », teintés
  * différemment pour les distinguer en lecture rapide. */
 .htmln-articles-table__site-btn {
