@@ -398,23 +398,13 @@ export default function ArticlesTable( {
 							<td>{ item.post_id }</td>
 							<td className="htmln-articles-table__title">
 								<div className="htmln-articles-table__title-cell">
-									{ item.edit_url && (
-										<a
-											href={ item.edit_url }
-											target="_blank"
-											rel="noopener noreferrer"
-											className="button button-small htmln-articles-table__edit-btn"
-											title={ __(
-												'Ouvrir l’éditeur (nouvel onglet)',
-												'100son-html-normalizer'
-											) }
-										>
-											{ __(
-												'Éditer',
-												'100son-html-normalizer'
-											) }
-										</a>
-									) }
+									{ /* Ordre : titre cliquable EN PREMIER pour
+									     que le `<th>` Titre s'aligne sur le
+									     titre de l'article (et non sur le
+									     bouton Éditer). Le bouton vient en
+									     second, poussé à droite par le flex
+									     (titre `flex: 1 1 auto`, bouton
+									     `flex: 0 0 auto`). */ }
 									{ item.permalink ? (
 										<a
 											href={ item.permalink }
@@ -442,6 +432,23 @@ export default function ArticlesTable( {
 														'100son-html-normalizer'
 												  ) }
 										</span>
+									) }
+									{ item.edit_url && (
+										<a
+											href={ item.edit_url }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="button button-small htmln-articles-table__edit-btn"
+											title={ __(
+												'Ouvrir l’éditeur (nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ __(
+												'Éditer',
+												'100son-html-normalizer'
+											) }
+										</a>
 									) }
 								</div>
 							</td>
