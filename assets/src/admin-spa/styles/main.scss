@@ -1022,7 +1022,22 @@
 }
 
 .htmln-settings__form {
-	max-width: 720px;
+	max-width: 1100px;
+}
+
+/* Wrapper qui met les deux fieldsets de seuils γ (pourcentages / absolus)
+ * côte à côte sur la même rangée. `flex-wrap` rebascule en empilement
+ * vertical sur écran trop étroit. Chaque fieldset reçoit `flex: 1 1 400px`
+ * pour partager équitablement la largeur dispo. */
+.htmln-settings__columns {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+
+	> .htmln-settings__group {
+		flex: 1 1 400px;
+		min-width: 320px;
+	}
 }
 
 .htmln-settings__group {
@@ -1052,6 +1067,15 @@
 	}
 }
 
+/* Inputs des seuils γ : par défaut un `<TextControl>` WordPress s'étire
+ * à 100 % de son parent (jusqu'à 600 px+ sur grand écran). Pour un nombre
+ * à 1-2 chiffres, c'est absurde. On contraint la largeur de l'input à
+ * 80 px (~4 chars + padding) tout en gardant le label sur sa propre ligne
+ * au-dessus. */
+.htmln-settings__field--narrow .components-text-control__input {
+	max-width: 80px;
+}
+
 .htmln-settings__actions {
 	margin-top: 16px;
 	display: flex;
@@ -1065,6 +1089,37 @@
 	margin-top: 32px;
 	padding-top: 24px;
 	border-top: 1px solid var( --htmln-border );
+}
+
+/* Ligne « Toggle | Libellé | URL » du fieldset « Domaines externes ».
+ * Tous les contrôles sur une seule ligne, alignés sur leur baseline.
+ * `flex-wrap` rebascule en pile sur écran étroit ou si le `<URL>` est
+ * trop large. */
+.htmln-settings__external-site-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 16px;
+
+	> .htmln-settings__external-site-toggle {
+		flex: 0 0 auto;
+		/* Aligne le toggle avec la baseline du bas des inputs (les inputs
+		 * ont leur `<label>` au-dessus, le toggle n'en a pas — on l'aligne
+		 * sur le bas). */
+		padding-bottom: 6px;
+	}
+
+	> .htmln-settings__external-site-label {
+		flex: 0 0 auto;
+		.components-text-control__input {
+			max-width: 100px;
+		}
+	}
+
+	> .htmln-settings__external-site-url {
+		flex: 1 1 320px;
+		min-width: 240px;
+	}
 }
 
 /* =============================================================================

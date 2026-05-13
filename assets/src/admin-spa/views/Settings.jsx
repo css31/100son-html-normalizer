@@ -318,15 +318,17 @@ export default function Settings() {
 			) }
 
 			<form onSubmit={ handleSave } className="htmln-settings__form">
-				<fieldset className="htmln-settings__group">
-					<legend>
-						{ __(
-							'Seuils en pourcentage',
-							'100son-html-normalizer'
-						) }
-					</legend>
-					{ FIELDS.filter( ( field ) => 'pct' === field.unit ).map(
-						( field ) => (
+				<div className="htmln-settings__columns">
+					<fieldset className="htmln-settings__group">
+						<legend>
+							{ __(
+								'Seuils en pourcentage',
+								'100son-html-normalizer'
+							) }
+						</legend>
+						{ FIELDS.filter(
+							( field ) => 'pct' === field.unit
+						).map( ( field ) => (
 							<FieldRow
 								key={ field.key }
 								field={ field }
@@ -337,32 +339,32 @@ export default function Settings() {
 								}
 								disabled={ isSaving }
 							/>
-						)
-					) }
-				</fieldset>
+						) ) }
+					</fieldset>
 
-				<fieldset className="htmln-settings__group">
-					<legend>
-						{ __(
-							'Seuils en nombre absolu',
-							'100son-html-normalizer'
-						) }
-					</legend>
-					{ FIELDS.filter(
-						( field ) => 'absolute' === field.unit
-					).map( ( field ) => (
-						<FieldRow
-							key={ field.key }
-							field={ field }
-							value={ formValues[ field.key ] ?? '' }
-							defaultValue={ defaults?.[ field.key ] ?? 0 }
-							onChange={ ( raw ) =>
-								handleChangeField( field.key, raw )
-							}
-							disabled={ isSaving }
-						/>
-					) ) }
-				</fieldset>
+					<fieldset className="htmln-settings__group">
+						<legend>
+							{ __(
+								'Seuils en nombre absolu',
+								'100son-html-normalizer'
+							) }
+						</legend>
+						{ FIELDS.filter(
+							( field ) => 'absolute' === field.unit
+						).map( ( field ) => (
+							<FieldRow
+								key={ field.key }
+								field={ field }
+								value={ formValues[ field.key ] ?? '' }
+								defaultValue={ defaults?.[ field.key ] ?? 0 }
+								onChange={ ( raw ) =>
+									handleChangeField( field.key, raw )
+								}
+								disabled={ isSaving }
+							/>
+						) ) }
+					</fieldset>
+				</div>
 
 				<div className="htmln-settings__actions">
 					<Button
@@ -599,52 +601,54 @@ function ExternalSiteFieldset( {
 	return (
 		<fieldset className="htmln-settings__group">
 			<legend>{ legend }</legend>
-			<div className="htmln-settings__field">
-				<ToggleControl
-					label={ __(
-						'Afficher le bouton',
-						'100son-html-normalizer'
-					) }
-					checked={ Boolean( formValues[ enabledKey ] ) }
-					onChange={ ( checked ) => onChange( enabledKey, checked ) }
-					disabled={ isSaving }
-					__nextHasNoMarginBottom
-				/>
-			</div>
-			<div className="htmln-settings__field">
-				<TextControl
-					label={ __(
-						'Libellé du bouton (5 caractères max)',
-						'100son-html-normalizer'
-					) }
-					value={ formValues[ labelKey ] ?? '' }
-					onChange={ ( raw ) => onChange( labelKey, raw ) }
-					disabled={ isSaving }
-					maxLength={ 5 }
-					help={ sprintf(
-						// translators: %s = libellé par défaut.
-						__( 'Par défaut : %s.', '100son-html-normalizer' ),
-						String( defaults?.[ labelKey ] ?? '' )
-					) }
-					__nextHasNoMarginBottom
-					__next40pxDefaultSize
-				/>
-			</div>
-			<div className="htmln-settings__field">
-				<TextControl
-					label={ __( 'URL', '100son-html-normalizer' ) }
-					value={ formValues[ urlKey ] ?? '' }
-					onChange={ ( raw ) => onChange( urlKey, raw ) }
-					disabled={ isSaving }
-					help={ sprintf(
-						// translators: %s = URL par défaut.
-						__( 'Par défaut : %s.', '100son-html-normalizer' ),
-						String( defaults?.[ urlKey ] ?? '' )
-					) }
-					type="url"
-					__nextHasNoMarginBottom
-					__next40pxDefaultSize
-				/>
+			{ /* Une seule ligne : `[Toggle Afficher] [Libellé court]
+			     [URL flexible]`. Cf. SCSS `.htmln-settings__external-site-row`
+			     qui pose le flex layout + les contraintes de largeur par
+			     enfant (100 px max sur le libellé, flex 1 sur l'URL). */ }
+			<div className="htmln-settings__external-site-row">
+				<div className="htmln-settings__external-site-toggle">
+					<ToggleControl
+						label={ __( 'Afficher', '100son-html-normalizer' ) }
+						checked={ Boolean( formValues[ enabledKey ] ) }
+						onChange={ ( checked ) =>
+							onChange( enabledKey, checked )
+						}
+						disabled={ isSaving }
+						__nextHasNoMarginBottom
+					/>
+				</div>
+				<div className="htmln-settings__external-site-label">
+					<TextControl
+						label={ __( 'Libellé', '100son-html-normalizer' ) }
+						value={ formValues[ labelKey ] ?? '' }
+						onChange={ ( raw ) => onChange( labelKey, raw ) }
+						disabled={ isSaving }
+						maxLength={ 5 }
+						help={ sprintf(
+							// translators: %s = libellé par défaut.
+							__( 'Default : %s.', '100son-html-normalizer' ),
+							String( defaults?.[ labelKey ] ?? '' )
+						) }
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+					/>
+				</div>
+				<div className="htmln-settings__external-site-url">
+					<TextControl
+						label={ __( 'URL', '100son-html-normalizer' ) }
+						value={ formValues[ urlKey ] ?? '' }
+						onChange={ ( raw ) => onChange( urlKey, raw ) }
+						disabled={ isSaving }
+						help={ sprintf(
+							// translators: %s = URL par défaut.
+							__( 'Default : %s.', '100son-html-normalizer' ),
+							String( defaults?.[ urlKey ] ?? '' )
+						) }
+						type="url"
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+					/>
+				</div>
 			</div>
 		</fieldset>
 	);
@@ -675,9 +679,12 @@ function FieldRow( { field, value, defaultValue, onChange, disabled } ) {
 		unitLabel,
 		defaultValue
 	);
+	// `--narrow` contraint la largeur de l'input à 80 px (cf. SCSS). Pour
+	// un nombre entier 1-2 chiffres comme un seuil γ, un input plein-largeur
+	// (~600 px par défaut WP) est inutile et visuellement gênant.
 	return (
 		<div
-			className={ `htmln-settings__field${
+			className={ `htmln-settings__field htmln-settings__field--narrow${
 				isValid ? '' : ' htmln-settings__field--invalid'
 			}` }
 		>

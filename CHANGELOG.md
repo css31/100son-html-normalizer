@@ -5,6 +5,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Réglages — refonte du design de la page
+
+Trois ajustements visuels sur l'onglet Réglages (zéro impact fonctionnel) :
+
+- **Seuils en 2 colonnes** : les fieldsets « Seuils en pourcentage » et « Seuils en nombre absolu » sont désormais côte à côte sur la même rangée (flex 2 colonnes), avec `flex-wrap` qui rebascule en empilement vertical sur écran étroit. Largeur du formulaire passe de 720 px à 1100 px.
+- **Largeur des inputs numériques contrainte à 80 px** via la classe `htmln-settings__field--narrow` (cf. SCSS) appliquée sur `FieldRow`. Un seuil γ est un nombre à 1-2 chiffres ; un input plein-largeur (~600 px par défaut WP) était inutile et visuellement gênant.
+- **Domaines externes sur une ligne** : pour chaque site (Old / Prod), les 3 contrôles `[Toggle Afficher] [Libellé] [URL]` sont désormais sur une seule ligne horizontale (flex row, `align-items: flex-end`). Le libellé est contraint à 100 px max (5 chars + padding), l'URL prend le reste via `flex: 1 1 320px`.
+
+Aucun changement de comportement, juste de la cosmétique CSS + restructuration JSX dans `ExternalSiteFieldset`. 715 PHPUnit verts inchangés.
+
 ### Réglages — libellé personnalisable et toggle d'affichage pour chaque bouton Old / Prod
 
 L'option `external_sites` passe de 2 à 6 clés. Chaque site (Old / Prod) expose désormais 3 champs configurables dans l'onglet Réglages :
