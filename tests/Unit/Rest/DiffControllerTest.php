@@ -282,4 +282,73 @@ final class DiffControllerTest extends TestCase {
 		$this->assertSame( 'siteorigin', $body['builder_type'] );
 		$this->assertFalse( $body['has_fossil_panels_data'] );
 	}
+
+	// =========================================================================
+	//  Normalisation pour l'affichage — supprime le bruit whitespace HTML
+	//  qui sinon apparait comme un faux diff dans le surlignage stabylo.
+	// =========================================================================
+
+	public function test_compute_diff_normalizes_double_spaces_between_attributes(): void {
+		$this->seed_post( 100, '<div id="x"  class="y">contenu</div>' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$body = $response->get_data();
+		// Le double espace `"x"  class="y"` est ramene a un simple espace
+		// dans `html_before` (cote affichage), pareil que `html_after`.
+		$this->assertStringNotContainsString( '"x"  class', $body['html_before'] );
+		$this->assertStringContainsString( '"x" class', $body['html_before'] );
+	}
+
+	public function test_compute_diff_normalizes_trailing_space_before_close_bracket(): void {
+		$this->seed_post( 100, '<div class="y" >contenu</div>' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$body = $response->get_data();
+		// L'espace avant le `>` final est retire.
+		$this->assertStringNotContainsString( '"y" >', $body['html_before'] );
+		$this->assertStringContainsString( '"y">', $body['html_before'] );
+	}
+
+	public function test_compute_diff_unchanged_true_when_only_whitespace_differs(): void {
+		// Cas frequent : le post_content brut a du bruit whitespace mais
+		// les regles n'auraient rien a faire dessus. Sans normalisation
+		// pour l'affichage, le flag `unchanged` serait `false` (vrai
+		// changement byte-a-byte par DOMDocument), ce qui afficherait a
+		// tort la notice « Aucun changement » manquante. Avec normalisation
+		// des deux cotes : `unchanged === true`.
+		$this->seed_post( 100, '<div id="x"  class="y" >contenu</div>' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$body = $response->get_data();
+		$this->assertTrue( $body['unchanged'] );
+		// Les deux cotes sont rigoureusement identiques apres normalisation.
+		$this->assertSame( $body['html_before'], $body['html_after'] );
+	}
+
+	public function test_compute_diff_normalization_is_idempotent_on_clean_html(): void {
+		// Du HTML deja "propre" doit passer le round-trip sans alteration
+		// inattendue (pas d'attribut reordonne, pas d'entite recodee
+		// silencieusement, etc.).
+		$clean = '<p class="x">contenu <strong>fort</strong> et liens</p>';
+		$this->seed_post( 100, $clean );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertSame( $clean, $response->get_data()['html_before'] );
+	}
 }

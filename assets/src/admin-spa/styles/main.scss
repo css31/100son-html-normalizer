@@ -1361,6 +1361,28 @@
 	.token.namespace {
 		opacity: 0.7;
 	}
+
+	/* Surlignage « stabylo » (toggle pinceau dans la barre view-toggle).
+	 * Pose `<mark>` autour des fragments diff au mot près. `color: inherit`
+	 * pour que les tokens Prism imbriqués conservent leur teinte (sinon
+	 * `<mark>` impose un noir qui écraserait le bleu/violet/vert Prism). */
+	mark.htmln-diff-removed,
+	mark.htmln-diff-added {
+		color: inherit;
+		padding: 1px 2px;
+		border-radius: 2px;
+	}
+
+	mark.htmln-diff-removed {
+		/* Jaune stabylo classique. */
+		background: #fff59d;
+	}
+
+	mark.htmln-diff-added {
+		/* Vert tendre pour le panneau Après — complémentaire visuelle
+		 * du jaune (ajout vs suppression). */
+		background: #c8e6c9;
+	}
 }
 
 .htmln-diff-modal__iframe {

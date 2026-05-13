@@ -17,20 +17,34 @@
 
 import { forwardRef, useMemo } from '@wordpress/element';
 import { highlightHtml } from '../../utils/highlightHtml';
+import { highlightHtmlWithDiff } from '../../utils/highlightHtmlWithDiff';
 
 /**
- * @param {Object}   props
- * @param {string}   props.code        Chaîne HTML brute à colorer.
- * @param {Function} [props.onScroll]  Handler scroll forwardé au `<pre>`.
- * @param {string}   [props.className] Classe additionnelle facultative.
- * @param {Object}   ref               Forwardée au `<pre>`.
+ * @param {Object}            props
+ * @param {string}            props.code          Chaîne HTML brute à colorer.
+ * @param {Function}          [props.onScroll]    Handler scroll forwardé au `<pre>`.
+ * @param {string}            [props.className]   Classe additionnelle facultative.
+ * @param {?string}           [props.diffAgainst] Chaîne de référence pour le surlignage diff. Si null/undefined, la sortie est simplement Prism (pas de `<mark>`).
+ * @param {'removed'|'added'} [props.diffMode]    Quels fragments wrapper en `<mark>` quand `diffAgainst` est fourni. Default `'removed'`.
+ * @param {Object}            ref                 Forwardée au `<pre>`.
  * @return {JSX.Element} Bloc `<pre><code>` coloré.
  */
 const HighlightedCode = forwardRef( function HighlightedCode(
-	{ code, onScroll, className = '' },
+	{
+		code,
+		onScroll,
+		className = '',
+		diffAgainst = null,
+		diffMode = 'removed',
+	},
 	ref
 ) {
-	const html = useMemo( () => highlightHtml( code ), [ code ] );
+	const html = useMemo( () => {
+		if ( 'string' === typeof diffAgainst ) {
+			return highlightHtmlWithDiff( code, diffAgainst, diffMode );
+		}
+		return highlightHtml( code );
+	}, [ code, diffAgainst, diffMode ] );
 	const preClassName = `htmln-diff-modal__code language-markup${
 		className ? ` ${ className }` : ''
 	}`;

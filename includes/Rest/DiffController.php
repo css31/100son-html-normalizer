@@ -13,6 +13,7 @@ namespace Cent_Son\Html_Normalizer\Rest;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
@@ -130,18 +131,59 @@ final class DiffController extends BaseController {
 
 		$builder_type = $this->classifier->classify( $post_id );
 
+		// Normalisation pour l'affichage : on fait passer les deux chaînes
+		// par le meme couple `parse_fragment` / `serialize_fragment` que les
+		// regles DOM-aware. Sans ca, le panneau « Avant » contient le brut
+		// `post_content` (avec ses double-espaces inter-attrs, ses ` >` en
+		// fin de tag, ses balises auto-fermantes XHTML `<img …/>`…) tandis
+		// que le panneau « Apres » sort du pipeline DOM-aware donc deja
+		// normalise → le surlignage stabylo (post-rc4) faisait apparaitre
+		// ce bruit comme des diffs alors qu'aucun caractere sémantique ne
+		// change. En passant les deux par DomHtml ici, le diff ne montre
+		// plus que les vraies modifications de contenu. Idempotent cote
+		// `html_after` (deja normalise par le pipeline).
+		$html_before_norm = self::normalize_for_display( $html_before );
+		$html_after_norm  = self::normalize_for_display( $html_after );
+
 		return $this->respond( array(
-			'html_before'             => $html_before,
-			'html_after'              => $html_after,
+			'html_before'             => $html_before_norm,
+			'html_after'              => $html_after_norm,
 			'metrics_before'          => $before->toArray(),
 			'metrics_after'           => $after->toArray(),
 			'warnings'                => $warnings,
-			'unchanged'               => $html_before === $html_after,
+			// `unchanged` calcule sur les versions normalisees — sinon un
+			// article dont seul le whitespace HTML differe (cas frequent
+			// si le post_content vient d'un import) serait marque comme
+			// "modifie" alors qu'il ne l'est pas semantiquement.
+			'unchanged'               => $html_before_norm === $html_after_norm,
 			'post_date'               => (string) $post->post_date,
 			'categories'              => $this->get_post_category_names( $post_id ),
 			'builder_type'            => $builder_type,
 			'has_fossil_panels_data'  => $this->has_fossil_panels_data( $post_id, $builder_type ),
 		) );
+	}
+
+	/**
+	 * Normalise une chaine HTML pour l'affichage dans la modale Diff —
+	 * round-trip via le meme helper `DomHtml` que les regles DOM-aware
+	 * (P1, P2, P4, P6, P7, P8). Effets visibles :
+	 *  - double-espaces entre attributs reduits a un simple ;
+	 *  - espace avant `>` retire en fin de tag ;
+	 *  - auto-fermeture XHTML `<img …/>` reserialisee en HTML5 `<img …>` ;
+	 *  - `\r` strippes (cf. `DomHtml::clean_serialized`).
+	 *
+	 * Idempotent : appeler ce helper deux fois sur la meme chaine produit
+	 * exactement le meme resultat. Une chaine vide ou que blanche est
+	 * retournee telle quelle pour eviter un round-trip inutile.
+	 *
+	 * @param string $html Chaine HTML brute.
+	 * @return string Chaine HTML normalisee.
+	 */
+	private static function normalize_for_display( string $html ): string {
+		if ( '' === trim( $html ) ) {
+			return $html;
+		}
+		return DomHtml::serialize_fragment( DomHtml::parse_fragment( $html ) );
 	}
 
 	/**

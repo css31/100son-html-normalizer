@@ -25,7 +25,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { useEffect, useState, useCallback, useRef } from '@wordpress/element';
 import { Modal, Button, Spinner } from '@wordpress/components';
-import { lock, unlock } from '@wordpress/icons';
+import { lock, unlock, brush } from '@wordpress/icons';
 import * as api from '../../api';
 import { sanitizeForIframe } from '../../utils/sanitizeForIframe';
 import { MetricsDiffSummary, MetricsDiffTable } from './MetricsDiffBar';
@@ -111,6 +111,15 @@ export default function DiffModal( {
 	// HTML). Défaut désactivé : l'utilisateur l'active explicitement quand
 	// il veut comparer deux passages alignés.
 	const [ scrollSync, setScrollSync ] = useState( false );
+
+	// Toggle « surlignage stabylo » des suppressions/ajouts dans la vue
+	// Code source. **Activé par défaut** — c'est la valeur ajoutée centrale
+	// de la modale Diff. Sous le capot, quand le toggle est ON,
+	// `highlightHtmlWithDiff` produit du texte brut HTML-escaped + `<mark>`
+	// (sans Prism). Quand le toggle est OFF, le chemin standard `highlightHtml`
+	// applique Prism pour coloriser les tokens. L'utilisateur bascule selon
+	// son besoin : lecture du diff (toggle ON) vs lecture du code (toggle OFF).
+	const [ showDiffMarks, setShowDiffMarks ] = useState( true );
 	const beforeScrollerRef = useRef( null );
 	const afterScrollerRef = useRef( null );
 	// Drapeau anti-boucle : `el.scrollTop = X` re-déclenche un événement
@@ -329,6 +338,28 @@ export default function DiffModal( {
 								}
 								showTooltip
 								className="htmln-diff-modal__scroll-lock"
+							/>{ ' ' }
+							<Button
+								icon={ brush }
+								variant={
+									showDiffMarks ? 'primary' : 'secondary'
+								}
+								onClick={ () =>
+									setShowDiffMarks( ( prev ) => ! prev )
+								}
+								label={
+									showDiffMarks
+										? __(
+												'Surlignage des suppressions/ajouts activé — cliquer pour désactiver',
+												'100son-html-normalizer'
+										  )
+										: __(
+												'Surligner les suppressions (jaune) et les ajouts (vert) dans la vue code source',
+												'100son-html-normalizer'
+										  )
+								}
+								showTooltip
+								className="htmln-diff-modal__diff-marks-toggle"
 							/>
 						</div>
 					</div>
@@ -344,6 +375,10 @@ export default function DiffModal( {
 								ref={ beforeScrollerRef }
 								onScroll={ handleBeforeScroll }
 								code={ payload.html_before }
+								diffAgainst={
+									showDiffMarks ? payload.html_after : null
+								}
+								diffMode="removed"
 							/>
 						</div>
 						<div className="htmln-diff-modal__col htmln-diff-modal__col--after">
@@ -354,6 +389,10 @@ export default function DiffModal( {
 								ref={ afterScrollerRef }
 								onScroll={ handleAfterScroll }
 								code={ payload.html_after }
+								diffAgainst={
+									showDiffMarks ? payload.html_before : null
+								}
+								diffMode="added"
 							/>
 						</div>
 					</div>

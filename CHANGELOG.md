@@ -5,6 +5,44 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — surlignage stabylo des suppressions/ajouts + normalisation HTML pour l'affichage
+
+Deux évolutions intriquées sur le panneau « Code source » de la modale Diff.
+
+#### Surlignage style « stabylo »
+
+Bouton pinceau ajouté dans la barre `view-toggle` (après le verrou scroll). Activé par défaut. Quand actif :
+
+- Panneau **Avant** : les fragments qui n'existent plus dans Après sont surlignés en **jaune** (`#fff59d`).
+- Panneau **Après** : ce qui est nouveau est surligné en **vert tendre** (`#c8e6c9`).
+- Granularité **mot** via `diffWordsWithSpace` de `diff` v4.0.4 (déjà présent en transitif, listé explicitement).
+
+**Compromis perf** : quand le surlignage est actif, **Prism (coloration syntaxique) est désactivé** pour le panneau concerné. Raison : `Prism.highlight()` est synchrone et appliqué par fragment cumulait > 1 s de freeze côté navigateur (modale « Page qui ne répond pas, Déboguer »). L'utilisateur bascule selon son besoin via le pinceau — surlignage actif → marks jaunes/verts + code texte brut ; surlignage inactif → Prism actif → code coloré sans marks.
+
+#### Normalisation HTML pour l'affichage
+
+`DiffController::compute_diff()` passe désormais `html_before` ET `html_after` par un round-trip `DomHtml::parse_fragment` + `serialize_fragment` avant de les envoyer dans le payload. Effet :
+
+- Double-espaces inter-attributs (`id="x"  class="y"`) → simple espace.
+- Espace avant `>` retiré en fin de tag (`"y" >` → `"y">`).
+- Auto-fermeture XHTML `<img …/>` reserialisée en HTML5 `<img …>`.
+
+Sans cette normalisation, le surlignage stabylo faisait apparaître ces différences de whitespace HTML comme de « vrais » diffs alors qu'aucun caractère sémantique ne change. Le flag `unchanged` du payload est aussi recalculé sur les versions normalisées.
+
+#### Fichiers livrés
+
+- `includes/Rest/DiffController.php` — helper privé `normalize_for_display()` + double normalisation + `unchanged` recalculé.
+- `assets/src/admin-spa/utils/highlightHtmlWithDiff.js` (nouveau) — helper diff + escape HTML + injection de `<mark>` (pas d'appel Prism).
+- `assets/src/admin-spa/views/Normalize/HighlightedCode.jsx` — nouvelles props `diffAgainst` / `diffMode`.
+- `assets/src/admin-spa/views/Normalize/DiffModal.jsx` — state `showDiffMarks` + bouton pinceau (icône `brush` de `@wordpress/icons`) + câblage des 2 `<HighlightedCode>`.
+- `assets/src/admin-spa/styles/main.scss` — règles `mark.htmln-diff-removed` (`#fff59d`) / `mark.htmln-diff-added` (`#c8e6c9`).
+- `package.json` — `diff ^4.0.4` listé explicitement dans `dependencies`.
+
+#### Tests
+
+- +4 PHPUnit `DiffControllerTest` (normalisation double-espaces, espace avant `>`, `unchanged` recalculé sur whitespace seul, idempotence sur HTML déjà propre).
+- 672 PHPUnit verts (vs 668), lint propre.
+
 ### Fix P1 — retire aussi le wrapper de bloc Gutenberg `<!-- wp:paragraph -->`
 
 Avant le fix, sur un bloc Gutenberg `wp:paragraph` vide :
