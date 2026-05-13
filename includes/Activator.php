@@ -129,18 +129,24 @@ final class Activator {
 	}
 
 	/**
-	 * Initialise la configuration des préréglages si l'option est absente.
+	 * Initialise / complète la configuration des préréglages.
 	 *
 	 * Tous les préréglages sont activés par défaut, avec leurs paramètres au
 	 * défaut documenté en §3.1 et §14.
 	 *
+	 * Comportement de **propagation** (post-rc4) : au lieu d'un seed
+	 * strictement initial (early-return si l'option existe), on fait un
+	 * **merge** à chaque activation/réactivation — les préréglages
+	 * existants sont préservés à l'identique (clés `enabled` et
+	 * paramètres conservés), les nouveaux préréglages absents sont ajoutés
+	 * avec leur config par défaut. Cela permet de propager les nouvelles
+	 * règles ajoutées dans une version (P10 post-rc4, futures Pxx) à un
+	 * site déjà activé sans écraser les choix de l'utilisateur — il
+	 * suffit d'une réactivation du plugin.
+	 *
 	 * @return void
 	 */
 	private static function seed_presets(): void {
-		if ( false !== get_option( 'son100_htmln_presets', false ) ) {
-			return;
-		}
-
 		$defaults = array(
 			'P1' => array( 'enabled' => true ),
 			'P2' => array( 'enabled' => true ),
@@ -173,10 +179,23 @@ final class Activator {
 					'italic' => true,
 				),
 			),
-			'P9' => array( 'enabled' => true ),
+			'P9'  => array( 'enabled' => true ),
+			'P10' => array( 'enabled' => true ),
 		);
 
-		add_option( 'son100_htmln_presets', $defaults, '', 'no' );
+		$existing = get_option( 'son100_htmln_presets', false );
+		if ( false === $existing || ! is_array( $existing ) ) {
+			add_option( 'son100_htmln_presets', $defaults, '', 'no' );
+			return;
+		}
+
+		// Merge : ne touche pas aux clés existantes, n'ajoute que celles
+		// absentes. `+` array operator en PHP : préserve les clés du LHS,
+		// complète avec les clés du RHS uniquement si absentes du LHS.
+		$merged = $existing + $defaults;
+		if ( $merged !== $existing ) {
+			update_option( 'son100_htmln_presets', $merged, false );
+		}
 	}
 
 	/**

@@ -42,12 +42,12 @@ use WP_REST_Response;
 final class PresetsController extends BaseController {
 
 	/**
-	 * Liste fixe des 9 ids attendus (P1..P9). Permet de valider l'id
+	 * Liste fixe des 10 ids attendus (P1..P10). Permet de valider l'id
 	 * URL en O(1) et de garantir l'ordre stable du listing.
 	 *
 	 * @var list<string>
 	 */
-	private const KNOWN_IDS = array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' );
+	private const KNOWN_IDS = array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10' );
 
 	/**
 	 * Defaults par règle. Source de vérité dupliquée depuis
@@ -85,7 +85,8 @@ final class PresetsController extends BaseController {
 				'italic' => true,
 			),
 		),
-		'P9' => array(),
+		'P9'  => array(),
+		'P10' => array(),
 	);
 
 	/**
@@ -112,7 +113,12 @@ final class PresetsController extends BaseController {
 			'permission_callback' => $cap,
 		) );
 
-		register_rest_route( $ns, '/presets/(?P<id>P[1-9])', array(
+		// Regex `P(?:10|[1-9])` : matche P1..P10 et **rien d'autre**. Le
+		// `P[1-9]` originel laissait P10 hors de la route (`[1-9]` est une
+		// classe d'un seul chiffre). On préfère l'alternation explicite à
+		// `P\d+` pour ne pas accepter des Pxx encore inexistants (P11, P12…)
+		// et garantir le 404 propre via la regex elle-même.
+		register_rest_route( $ns, '/presets/(?P<id>P(?:10|[1-9]))', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'update_preset' ),
 			'permission_callback' => $cap,
@@ -127,7 +133,7 @@ final class PresetsController extends BaseController {
 	 * `GET /presets`
 	 *
 	 * Réponse 200 : `{ presets: [ { id, label, description, has_options,
-	 * enabled, params, defaults }, … ] }` dans l'ordre P1..P8 canonique.
+	 * enabled, params, defaults }, … ] }` dans l'ordre P1..P10 canonique.
 	 *
 	 * @param WP_REST_Request $request Requête (inutilisée).
 	 * @return WP_REST_Response
@@ -214,7 +220,7 @@ final class PresetsController extends BaseController {
 	/**
 	 * Sérialise un préréglage pour la SPA.
 	 *
-	 * @param string                                                                $id     Identifiant P1..P8.
+	 * @param string                                                                $id     Identifiant P1..P10.
 	 * @param array{label: string, description: string, has_options: bool}          $meta   Metadata depuis le registry.
 	 * @param array<string, mixed>                                                  $config Configuration courante (option WP).
 	 * @return array<string, mixed>

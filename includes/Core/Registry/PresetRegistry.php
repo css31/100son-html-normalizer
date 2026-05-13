@@ -24,6 +24,7 @@ use Cent_Son\Html_Normalizer\Core\Rules\RemoveInlineStylesRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 use Cent_Son\Html_Normalizer\Core\Rules\ShareaholicShortcodeRule;
 use Cent_Son\Html_Normalizer\Core\Rules\UnwrapHeadingImageRule;
+use Cent_Son\Html_Normalizer\Core\Rules\UnwrapParagraphImageRule;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
@@ -43,9 +44,14 @@ class PresetRegistry {
 	 * `<hN>` autour d'images, opération structurelle qu'on veut faire avant
 	 * le cleanup final P1/P2 (paragraphes/titres vides).
 	 *
+	 * P10 (post-rc4, cousine de P9) traite la même chose pour `<p>` autour
+	 * d'images. Placée immédiatement après P9 — même invariant (s'exécute
+	 * avant P1/P2) + cohérence sémantique (les deux règles de désencapsulation
+	 * d'images sont côte-à-côte).
+	 *
 	 * @var list<string>
 	 */
-	public const PRESETS = array( 'P3', 'P4', 'P8', 'P6', 'P7', 'P5', 'P9', 'P1', 'P2' );
+	public const PRESETS = array( 'P3', 'P4', 'P8', 'P6', 'P7', 'P5', 'P9', 'P10', 'P1', 'P2' );
 
 	/**
 	 * Repository de configuration des presets.
@@ -174,6 +180,11 @@ class PresetRegistry {
 				'description' => __( 'Désencapsule les <code>&lt;h1&gt;</code>-<code>&lt;h6&gt;</code> qui ne contiennent qu\'une image (sans texte). Le <code>&lt;img&gt;</code> et son éventuel wrapper (<code>&lt;a&gt;</code>, <code>&lt;figure&gt;</code>…) sont préservés intacts, seules les balises de titre sont retirées. Typique des contenus migrés où un éditeur visuel a wrappé une image dans un titre par erreur. Symétrique de P2 (qui préserve volontairement ces titres).', '100son-html-normalizer' ),
 				'has_options' => false,
 			),
+			'P10' => array(
+				'label'       => __( 'Paragraphes autour d\'images', '100son-html-normalizer' ),
+				'description' => __( 'Désencapsule les <code>&lt;p&gt;</code> qui ne contiennent qu\'une image (sans texte). Le <code>&lt;img&gt;</code> et son éventuel wrapper (<code>&lt;a&gt;</code>, <code>&lt;figure&gt;</code>…) sont préservés intacts, seule la balise <code>&lt;p&gt;</code> est retirée. Typique des contenus migrés depuis Word, Classic Editor ou SiteOrigin où une image isolée a été automatiquement enveloppée dans un paragraphe. Symétrique de P1 (qui préserve volontairement ces paragraphes) et cousine de P9 (qui fait la même chose sur les titres).', '100son-html-normalizer' ),
+				'has_options' => false,
+			),
 		);
 	}
 
@@ -229,6 +240,9 @@ class PresetRegistry {
 
 			case 'P9':
 				return new UnwrapHeadingImageRule();
+
+			case 'P10':
+				return new UnwrapParagraphImageRule();
 
 			default:
 				return null;

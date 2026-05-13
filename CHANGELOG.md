@@ -5,6 +5,58 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Nouvelle règle P10 — désencapsulation des `<p>` autour d'images
+
+Symétrique de P9 (qui désencapsule les `<h*><img></h*>`), P10 traite le même pattern sur les `<p>` :
+
+```
+Avant : <p><img class="aligncenter wp-image-19036" src="…" alt="…" width="700" height="485"></p>
+Après : <img class="aligncenter wp-image-19036" src="…" alt="…" width="700" height="485">
+```
+
+Typique des contenus migrés depuis Word, Classic Editor ou SiteOrigin où une image isolée a été automatiquement enveloppée dans un paragraphe. Signalé sur l'article 19087 du corpus MMM.
+
+Critères de match (alignés sur P9) :
+1. Le `<p>` contient au moins un `<img>` (à n'importe quelle profondeur, pour gérer `<p><a><img></a></p>` et `<p><figure><img></figure></p>`).
+2. Son `textContent` après normalisation NBSP→espace et trim est vide.
+
+Le `<img>` (et son éventuel wrapper `<a>`, `<figure>`, `<picture>`) est préservé intact à l'unwrap.
+
+**Symétrie de famille** (cf. mapping `RULE_DISPLAY_LABELS` côté SPA) :
+- `P1` (paragraphes vides) → affiché **P1.1**
+- `P10` (paragraphes autour d'images) → affiché **P1.2**
+- `P2` (titres vides) → affiché **P2.1**
+- `P9` (titres autour d'images) → affiché **P2.2**
+
+L'ordre d'affichage UI regroupe les paires P1.x et P2.x contiguës ; l'ordre d'exécution du pipeline (`PresetRegistry::PRESETS`) reste `P3 → P4 → P8 → P6 → P7 → P5 → P9 → P10 → P1 → P2`.
+
+#### Backend
+
+- `includes/Core/Rules/UnwrapParagraphImageRule.php` (nouveau) — structure clonée de P9 avec `<p>` comme tag racine au lieu de `<h1>..<h6>`.
+- `includes/Core/Registry/PresetRegistry.php` — ajout de `'P10'` à `PRESETS`, du case dans `build_rule()`, et de l'entrée metadata avec label/description.
+- `includes/Rest/PresetsController.php` — **3 fixes adjacents** qui empêchaient P10 d'apparaître dans l'onglet Règles côté SPA :
+  1. `KNOWN_IDS` étendu de 9 à 10 ids — l'endpoint `GET /presets` itère dessus pour produire la réponse, P10 était donc invisible.
+  2. Regex de route `P[1-9]` → `P(?:10|[1-9])` — la regex précédente ne matchait qu'un seul chiffre, `POST /presets/P10` aurait répondu 404.
+  3. `DEFAULTS` étendu avec `'P10' => array()` pour la cohérence du payload.
+- `includes/Activator.php` — `seed_presets` refactoré : au lieu d'un seed strictement initial (early-return si l'option existe), fait désormais un **merge** à chaque activation. Les préréglages existants sont préservés à l'identique, les nouveaux préréglages absents sont ajoutés. Permet la propagation des futures règles (P10, futures Pxx) à un site déjà activé sans écraser les choix de l'utilisateur — il suffit d'une réactivation du plugin.
+
+#### Frontend
+
+- `store/index.js` — `ALL_RULE_IDS` étendu de 9 à 10 ids.
+- `utils/ruleLabels.js` — `RULE_DISPLAY_LABELS` / `RULE_TOOLTIPS` / `RULE_DISPLAY_ORDER` étendus pour P10. P1 reçoit le label `P1.1` (par symétrie avec P10 → P1.2), P10 reçoit `P1.2` et le rang 2 (juste après P1).
+
+#### Tests
+
+- +21 PHPUnit `UnwrapParagraphImageRuleTest` couvrant : cas canonique (article 19087), wrappers `<a>`/`<figure>`/`<picture>`, NBSP autour, négatives (texte autour, `<p>` vide sans img, `<p>` texte uniquement), cas multiples (séries de blocs image, mix avec texte), edge cases (heading préservé par P10, div préservé), countMatches/idempotence.
+- 2 tests `PresetsControllerTest` ajustés pour refléter la nouvelle regex de route et le compteur passant de 9 à 10 presets.
+- **703 PHPUnit verts** (vs 682, +21, 1527 assertions), PHPStan baseline inchangée, lint propre.
+
+#### Pour propager P10 à une install existante
+
+P10 est listé dans l'onglet Règles mais désactivé par défaut tant que la BDD ne contient pas son entrée dans `son100_htmln_presets`. Deux options pour l'activer :
+- **Réactiver le plugin** (déclenche `Activator::activate` → `seed_presets` qui merge P10 avec `enabled: true`).
+- L'**activer manuellement** dans l'onglet Règles. Dans les deux cas, **un rescan diagnostic est ensuite nécessaire** (bouton « Scanner… » dans le ScanBar de l'onglet Normaliser) pour que les compteurs de la facette `applicable_rules` reflètent les vraies occurrences de P10 dans le corpus.
+
 ### Fix P6 — unwrap des `<span>` orphelins après strip du style
 
 Quand P6 retire l'attribut `style` d'un `<span>` qui n'avait que cet attribut, le span devient `<span>` (sans aucun attribut) — un container sémantique-neutre qui ne fait plus rien. P6 le retire désormais (unwrap) en préservant son contenu :

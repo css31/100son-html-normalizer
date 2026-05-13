@@ -56,7 +56,7 @@ export const STORE_NAME = 'htmln/spa';
  */
 
 /**
- * Liste canonique des 9 ids de préréglages, dans l'ordre du pipeline.
+ * Liste canonique des 10 ids de préréglages, dans l'ordre du pipeline.
  *
  * Note : l'ORDRE ici est l'ordre d'EXÉCUTION (P3 → P4 → … → P2), pas
  * l'ordre d'affichage UI. Pour l'affichage trié (Règles tab, recap),
@@ -74,6 +74,7 @@ export const ALL_RULE_IDS = [
 	'P7',
 	'P8',
 	'P9',
+	'P10',
 ];
 
 /**

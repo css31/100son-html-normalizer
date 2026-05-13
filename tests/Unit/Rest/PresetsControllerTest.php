@@ -44,7 +44,7 @@ final class PresetsControllerTest extends TestCase {
 			$routes
 		);
 		$this->assertContains( '/presets', $paths );
-		$this->assertContains( '/presets/(?P<id>P[1-9])', $paths );
+		$this->assertContains( '/presets/(?P<id>P(?:10|[1-9]))', $paths );
 	}
 
 	public function test_register_routes_uses_manage_options_permission(): void {
@@ -60,19 +60,19 @@ final class PresetsControllerTest extends TestCase {
 	//  GET /presets
 	// =========================================================================
 
-	public function test_list_returns_nine_presets_in_canonical_order(): void {
+	public function test_list_returns_ten_presets_in_canonical_order(): void {
 		$response = $this->controller()->list_presets( new WP_REST_Request() );
 		$this->assertSame( 200, $response->get_status() );
 		$body = $response->get_data();
-		$this->assertCount( 9, $body['presets'] );
+		$this->assertCount( 10, $body['presets'] );
 		$ids = array_map(
 			static fn( array $p ): string => $p['id'],
 			$body['presets']
 		);
-		// Ordre numérique P1..P9 (l'API trie par id pour l'UI, distinct du
-		// pipeline order qui est P3→P4→P8→P6→P7→P5→P9→P1→P2).
+		// Ordre numérique P1..P10 (l'API trie par id pour l'UI, distinct du
+		// pipeline order qui est P3→P4→P8→P6→P7→P5→P9→P10→P1→P2).
 		$this->assertSame(
-			array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' ),
+			array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10' ),
 			$ids
 		);
 	}

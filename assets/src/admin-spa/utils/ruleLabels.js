@@ -1,7 +1,7 @@
 /**
  * Renommage d'affichage des rule_ids côté SPA.
  *
- * Les IDs internes (P1..P9) sont **stables côté code et base de
+ * Les IDs internes (P1..P10) sont **stables côté code et base de
  * données** — DiagnosticRecord, son100_htmln_diagnostics.matching_rules,
  * son100_htmln_steps.applied_rules, l'option son100_htmln_presets et
  * les routes REST utilisent tous ces IDs bruts. Ne JAMAIS modifier
@@ -13,6 +13,11 @@
  * footer de sélection, drawer d'historique, modales Diff/Régression).
  *
  * Choix éditoriaux :
+ *  - `P1` (paragraphes vides) → **P1.1** car P10 (paragraphes autour
+ *    d'images) couvre une famille adjacente sur les `<p>` — regrouper
+ *    sous P1.x rend l'arbre des règles plus lisible.
+ *  - `P10` → **P1.2** : déplacé directement après P1.1 dans l'ordre
+ *    d'affichage.
  *  - `P2` (titres vides) → **P2.1** car P9 (titres autour d'images)
  *    couvre une famille adjacente sur les `<hN>` — regrouper sous P2.x
  *    rend l'arbre des règles plus lisible.
@@ -20,8 +25,8 @@
  *    d'affichage (cf. `RULE_DISPLAY_ORDER`).
  *
  * L'ordre d'EXÉCUTION du pipeline (cf. `PresetRegistry::PRESETS` côté
- * PHP) reste P3 → P4 → P8 → P6 → P7 → P5 → P9 → P1 → P2. C'est l'ordre
- * d'affichage UI qui change, pas l'ordre d'exécution.
+ * PHP) reste P3 → P4 → P8 → P6 → P7 → P5 → P9 → P10 → P1 → P2. C'est
+ * l'ordre d'affichage UI qui change, pas l'ordre d'exécution.
  */
 
 /**
@@ -32,7 +37,7 @@
  * @type {Object<string, string>}
  */
 export const RULE_DISPLAY_LABELS = {
-	P1: 'P1',
+	P1: 'P1.1',
 	P2: 'P2.1',
 	P3: 'P3',
 	P4: 'P4',
@@ -41,6 +46,7 @@ export const RULE_DISPLAY_LABELS = {
 	P7: 'P7',
 	P8: 'P8',
 	P9: 'P2.2',
+	P10: 'P1.2',
 };
 
 /**
@@ -64,6 +70,7 @@ export const RULE_TOOLTIPS = {
 	P7: 'Listes ASCII',
 	P8: 'Récupération sémantique des styles',
 	P9: "Titres autour d'images",
+	P10: "Paragraphes autour d'images",
 };
 
 /**
@@ -71,22 +78,23 @@ export const RULE_TOOLTIPS = {
  * position dans la liste des cards Règles + dans toutes les listes
  * triées par display order.
  *
- * Ordre choisi : P1, P2(=P2.1), P9(=P2.2), P3, P4, P5, P6, P7, P8.
- * Les ressemblances P2.1/P2.2 sont contiguës ; les autres restent
- * dans l'ordre naturel.
+ * Ordre choisi : P1(=P1.1), P10(=P1.2), P2(=P2.1), P9(=P2.2), P3,
+ * P4, P5, P6, P7, P8. Les paires P1.x et P2.x sont contiguës ; les
+ * autres restent dans l'ordre naturel.
  *
  * @type {Object<string, number>}
  */
 export const RULE_DISPLAY_ORDER = {
 	P1: 1,
-	P2: 2,
-	P9: 3,
-	P3: 4,
-	P4: 5,
-	P5: 6,
-	P6: 7,
-	P7: 8,
-	P8: 9,
+	P10: 2,
+	P2: 3,
+	P9: 4,
+	P3: 5,
+	P4: 6,
+	P5: 7,
+	P6: 8,
+	P7: 9,
+	P8: 10,
 };
 
 /**
