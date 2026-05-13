@@ -345,8 +345,15 @@ export default function ArticlesTable( {
 						<th scope="col" className="manage-column">
 							{ __( 'Règles', '100son-html-normalizer' ) }
 						</th>
-						<th scope="col" className="manage-column">
-							{ __( 'Violations', '100son-html-normalizer' ) }
+						<th
+							scope="col"
+							className="manage-column"
+							title={ __(
+								'Occurrence des règles dans l’article.',
+								'100son-html-normalizer'
+							) }
+						>
+							{ __( 'Occur.', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
 							{ __( 'Mots', '100son-html-normalizer' ) }
