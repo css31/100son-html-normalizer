@@ -78,10 +78,6 @@ function renderRuleIds( matchingRules ) {
 }
 
 /**
- * @param {{status: string, is_stale: boolean}} item Diagnostic.
- * @return {JSX.Element} Pastille statut + drapeau stale.
- */
-/**
  * Boutons « Old » / « Prod » de la colonne « Ouvrir sur » — ouvrent
  * l'article sur les domaines configurés en Réglages. Pour chaque site
  * on n'affiche le bouton que si (a) le toggle `<site>_enabled` est
@@ -139,6 +135,11 @@ function OpenOnButtons( { item, externalSites } ) {
 	);
 }
 
+/**
+ * @param {Object}                              props
+ * @param {{status: string, is_stale: boolean}} props.item Diagnostic.
+ * @return {JSX.Element} Pastille statut + drapeau stale.
+ */
 function StatusBadge( { item } ) {
 	const status = String( item.status );
 	const isStale = Boolean( item.is_stale );
@@ -231,6 +232,17 @@ export default function ArticlesTable( {
 	const someOnPageChecked =
 		! allOnPageChecked &&
 		items.some( ( item ) => selectedIds.has( item.post_id ) );
+	// Colonne « Ouvrir sur » : on ne l'affiche que si au moins un des
+	// deux sites externes est activé ET configuré avec une URL non vide
+	// — sinon la cellule serait vide pour 100 % des articles et la
+	// colonne ne servirait à rien. Le fallback `?? true` sur `_enabled`
+	// reflète le comportement par défaut (activé tant que le toggle n'a
+	// pas été touché côté Réglages).
+	const showOpenOnColumn =
+		( false !== ( externalSites?.old_enabled ?? true ) &&
+			'' !== String( externalSites?.old_url ?? '' ).trim() ) ||
+		( false !== ( externalSites?.prod_enabled ?? true ) &&
+			'' !== String( externalSites?.prod_url ?? '' ).trim() );
 	if ( error ) {
 		return (
 			<div className="htmln-error notice notice-error">
@@ -309,9 +321,11 @@ export default function ArticlesTable( {
 						<th scope="col" className="manage-column">
 							{ __( 'Titre', '100son-html-normalizer' ) }
 						</th>
-						<th scope="col" className="manage-column">
-							{ __( 'Ouvrir sur', '100son-html-normalizer' ) }
-						</th>
+						{ showOpenOnColumn && (
+							<th scope="col" className="manage-column">
+								{ __( 'Ouvrir sur', '100son-html-normalizer' ) }
+							</th>
+						) }
 						<th scope="col" className="manage-column">
 							{ __( 'Statut', '100son-html-normalizer' ) }
 						</th>
@@ -424,12 +438,14 @@ export default function ArticlesTable( {
 									) }
 								</div>
 							</td>
-							<td>
-								<OpenOnButtons
-									item={ item }
-									externalSites={ externalSites }
-								/>
-							</td>
+							{ showOpenOnColumn && (
+								<td>
+									<OpenOnButtons
+										item={ item }
+										externalSites={ externalSites }
+									/>
+								</td>
+							) }
 							<td>
 								<StatusBadge item={ item } />
 							</td>
