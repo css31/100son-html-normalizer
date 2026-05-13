@@ -1069,11 +1069,53 @@
 
 /* Inputs des seuils γ : par défaut un `<TextControl>` WordPress s'étire
  * à 100 % de son parent (jusqu'à 600 px+ sur grand écran). Pour un nombre
- * à 1-2 chiffres, c'est absurde. On contraint la largeur de l'input à
- * 80 px (~4 chars + padding) tout en gardant le label sur sa propre ligne
- * au-dessus. */
+ * à 1-2 chiffres, c'est absurde.
+ *
+ * Layout cible : le **titre du champ** seul sur sa première ligne, puis
+ * sur la deuxième ligne **`[input 80 px] [description]`** côte à côte.
+ * Ainsi la description n'apparaît jamais à hauteur du titre, et l'input
+ * compact ne mange pas la largeur de la description.
+ *
+ * Structure DOM générée par `<TextControl>` :
+ *   .components-base-control
+ *     .components-base-control__field
+ *       <label> + <input class="components-text-control__input">
+ *     .components-base-control__help
+ *
+ * On grid `.components-base-control` en 2 colonnes × 2 rangées, et on
+ * « aplatit » la couche intermédiaire `__field` avec `display: contents`
+ * pour pouvoir placer son `<label>` et son `<input>` directement dans le
+ * grid parent. `display: contents` est supporté par tous les navigateurs
+ * modernes (Firefox 37+, Chrome 65+, Safari 11.1+). */
+.htmln-settings__field--narrow .components-base-control {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	column-gap: 14px;
+	row-gap: 4px;
+}
+
+.htmln-settings__field--narrow .components-base-control__field {
+	display: contents;
+}
+
+.htmln-settings__field--narrow .components-base-control__field > label {
+	grid-column: 1 / -1;
+	grid-row: 1;
+}
+
 .htmln-settings__field--narrow .components-text-control__input {
+	grid-column: 1;
+	grid-row: 2;
 	max-width: 80px;
+}
+
+.htmln-settings__field--narrow .components-base-control__help {
+	grid-column: 2;
+	grid-row: 2;
+	margin: 0;
+	align-self: center;
+	font-size: 12px;
+	color: var( --htmln-text-muted );
 }
 
 .htmln-settings__actions {
@@ -1084,11 +1126,21 @@
 }
 
 /* Section secondaire dans la page Réglages (ex. « Domaines externes »),
- * séparée du formulaire principal par un trait léger + marge. */
+ * séparée du formulaire principal par un trait léger + marge. Le trait
+ * `border-top` reste full-width pour matcher visuellement le header de
+ * la page ; on ne contraint que le contenu (description + fieldsets) à
+ * la largeur naturelle d'un fieldset « Domaine externe » (~542 px) pour
+ * que le `<p class="description">` s'aligne sur les `<fieldset>` en
+ * dessous. */
 .htmln-settings__section {
 	margin-top: 32px;
 	padding-top: 24px;
 	border-top: 1px solid var( --htmln-border );
+
+	> .htmln-settings__header,
+	> .htmln-settings__form {
+		max-width: 542px;
+	}
 }
 
 /* Ligne « Toggle | Libellé | URL » du fieldset « Domaines externes ».
@@ -1109,16 +1161,81 @@
 		padding-bottom: 6px;
 	}
 
+	/* Libellé court (5 chars max) — input contraint à 70 px. Même layout
+	 * grid (titre en ligne 1, [input | help] en ligne 2) que les seuils γ
+	 * — cf. commentaire détaillé sur `.htmln-settings__field--narrow`. */
 	> .htmln-settings__external-site-label {
-		flex: 0 0 auto;
+		flex: 0 1 auto;
+
+		.components-base-control {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			column-gap: 10px;
+			row-gap: 4px;
+		}
+
+		.components-base-control__field {
+			display: contents;
+		}
+
+		.components-base-control__field > label {
+			grid-column: 1 / -1;
+			grid-row: 1;
+		}
+
 		.components-text-control__input {
-			max-width: 100px;
+			grid-column: 1;
+			grid-row: 2;
+			max-width: 70px;
+		}
+
+		.components-base-control__help {
+			grid-column: 2;
+			grid-row: 2;
+			margin: 0;
+			align-self: center;
+			font-size: 12px;
+			color: var( --htmln-text-muted );
+			white-space: nowrap;
 		}
 	}
 
+	/* URL — input contraint à 300 px. Layout grid identique à libellé. */
 	> .htmln-settings__external-site-url {
-		flex: 1 1 320px;
-		min-width: 240px;
+		flex: 0 1 auto;
+		min-width: 320px;
+
+		.components-base-control {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			column-gap: 14px;
+			row-gap: 4px;
+		}
+
+		.components-base-control__field {
+			display: contents;
+		}
+
+		.components-base-control__field > label {
+			grid-column: 1 / -1;
+			grid-row: 1;
+		}
+
+		.components-text-control__input {
+			grid-column: 1;
+			grid-row: 2;
+			max-width: 300px;
+			width: 300px;
+		}
+
+		.components-base-control__help {
+			grid-column: 2;
+			grid-row: 2;
+			margin: 0;
+			align-self: center;
+			font-size: 12px;
+			color: var( --htmln-text-muted );
+		}
 	}
 }
 
