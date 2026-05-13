@@ -85,8 +85,8 @@ function StatusBadge( { item } ) {
 	const status = String( item.status );
 	const isStale = Boolean( item.is_stale );
 	const labels = {
-		normal: __( 'Normal', '100son-html-normalizer' ),
-		to_improve: __( 'À améliorer', '100son-html-normalizer' ),
+		normal: __( 'OK', '100son-html-normalizer' ),
+		to_improve: __( 'NOK', '100son-html-normalizer' ),
 	};
 	const label = labels[ status ] || status;
 	return (
