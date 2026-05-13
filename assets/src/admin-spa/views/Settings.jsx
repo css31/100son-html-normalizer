@@ -564,11 +564,38 @@ function ExternalSiteFieldset( {
 	return (
 		<fieldset className="htmln-settings__group">
 			<legend>{ legend }</legend>
-			{ /* Une seule ligne : `[Toggle Afficher] [Libellé court]
-			     [URL flexible]`. Cf. SCSS `.htmln-settings__external-site-row`
-			     qui pose le flex layout + les contraintes de largeur par
-			     enfant (70 px sur le libellé, 300 px sur l'URL). */ }
+			{ /* Deux rangées empilées : d'abord `[Libellé court] [URL
+			     flexible]`, puis dessous `[Toggle Afficher]`. Cf. SCSS
+			     `.htmln-settings__external-site-row` (flex column) et
+			     `.htmln-settings__external-site-fields` (flex row pour
+			     les deux inputs). Les contraintes de largeur (70 px sur
+			     le libellé, 300 px sur l'URL) sont portées par leurs
+			     wrappers respectifs. */ }
 			<div className="htmln-settings__external-site-row">
+				<div className="htmln-settings__external-site-fields">
+					<div className="htmln-settings__external-site-label">
+						<TextControl
+							label={ __( 'Libellé', '100son-html-normalizer' ) }
+							value={ formValues[ labelKey ] ?? '' }
+							onChange={ ( raw ) => onChange( labelKey, raw ) }
+							disabled={ isSaving }
+							maxLength={ 5 }
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+						/>
+					</div>
+					<div className="htmln-settings__external-site-url">
+						<TextControl
+							label={ __( 'URL', '100son-html-normalizer' ) }
+							value={ formValues[ urlKey ] ?? '' }
+							onChange={ ( raw ) => onChange( urlKey, raw ) }
+							disabled={ isSaving }
+							type="url"
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+						/>
+					</div>
+				</div>
 				<div className="htmln-settings__external-site-toggle">
 					<ToggleControl
 						label={ __( 'Afficher', '100son-html-normalizer' ) }
@@ -578,28 +605,6 @@ function ExternalSiteFieldset( {
 						}
 						disabled={ isSaving }
 						__nextHasNoMarginBottom
-					/>
-				</div>
-				<div className="htmln-settings__external-site-label">
-					<TextControl
-						label={ __( 'Libellé', '100son-html-normalizer' ) }
-						value={ formValues[ labelKey ] ?? '' }
-						onChange={ ( raw ) => onChange( labelKey, raw ) }
-						disabled={ isSaving }
-						maxLength={ 5 }
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-					/>
-				</div>
-				<div className="htmln-settings__external-site-url">
-					<TextControl
-						label={ __( 'URL', '100son-html-normalizer' ) }
-						value={ formValues[ urlKey ] ?? '' }
-						onChange={ ( raw ) => onChange( urlKey, raw ) }
-						disabled={ isSaving }
-						type="url"
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
 					/>
 				</div>
 			</div>

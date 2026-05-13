@@ -1143,28 +1143,33 @@
 	}
 }
 
-/* Ligne « Toggle | Libellé | URL » du fieldset « Domaines externes ».
- * Tous les contrôles sur une seule ligne, alignés sur leur baseline.
- * `flex-wrap` rebascule en pile sur écran étroit ou si le `<URL>` est
- * trop large. */
+/* Fieldset « Domaines externes » : deux rangées empilées. La rangée du
+ * haut accueille `[Libellé | URL]`, celle du bas le `[Toggle Afficher]`.
+ * Le toggle est sous les inputs et non au-dessus pour rester proche du
+ * label legend du fieldset (« Site 1 (dev) ») qui le titre déjà. */
 .htmln-settings__external-site-row {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	gap: 16px;
+	flex-direction: column;
+	gap: 12px;
+
+	/* Rangée du haut : inputs `[Libellé court] [URL flexible]` alignés
+	 * sur leur baseline (les inputs ont un `<label>` au-dessus, donc
+	 * `flex-end` aligne les *inputs* eux-mêmes, pas les labels). */
+	> .htmln-settings__external-site-fields {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: 16px;
+	}
 
 	> .htmln-settings__external-site-toggle {
 		flex: 0 0 auto;
-		/* Aligne le toggle avec la baseline du bas des inputs (les inputs
-		 * ont leur `<label>` au-dessus, le toggle n'en a pas — on l'aligne
-		 * sur le bas). */
-		padding-bottom: 6px;
 	}
 
 	/* Libellé court (5 chars max) — input contraint à 70 px. Même layout
 	 * grid (titre en ligne 1, [input | help] en ligne 2) que les seuils γ
 	 * — cf. commentaire détaillé sur `.htmln-settings__field--narrow`. */
-	> .htmln-settings__external-site-label {
+	> .htmln-settings__external-site-fields > .htmln-settings__external-site-label {
 		flex: 0 1 auto;
 
 		.components-base-control {
@@ -1201,7 +1206,7 @@
 	}
 
 	/* URL — input contraint à 300 px. Layout grid identique à libellé. */
-	> .htmln-settings__external-site-url {
+	> .htmln-settings__external-site-fields > .htmln-settings__external-site-url {
 		flex: 0 1 auto;
 		min-width: 320px;
 
