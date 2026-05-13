@@ -5,6 +5,21 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Masquage des pages admin V0.1 — la SPA devient le point d'entrée unique
+
+La SPA `1.0.0-rc4` couvre désormais l'essentiel des besoins fonctionnels V0.1 (Normalisation par lots, Règles, Historique, Notes, Réglages). Pour éviter à l'utilisateur de devoir choisir entre deux UI et clarifier le cap vers `v1.0.0`, les pages V0.1 sortent du menu admin — **sans être supprimées** : leurs URLs `?page=…-<sub>` restent fonctionnelles pour du rollback / non-régression, mais aucune entrée n'apparaît plus dans le sidebar.
+
+- `Admin\Menu::on_admin_menu()` :
+  - Le top-level « HTML Normalizer » bascule son callback de `PresetsPage::render` vers `SpaPage::render`. L'icône, le menu_title et le slug (`100son-html-normalizer`) restent inchangés pour ne pas dérouter l'utilisateur.
+  - Les 4 pages V0.1 (Préréglages / Tester / Normaliser / Journal) restent **enregistrées** (URLs `?page=100son-html-normalizer-{presets,tester,posts,logs}` fonctionnelles) puis retirées du menu via `remove_submenu_page()`. Préréglages prend un slug dédié `…-presets` au lieu de l'ancien alias top-level (qui aurait collisionné avec la nouvelle route SPA).
+  - L'alias rétro-compat `?page=100son-html-normalizer-spa` est conservé puis également masqué — les favoris/bookmarks existants continuent de marcher.
+- `Admin\Assets::is_spa_page()` accepte désormais les **deux slugs** SPA (`Menu::SLUG` *et* `Menu::SPA_PAGE_SLUG`) pour que le bundle React s'enqueue aussi bien sur le top-level que sur l'ancien chemin.
+- Aucune classe V0.1 n'est instanciée différemment — les hooks `admin_post_*` de `PostsPage` restent branchés (`Menu::register()` les conserve).
+
+#### Rollback
+
+Réafficher une page V0.1 = retirer la ligne `remove_submenu_page` correspondante dans `Menu::on_admin_menu()`. Pour revenir entièrement à la configuration rc4, restaurer le bloc V0.1 d'origine depuis l'historique git.
+
 ### Fix — état de l'onglet Normaliser perdu au switch d'onglets primaires
 
 Bug : un aller-retour entre l'onglet « Normaliser » et un autre onglet primaire de l'App (`Notes`, `Réglages`, `Historique`, `Règles`) faisait perdre la configuration en cours — tab interne (To improve / Normal / Stale), pagination courante, per-page, filtres (constructeur, catégorie, année, recherche…) et sélection d'articles cochés étaient remis aux defaults. Cause : `App.jsx` route via `renderRoute()` qui monte/démonte les vues, et toute la config Normalize vivait en `useState` local — donc perdue à chaque démontage. Seul `selectedRules` survivait car déjà dans le store.

@@ -2,9 +2,17 @@
 /**
  * Menu admin — enregistre le top-level et les sous-pages.
  *
- * V0.1 : UI minimale en PHP classique (pas de SPA React, ce sera la phase 15
- * du §11). 2 sous-pages : Préréglages (cocher/décocher + paramètres) et Tester
- * (normalisation interactive d'un fragment).
+ * Historique :
+ *  - V0.1 : UI classique en pages PHP (Préréglages / Tester / Normaliser /
+ *    Journal). Top-level pointait sur Préréglages.
+ *  - V1.0 (rc4) : SPA React ajoutée comme sous-page « Normaliser V1 »,
+ *    cohabitant avec les 4 pages V0.1.
+ *  - Post-rc4 : la SPA devient le **point d'entrée unique** — le top-level
+ *    « HTML Normalizer » pointe désormais sur SpaPage et toutes les
+ *    sous-pages V0.1 sont retirées du menu via `remove_submenu_page()`.
+ *    Les classes V0.1 restent instanciées et leurs URLs `?page=…-<sub>`
+ *    restent accessibles directement (pour non-régression / rollback),
+ *    mais aucune entrée n'apparaît plus dans le sidebar admin.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -80,66 +88,84 @@ final class Menu {
 	 * @return void
 	 */
 	public function on_admin_menu(): void {
+		// Top-level — sert désormais la SPA V1.0. L'icône et le menu_title
+		// restent identiques (« HTML Normalizer ») pour ne pas dérouter
+		// l'utilisateur ; seul le callback bascule de PresetsPage à SpaPage.
 		add_menu_page(
 			__( 'HTML Normalizer', '100son-html-normalizer' ),
 			__( 'HTML Normalizer', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG,
-			array( $this->presets_page, 'render' ),
+			array( $this->spa_page, 'render' ),
 			'dashicons-editor-removeformatting',
 			80
 		);
 
-		// Sous-page "Préréglages" (alias de la top-level — point d'entrée naturel V0.1).
+		// === Pages V0.1 — enregistrées pour conserver leurs URLs directes ===
+		//
+		// L'enregistrement via `add_submenu_page()` est nécessaire pour que
+		// WordPress route `?page=<slug>` vers le callback de rendu. Une fois
+		// enregistrées, on les retire du menu visible via `remove_submenu_page()`
+		// plus bas — l'URL reste fonctionnelle (rollback, non-régression, lien
+		// existant dans un favori) mais aucune entrée n'apparaît dans le
+		// sidebar admin.
+		//
+		// Préréglages prend un slug dédié `…-presets` (au lieu de l'ancien
+		// alias sur le top-level) — sinon il entrerait en conflit avec le
+		// nouveau top-level qui pointe sur la SPA.
 		add_submenu_page(
 			self::SLUG,
-			__( 'Préréglages', '100son-html-normalizer' ),
-			__( 'Préréglages', '100son-html-normalizer' ),
+			__( 'Préréglages (V0.1)', '100son-html-normalizer' ),
+			__( 'Préréglages (V0.1)', '100son-html-normalizer' ),
 			self::CAPABILITY,
-			self::SLUG,
+			self::SLUG . '-presets',
 			array( $this->presets_page, 'render' )
 		);
-
-		// Sous-page "Tester un fragment".
 		add_submenu_page(
 			self::SLUG,
-			__( 'Tester un fragment', '100son-html-normalizer' ),
-			__( 'Tester un fragment', '100son-html-normalizer' ),
+			__( 'Tester un fragment (V0.1)', '100son-html-normalizer' ),
+			__( 'Tester un fragment (V0.1)', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-tester',
 			array( $this->tester_page, 'render' )
 		);
-
-		// Sous-page "Normaliser" (F8).
 		add_submenu_page(
 			self::SLUG,
-			__( 'Normaliser', '100son-html-normalizer' ),
-			__( 'Normaliser', '100son-html-normalizer' ),
+			__( 'Normaliser (V0.1)', '100son-html-normalizer' ),
+			__( 'Normaliser (V0.1)', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-posts',
 			array( $this->posts_page, 'render' )
 		);
-
-		// Sous-page "Journal".
 		add_submenu_page(
 			self::SLUG,
-			__( 'Journal', '100son-html-normalizer' ),
-			__( 'Journal', '100son-html-normalizer' ),
+			__( 'Journal (V0.1)', '100son-html-normalizer' ),
+			__( 'Journal (V0.1)', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-logs',
 			array( $this->logs_page, 'render' )
 		);
 
-		// Sous-page SPA V1.0 (Phase 6) — interface React de normalisation
-		// par pas. Cohabite avec les pages V0.1 PHP en V1.0 ; la migration
-		// complète vers la SPA est différée V1.1.
+		// SPA — alias submenu sur l'ancien slug `…-spa`, conservé pour que
+		// les favoris/bookmarks utilisateur sur `?page=100son-html-normalizer-spa`
+		// continuent de marcher. Retiré du menu juste après.
 		add_submenu_page(
 			self::SLUG,
-			__( 'Normaliser V1', '100son-html-normalizer' ),
-			__( 'Normaliser V1', '100son-html-normalizer' ),
+			__( 'Normaliser', '100son-html-normalizer' ),
+			__( 'Normaliser', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SPA_PAGE_SLUG,
 			array( $this->spa_page, 'render' )
 		);
+
+		// Toutes les sous-pages enregistrées ci-dessus + l'alias auto-créé
+		// par WP (qui réutilise le slug du top-level) sortent du menu visible.
+		// Le sidebar n'affiche plus que l'entrée top-level « HTML Normalizer ».
+		remove_submenu_page( self::SLUG, self::SLUG );                // alias auto-créé du top-level
+		remove_submenu_page( self::SLUG, self::SLUG . '-presets' );   // V0.1 Préréglages
+		remove_submenu_page( self::SLUG, self::SLUG . '-tester' );    // V0.1 Tester
+		remove_submenu_page( self::SLUG, self::SLUG . '-posts' );     // V0.1 Normaliser
+		remove_submenu_page( self::SLUG, self::SLUG . '-logs' );      // V0.1 Journal
+		remove_submenu_page( self::SLUG, self::SPA_PAGE_SLUG );       // alias rétro-compat SPA
 	}
 }

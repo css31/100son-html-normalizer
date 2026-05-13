@@ -3,8 +3,9 @@
  * Admin\Assets — enqueue scope-restreint du bundle SPA V1.0.
  *
  * Cf. cahier v2.0 §13 garde-fou « ne pas charger d'assets globalement sur
- * toutes les pages admin ». L'enqueue se fait uniquement quand le
- * hook_suffix correspond à la page SPA (slug défini dans `Menu::SPA_PAGE_SLUG`).
+ * toutes les pages admin ». L'enqueue se fait uniquement quand l'URL admin
+ * cible la SPA — soit le top-level `Menu::SLUG`, soit l'alias rétro-compat
+ * `Menu::SPA_PAGE_SLUG` (cf. `is_spa_page()`).
  *
  * Convention `@wordpress/scripts` : la sortie webpack produit un fichier
  * `<entry>.asset.php` qui retourne `[ 'dependencies' => [...], 'version' => '...' ]`.
@@ -142,9 +143,16 @@ final class Assets {
 	 * menu_title localisé = hook_suffix différent → mismatch silencieux).
 	 *
 	 * `$_GET['page']` est stable, exposé par WordPress sur toute requête
-	 * `wp-admin/admin.php?page=<sub-slug>`, et on contrôle directement la
-	 * constante `Menu::SPA_PAGE_SLUG` pour la comparaison stricte. Pas de
-	 * sanitize nécessaire : on compare à une constante littérale.
+	 * `wp-admin/admin.php?page=<sub-slug>`, et on contrôle directement les
+	 * constantes `Menu::SLUG` / `Menu::SPA_PAGE_SLUG` pour la comparaison
+	 * stricte. Pas de sanitize nécessaire : on compare à des constantes
+	 * littérales.
+	 *
+	 * Deux slugs acceptés depuis le masquage des pages V0.1 :
+	 *  - `Menu::SLUG` (`100son-html-normalizer`) — top-level, route principale
+	 *    de la SPA depuis post-rc4 ;
+	 *  - `Menu::SPA_PAGE_SLUG` (`100son-html-normalizer-spa`) — alias
+	 *    rétro-compat pour les favoris utilisateur.
 	 *
 	 * Le paramètre `$hook_suffix` reste dans la signature pour cohérence
 	 * avec la callback `admin_enqueue_scripts` (et future télémétrie
@@ -155,7 +163,11 @@ final class Assets {
 	 */
 	private function is_spa_page( string $hook_suffix ): bool {
 		unset( $hook_suffix );
-		return isset( $_GET['page'] )
-			&& Menu::SPA_PAGE_SLUG === $_GET['page']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! isset( $_GET['page'] ) ) {
+			return false;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = (string) $_GET['page'];
+		return Menu::SLUG === $page || Menu::SPA_PAGE_SLUG === $page;
 	}
 }
