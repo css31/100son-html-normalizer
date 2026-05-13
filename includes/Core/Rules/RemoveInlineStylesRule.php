@@ -10,6 +10,15 @@
  *           Si rien ne reste, l'attribut est entierement supprime.
  *  - false : strip integralement l'attribut style sans exception.
  *
+ * **Cleanup post-strip des `<span>` orphelins** : un `<span style="...">`
+ * dont le `style` est l'unique attribut devient `<span>` apres le strip —
+ * un container semantique-neutre qui ne fait plus rien (la balise `<span>`
+ * en HTML n'a aucune semantique en soi, elle ne sert qu'a porter des
+ * attributs `style`/`class`/`id`). On l'unwrap (le retire en preservant
+ * son contenu). Limite ciblee au seul `<span>` — `<div>`, `<font>`,
+ * `<strong>`, `<em>`, etc. portent une semantique ou un layout qu'on
+ * conserve quel que soit l'etat des attributs.
+ *
  * **Exception `core/image` Gutenberg** : les `<img>` enfants directs d'un
  * `<figure>` portant la classe `wp-block-image` sont **ignores** par la regle.
  * Leur attribut `style="aspect-ratio:...;width:...;height:...;object-fit:..."`
@@ -100,13 +109,23 @@ final class RemoveInlineStylesRule implements RuleInterface {
 			}
 			if ( ! $this->keep_text_align ) {
 				$el->removeAttribute( 'style' );
-				continue;
-			}
-			$filtered = self::keep_only_text_align( (string) $el->getAttribute( 'style' ) );
-			if ( '' === $filtered ) {
-				$el->removeAttribute( 'style' );
 			} else {
-				$el->setAttribute( 'style', $filtered );
+				$filtered = self::keep_only_text_align( (string) $el->getAttribute( 'style' ) );
+				if ( '' === $filtered ) {
+					$el->removeAttribute( 'style' );
+				} else {
+					$el->setAttribute( 'style', $filtered );
+				}
+			}
+
+			// Post-strip cleanup : `<span>` qui n'a plus aucun attribut →
+			// container semantique-neutre, on le retire en preservant son
+			// contenu. Limite stricte aux `<span>` — voir docblock.
+			if (
+				'span' === strtolower( $el->tagName )
+				&& 0 === $el->attributes->length
+			) {
+				self::unwrap_element( $el );
 			}
 		}
 
@@ -185,6 +204,30 @@ final class RemoveInlineStylesRule implements RuleInterface {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Retire un element du DOM en preservant son contenu — l'element est
+	 * remplace par la sequence de ses enfants (dans le meme ordre, au meme
+	 * endroit). Cas d'usage : un `<span>` sans aucun attribut, qu'on souhaite
+	 * effacer comme container vide tout en gardant son texte et ses enfants
+	 * lies a la position originale.
+	 *
+	 * Tolerant aux elements sans parent (no-op silencieux) — defensif pour
+	 * eviter une fatal sur un edge case de parsing.
+	 *
+	 * @param DOMElement $el Element a unwrap.
+	 * @return void
+	 */
+	private static function unwrap_element( DOMElement $el ): void {
+		$parent = $el->parentNode;
+		if ( null === $parent ) {
+			return;
+		}
+		while ( null !== $el->firstChild ) {
+			$parent->insertBefore( $el->firstChild, $el );
+		}
+		$parent->removeChild( $el );
 	}
 
 	/**

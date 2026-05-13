@@ -92,9 +92,12 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 	}
 
 	public function test_descendant_styles_also_processed(): void {
+		// Le `<p>` garde son `text-align` (keep_text_align mode), le `<span>`
+		// perd son `font-weight` → il devient sans attribut → il est unwrap
+		// (cleanup post-strip). Cf. tests dédiés en bas de fichier.
 		$rule = new RemoveInlineStylesRule( true );
 		$this->assertHtmlEquals(
-			'<p style="text-align: left;"><span>nested</span></p>',
+			'<p style="text-align: left;">nested</p>',
 			$rule->apply( '<p style="text-align: left; color: blue;"><span style="font-weight: bold;">nested</span></p>' )
 		);
 	}
@@ -273,5 +276,120 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 			. '</figure>',
 			$rule->apply( $input )
 		);
+	}
+
+	// =========================================================================
+	//  Unwrap des `<span>` orphelins apres strip du style — un `<span>`
+	//  qui n'a plus aucun attribut est semantiquement transparent, on le
+	//  retire en preservant son contenu (typique des residus Word / SO /
+	//  Classic Editor).
+	// =========================================================================
+
+	public function test_unwraps_span_when_style_was_only_attribute(): void {
+		// Cas typique signale sur l'article 18804 du corpus MMM.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><span style="font-size: 14pt;">Texte du chapô avec <a href="x">lien</a>.</span></p>';
+		$this->assertHtmlEquals(
+			'<p>Texte du chapô avec <a href="x">lien</a>.</p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_unwraps_span_when_style_only_in_keep_text_align_mode_too(): void {
+		// Meme cas en mode keep_text_align (defaut) : le style non-text-align
+		// est strip, l'attribut style entier disparait, span sans autre attr
+		// → unwrap.
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = '<p><span style="color: red;">Texte</span></p>';
+		$this->assertHtmlEquals(
+			'<p>Texte</p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_preserves_span_when_class_attribute_remains(): void {
+		// Si le span garde au moins un attribut apres strip (ici `class`),
+		// on ne l'unwrap PAS — l'attribut peut servir au styling CSS externe.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><span class="highlight" style="color:red">Texte</span></p>';
+		$this->assertHtmlEquals(
+			'<p><span class="highlight">Texte</span></p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_preserves_span_when_id_attribute_remains(): void {
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><span id="anchor" style="color:red">Texte</span></p>';
+		$this->assertHtmlEquals(
+			'<p><span id="anchor">Texte</span></p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_preserves_span_when_style_kept_text_align(): void {
+		// En mode keep_text_align=true, un style="text-align: …" est conserve.
+		// Le span garde alors son attribut style → pas d'unwrap.
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = '<p><span style="text-align: center;">Texte</span></p>';
+		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
+	}
+
+	public function test_unwrap_preserves_inner_html_with_children(): void {
+		// L'unwrap doit preserver TOUS les enfants du span (texte + tags
+		// inline) dans le bon ordre, a la place du span.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><span style="color:red">Avant <strong>gras</strong> et <em>italique</em> Après</span></p>';
+		$this->assertHtmlEquals(
+			'<p>Avant <strong>gras</strong> et <em>italique</em> Après</p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_does_not_unwrap_div_with_style_only(): void {
+		// L'unwrap est limite a `<span>`. Un `<div style="...">` devient
+		// `<div>` qui reste — un `<div>` peut avoir un impact de layout
+		// (block element) qu'on ne peut pas supprimer aveuglement.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<div style="color:red">Texte</div>';
+		$this->assertHtmlEquals(
+			'<div>Texte</div>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_does_not_unwrap_strong_with_style_only(): void {
+		// `<strong>` porte une semantique (importance) → conserve meme
+		// quand on retire son style. Pareil pour `<em>`, `<b>`, `<i>`, etc.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><strong style="color:red">important</strong></p>';
+		$this->assertHtmlEquals(
+			'<p><strong>important</strong></p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_unwraps_nested_spans_recursively(): void {
+		// Spans imbriques : `<span style="A"><span style="B">x</span></span>`.
+		// Apres P6 : `<span><span>x</span></span>`. Comme on itere sur tous
+		// les elements styles dans l'ordre du document, les deux sont
+		// unwrappes → texte nu.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><span style="color:red"><span style="font-weight:bold">texte</span></span></p>';
+		$this->assertHtmlEquals(
+			'<p>texte</p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_unwrap_does_not_affect_count_matches(): void {
+		// `countMatches` reste l'unite "nombre de spans avec style nettoye",
+		// l'unwrap est un detail d'implementation. 1 span style → 1 match.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<p><span style="font-size: 14pt;">Texte</span></p>';
+		$this->assertSame( 1, $rule->countMatches( $input ) );
+		// Et idempotence : apres unwrap, plus rien a faire.
+		$after = $rule->apply( $input );
+		$this->assertSame( 0, $rule->countMatches( $after ) );
 	}
 }

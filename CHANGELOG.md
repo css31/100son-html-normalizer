@@ -5,6 +5,30 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Fix P6 — unwrap des `<span>` orphelins après strip du style
+
+Quand P6 retire l'attribut `style` d'un `<span>` qui n'avait que cet attribut, le span devient `<span>` (sans aucun attribut) — un container sémantique-neutre qui ne fait plus rien. P6 le retire désormais (unwrap) en préservant son contenu :
+
+```
+Avant : <p><span style="font-size: 14pt;">Texte chapô...</span></p>
+Après : <p>Texte chapô...</p>
+```
+
+Cas typique des résidus laissés par Word / Classic Editor / SiteOrigin Editor. Signalé sur l'article 18804 du corpus MMM.
+
+L'exception est restrictive : seul `<span>` est concerné. `<div>`, `<font>`, `<strong>`, `<em>`, `<b>`, `<i>` portent une sémantique ou un layout qu'on conserve indépendamment de l'état des attributs.
+
+Garde-fous (validés par les tests) :
+- `<span class="…" style="…">` → conserve `class`, span gardé.
+- `<span id="…" style="…">` → conserve `id`, span gardé.
+- `<span style="text-align: center">` en mode `keep_text_align` → style préservé, span gardé.
+- Enfants préservés en ordre (texte + tags inline) à la place du span unwrap.
+- Spans imbriqués → unwrap récursif (P6 traite tous les éléments stylés dans l'ordre du document).
+
+Fichiers : `includes/Core/Rules/RemoveInlineStylesRule.php` (helper privé `unwrap_element` + condition post-strip ciblée `<span>` sans attribut).
+
+Tests : +10 PHPUnit `RemoveInlineStylesRuleTest` ; 1 test pré-existant (`test_descendant_styles_also_processed`) ajusté pour refléter le nouveau comportement. Total **682 PHPUnit verts** (vs 672), PHPStan propre sur la règle éditée.
+
 ### Modale Diff — surlignage stabylo des suppressions/ajouts + normalisation HTML pour l'affichage
 
 Deux évolutions intriquées sur le panneau « Code source » de la modale Diff.
