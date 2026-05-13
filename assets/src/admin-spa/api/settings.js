@@ -25,3 +25,23 @@ export const getRegressionThresholds = () =>
  */
 export const saveRegressionThresholds = ( thresholds ) =>
 	post( '/settings/regression-thresholds', { thresholds } );
+
+/**
+ * `GET /settings/external-sites` — récupère les 2 URLs (Old / Prod) configurées
+ * pour l'ouverture rapide d'un article depuis l'onglet Normaliser, plus les
+ * defaults pour le bouton « Restaurer ».
+ *
+ * @return {Promise<{sites: {old_url: string, prod_url: string}, defaults: {old_url: string, prod_url: string}}>} URLs courantes + defaults.
+ */
+export const getExternalSites = () => get( '/settings/external-sites' );
+
+/**
+ * `POST /settings/external-sites` — écrit les 2 URLs. Toute valeur non-URL
+ * (mauvais schéma, espaces, vide) est silencieusement remplacée par le default
+ * côté serveur (cf. `SettingsRepository::setExternalSites`).
+ *
+ * @param {{old_url: string, prod_url: string}} sites Map clé canonique → URL.
+ * @return {Promise<{sites: {old_url: string, prod_url: string}}>} URLs après normalisation.
+ */
+export const saveExternalSites = ( sites ) =>
+	post( '/settings/external-sites', { sites } );

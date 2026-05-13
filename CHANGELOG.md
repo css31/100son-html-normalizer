@@ -3,6 +3,59 @@
 Toutes les modifications notables de cette extension sont consignées ici.
 Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionning [SemVer](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Fix — état de l'onglet Normaliser perdu au switch d'onglets primaires
+
+Bug : un aller-retour entre l'onglet « Normaliser » et un autre onglet primaire de l'App (`Notes`, `Réglages`, `Historique`, `Règles`) faisait perdre la configuration en cours — tab interne (To improve / Normal / Stale), pagination courante, per-page, filtres (constructeur, catégorie, année, recherche…) et sélection d'articles cochés étaient remis aux defaults. Cause : `App.jsx` route via `renderRoute()` qui monte/démonte les vues, et toute la config Normalize vivait en `useState` local — donc perdue à chaque démontage. Seul `selectedRules` survivait car déjà dans le store.
+
+Correctif : déplacement des 5 états locaux vers le store `htmln/spa` dans un slice dédié `normalizeView` (tab / page / perPage / filters / selectedPostIds). Persistant au switch d'onglets primaires, perdu au reload (cohérent avec la sémantique éphémère de `selectedRules`).
+
+- `store/index.js` : nouveau slice `normalizeView` avec defaults centralisés (`DEFAULT_NORMALIZE_VIEW`), 4 actions (`setNormalizeView` partiel-merge, `toggleNormalizeSelectedPost`, `toggleNormalizeSelectedPostsOnPage`, `clearNormalizeSelectedPosts`), 1 selector (`getNormalizeView`). Le reducer privilégie un dispatch unique pour les transitions composées (`{ tab, page: 1 }`, `{ filters, page: 1 }`, etc.) — un seul re-render au lieu de deux.
+- `views/Normalize.jsx` : remplacement de 5 `useState` par `useSelect` + `useDispatch`. `selectedPostIds` côté store reste un array (sérialisable Redux) ; le composant le matérialise en `Set` via `useMemo` pour préserver l'API `.has()` / `.size` attendue par `ArticlesTable`.
+- `useState( diffPostId )` conservé en local — la modale Diff doit se refermer au switch d'onglet, c'est même l'effet attendu.
+
+#### Métriques
+
+- Bundle JS 95.1 KiB (vs 93.6 — +1.5 KiB pour le slice + reducer cases).
+- Lint JS propre, PHPUnit 641 verts + 9 intégration verts (aucun test PHP impacté), PHPStan baseline inchangée.
+
+### Onglet Normaliser — accès rapide aux sites externes Old / Prod
+
+Pendant la migration MMM, on a régulièrement besoin de comparer un article entre l'ancien site (`old.ma-maison-mag.fr`) et la prod. Trois petites évolutions, sans incidence fonctionnelle sur le pipeline de normalisation :
+
+- **Réagencement de la cellule Titre** dans `ArticlesTable` : le bouton « Éditer » passe **avant** le titre (alignement gauche), suivi du titre cliquable, puis de deux nouveaux boutons « Old » et « Prod » qui ouvrent l'article sur les domaines configurés (path du permalien local préservé via `new URL(...).pathname`).
+- **Nouvelle option `external_sites`** dans `son100_htmln_settings` — deux clés `old_url` / `prod_url`, defaults `https://old.ma-maison-mag.fr` et `https://ma-maison-mag.fr`. Normalisation défensive (regex `^https?://host`, slash final retiré, fallback default sur valeur invalide) — même contrat que les seuils γ.
+- **Section « Domaines externes »** dans l'onglet Réglages — 2 inputs URL, bouton « Restaurer les valeurs par défaut », notice succès/erreur, cycle isDirty propre.
+
+#### Backend
+
+- `SettingsRepository::EXTERNAL_SITES_DEFAULTS` (constante publique).
+- `SettingsRepository::getExternalSites()` / `setExternalSites()` / `normalize_external_sites()` (le délimiteur du regex est `~` et non `#`, vu que `#` apparaît dans la classe de caractères et terminerait prématurément le motif sinon).
+- `SettingsController` : 2 nouvelles routes `GET`/`POST /settings/external-sites` (permission `manage_options`, contrat `{ sites, defaults }` / `{ sites }`).
+- 24 routes REST au total (vs 23 en rc4).
+
+#### Frontend
+
+- `api/settings.js` : `getExternalSites()` / `saveExternalSites()`.
+- `hooks/useExternalSites.js` : nouveau hook (cycle fetch/save indépendant de `useSettings`).
+- `views/Settings.jsx` : ajout du composant `<ExternalSitesSection />` sous le formulaire des seuils.
+- `views/Normalize/ArticlesTable.jsx` : utilitaire `buildExternalUrl(permalink, baseUrl)` (path préservé, fallback null si URL parse fail), prop `externalSites`.
+- `styles/main.scss` : `.htmln-articles-table__site-btn`, `.htmln-settings__section`.
+
+#### Tests
+
+- +10 tests `SettingsRepositoryTest`, +5 tests `SettingsControllerTest` (defaults, override, slash final, URLs invalides, valeurs non-string, ignore clés inconnues, préservation autres settings, http/https, normalisation silencieuse).
+- `test_register_routes_registers_single_endpoint_pair` renommé en `…_registers_both_endpoint_pairs` pour couvrir les 2 routes.
+
+#### Métriques
+
+- 641 PHPUnit verts (vs 635 en rc4 — net +6 après refactor `…_registers_both_endpoint_pairs`), 1456 assertions, 9 tests d'intégration verts.
+- PHPStan inchangé (22 erreurs baseline) — mes fichiers édités sont propres.
+- Bundle JS 93.6 KiB (vs 88.2), CSS 22.4 KiB (vs 22.3).
+
+---
+
 ## [1.0.0-rc4] — 2026-05-12
 
 **Portage dans la SPA des fonctionnalités V0.1 perdues** + **refontes UX finales rc4** (filtre Règles, pagination numérotée, refonte Diff & Métriques, badge orange « Gut + fossile »). Cible : parité fonctionnelle SPA ↔ V0.1 + qualité visuelle prête pour `1.0.0` final.

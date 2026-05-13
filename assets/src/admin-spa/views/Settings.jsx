@@ -22,6 +22,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { Button, Notice, Spinner, TextControl } from '@wordpress/components';
 import { useSettings } from '../hooks/useSettings';
+import { useExternalSites } from '../hooks/useExternalSites';
 
 /**
  * Schéma des 7 seuils — clé, libellé, unité, max recommandé pour
@@ -376,7 +377,211 @@ export default function Settings() {
 					</Button>
 				</div>
 			</form>
+
+			<ExternalSitesSection />
 		</div>
+	);
+}
+
+/**
+ * Section « Domaines externes » — 2 URLs (Old / Prod) consommées par les
+ * boutons d'ouverture rapide dans l'onglet Normaliser. Indépendante du
+ * formulaire des seuils γ — chacun a son cycle save/dirty.
+ *
+ * @return {JSX.Element} Fieldset URLs + boutons.
+ */
+function ExternalSitesSection() {
+	const {
+		sites,
+		defaults,
+		isLoading,
+		isSaving,
+		error,
+		isDirty,
+		save,
+		clearStatus,
+	} = useExternalSites();
+
+	// String state pour autoriser un input vide sans perdre le focus, même
+	// pattern que la section seuils γ ci-dessus.
+	const [ formValues, setFormValues ] = useState( {} );
+
+	useEffect( () => {
+		if ( sites && 0 === Object.keys( formValues ).length ) {
+			setFormValues( {
+				old_url: String( sites.old_url ?? '' ),
+				prod_url: String( sites.prod_url ?? '' ),
+			} );
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ sites ] );
+
+	const handleChange = useCallback(
+		( key, raw ) => {
+			setFormValues( ( prev ) => ( {
+				...prev,
+				[ key ]: String( raw ),
+			} ) );
+			if ( isDirty || error ) {
+				clearStatus();
+			}
+		},
+		[ isDirty, error, clearStatus ]
+	);
+
+	const handleRestore = useCallback( () => {
+		if ( ! defaults ) {
+			return;
+		}
+		setFormValues( {
+			old_url: String( defaults.old_url ?? '' ),
+			prod_url: String( defaults.prod_url ?? '' ),
+		} );
+		clearStatus();
+	}, [ defaults, clearStatus ] );
+
+	const handleSave = useCallback(
+		async ( event ) => {
+			event.preventDefault();
+			try {
+				const normalized = await save( {
+					old_url: ( formValues.old_url ?? '' ).trim(),
+					prod_url: ( formValues.prod_url ?? '' ).trim(),
+				} );
+				// Resync : si l'utilisateur a tapé une URL invalide, le serveur
+				// l'a remplacée par le default — on reflète la valeur réelle.
+				setFormValues( {
+					old_url: String( normalized.old_url ?? '' ),
+					prod_url: String( normalized.prod_url ?? '' ),
+				} );
+			} catch ( _err ) {
+				// Erreur affichée via <Notice>.
+			}
+		},
+		[ formValues, save ]
+	);
+
+	if ( isLoading && null === sites ) {
+		return (
+			<section className="htmln-settings__section">
+				<Spinner />{ ' ' }
+				{ __(
+					'Chargement des domaines externes…',
+					'100son-html-normalizer'
+				) }
+			</section>
+		);
+	}
+
+	return (
+		<section className="htmln-settings__section">
+			<header className="htmln-settings__header">
+				<h2>{ __( 'Domaines externes', '100son-html-normalizer' ) }</h2>
+				<p className="description">
+					{ __(
+						'URLs des sites où ouvrir un article depuis l’onglet Normaliser (boutons « Old » et « Prod »). Schéma http:// ou https:// requis ; le slash final est retiré automatiquement. Une valeur invalide est remplacée par la valeur par défaut.',
+						'100son-html-normalizer'
+					) }
+				</p>
+			</header>
+
+			{ isDirty && ! isSaving && (
+				<Notice status="success" onRemove={ clearStatus } isDismissible>
+					{ __( 'Domaines enregistrés.', '100son-html-normalizer' ) }
+				</Notice>
+			) }
+
+			{ error && (
+				<Notice status="error" onRemove={ clearStatus } isDismissible>
+					{ sprintf(
+						// translators: %s = message d'erreur.
+						__(
+							'Échec de l’enregistrement : %s',
+							'100son-html-normalizer'
+						),
+						error
+					) }
+				</Notice>
+			) }
+
+			<form onSubmit={ handleSave } className="htmln-settings__form">
+				<fieldset className="htmln-settings__group">
+					<legend>
+						{ __( 'URLs des sites', '100son-html-normalizer' ) }
+					</legend>
+					<div className="htmln-settings__field">
+						<TextControl
+							label={ __(
+								'Ancien site (« Old »)',
+								'100son-html-normalizer'
+							) }
+							value={ formValues.old_url ?? '' }
+							onChange={ ( raw ) =>
+								handleChange( 'old_url', raw )
+							}
+							disabled={ isSaving }
+							help={ sprintf(
+								// translators: %s = URL par défaut.
+								__(
+									'Par défaut : %s.',
+									'100son-html-normalizer'
+								),
+								String( defaults?.old_url ?? '' )
+							) }
+							type="url"
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+						/>
+					</div>
+					<div className="htmln-settings__field">
+						<TextControl
+							label={ __(
+								'Site de production (« Prod »)',
+								'100son-html-normalizer'
+							) }
+							value={ formValues.prod_url ?? '' }
+							onChange={ ( raw ) =>
+								handleChange( 'prod_url', raw )
+							}
+							disabled={ isSaving }
+							help={ sprintf(
+								// translators: %s = URL par défaut.
+								__(
+									'Par défaut : %s.',
+									'100son-html-normalizer'
+								),
+								String( defaults?.prod_url ?? '' )
+							) }
+							type="url"
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+						/>
+					</div>
+				</fieldset>
+
+				<div className="htmln-settings__actions">
+					<Button
+						type="submit"
+						variant="primary"
+						disabled={ isSaving }
+						isBusy={ isSaving }
+					>
+						{ __( 'Enregistrer', '100son-html-normalizer' ) }
+					</Button>{ ' ' }
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={ handleRestore }
+						disabled={ isSaving || ! defaults }
+					>
+						{ __(
+							'Restaurer les valeurs par défaut',
+							'100son-html-normalizer'
+						) }
+					</Button>
+				</div>
+			</form>
+		</section>
 	);
 }
 

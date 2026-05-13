@@ -655,6 +655,17 @@
 	text-decoration: none;
 }
 
+/* Boutons « Old » / « Prod » : même gabarit compact que « Éditer », teintés
+ * différemment pour les distinguer en lecture rapide. */
+.htmln-articles-table__site-btn {
+	flex: 0 0 auto;
+	font-size: 11px;
+	padding: 2px 8px;
+	line-height: 1.6;
+	white-space: nowrap;
+	text-decoration: none;
+}
+
 /* =============================================================================
  *  Vue Normaliser — barre « Appliquer ce lot » (rc4, dans `.htmln-normalize__actions`)
  *
@@ -1038,6 +1049,14 @@
 	display: flex;
 	gap: 10px;
 	flex-wrap: wrap;
+}
+
+/* Section secondaire dans la page Réglages (ex. « Domaines externes »),
+ * séparée du formulaire principal par un trait léger + marge. */
+.htmln-settings__section {
+	margin-top: 32px;
+	padding-top: 24px;
+	border-top: 1px solid var( --htmln-border );
 }
 
 /* =============================================================================

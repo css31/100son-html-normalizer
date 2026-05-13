@@ -103,6 +103,35 @@ function StatusBadge( { item } ) {
 }
 
 /**
+ * Compose une URL d'ouverture vers un site externe en gardant le path du
+ * permalien courant (slug, structure de permaliens) et en remplaçant juste
+ * le scheme + host.
+ *
+ * Pourquoi pas un simple concat `domain + slug` : la structure de permaliens
+ * peut être `/%category%/%postname%/`, `/blog/%postname%/`, etc. On préserve
+ * exactement le path du permalien local — il est censé être identique sur
+ * Old et Prod (corpus migré, même config).
+ *
+ * Retourne `null` si l'un des deux ingrédients manque ou est invalide.
+ *
+ * @param {string} permalink Permalien local (peut être absolu ou vide).
+ * @param {string} baseUrl   URL absolue configurée (sans slash final).
+ * @return {?string} URL absolue cible, ou null si impossible à composer.
+ */
+function buildExternalUrl( permalink, baseUrl ) {
+	if ( ! permalink || ! baseUrl ) {
+		return null;
+	}
+	try {
+		const src = new URL( permalink );
+		const dest = new URL( baseUrl );
+		return `${ dest.origin }${ src.pathname }${ src.search }${ src.hash }`;
+	} catch ( _err ) {
+		return null;
+	}
+}
+
+/**
  * @param {Object}                                 props
  * @param {Array}                                  props.items             Diagnostics paginés.
  * @param {number}                                 props.total             Total non paginé.
@@ -118,6 +147,7 @@ function StatusBadge( { item } ) {
  * @param {(checked: boolean) => void}             props.onToggleAllOnPage Toggle de tous les articles de la page.
  * @param {boolean}                                props.disabled          Désactive les checkboxes (pas en cours).
  * @param {(id: number) => void}                   props.onViewDiff        Callback bouton « Voir le diff » par ligne.
+ * @param {?{old_url: string, prod_url: string}}   props.externalSites     URLs des sites externes (Old / Prod) — null tant que pas chargé.
  * @return {JSX.Element} Tableau + pagination.
  */
 export default function ArticlesTable( {
@@ -135,6 +165,7 @@ export default function ArticlesTable( {
 	onToggleAllOnPage,
 	disabled,
 	onViewDiff,
+	externalSites,
 } ) {
 	const allOnPageChecked =
 		items.length > 0 &&
@@ -285,6 +316,23 @@ export default function ArticlesTable( {
 							<td>{ item.post_id }</td>
 							<td className="htmln-articles-table__title">
 								<div className="htmln-articles-table__title-cell">
+									{ item.edit_url && (
+										<a
+											href={ item.edit_url }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="button button-small htmln-articles-table__edit-btn"
+											title={ __(
+												'Ouvrir l’éditeur (nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ __(
+												'Éditer',
+												'100son-html-normalizer'
+											) }
+										</a>
+									) }
 									{ item.permalink ? (
 										<a
 											href={ item.permalink }
@@ -313,23 +361,60 @@ export default function ArticlesTable( {
 												  ) }
 										</span>
 									) }
-									{ item.edit_url && (
-										<a
-											href={ item.edit_url }
-											target="_blank"
-											rel="noopener noreferrer"
-											className="button button-small htmln-articles-table__edit-btn"
-											title={ __(
-												'Ouvrir l’éditeur (nouvel onglet)',
-												'100son-html-normalizer'
-											) }
-										>
-											{ __(
-												'Éditer',
-												'100son-html-normalizer'
-											) }
-										</a>
-									) }
+									{ /* Boutons Old / Prod — ouvrent l'article
+									     sur les domaines configurés en Réglages.
+									     Affichés seulement si on a pu composer
+									     une URL valide (permalink + domaine ok). */ }
+									{ ( () => {
+										const oldHref = buildExternalUrl(
+											item.permalink,
+											externalSites?.old_url ?? ''
+										);
+										return (
+											oldHref && (
+												<a
+													href={ oldHref }
+													target="_blank"
+													rel="noopener noreferrer"
+													className="button button-small htmln-articles-table__site-btn"
+													title={ __(
+														'Ouvrir sur l’ancien site (nouvel onglet)',
+														'100son-html-normalizer'
+													) }
+												>
+													{ __(
+														'Old',
+														'100son-html-normalizer'
+													) }
+												</a>
+											)
+										);
+									} )() }
+									{ ( () => {
+										const prodHref = buildExternalUrl(
+											item.permalink,
+											externalSites?.prod_url ?? ''
+										);
+										return (
+											prodHref && (
+												<a
+													href={ prodHref }
+													target="_blank"
+													rel="noopener noreferrer"
+													className="button button-small htmln-articles-table__site-btn"
+													title={ __(
+														'Ouvrir sur le site de prod (nouvel onglet)',
+														'100son-html-normalizer'
+													) }
+												>
+													{ __(
+														'Prod',
+														'100son-html-normalizer'
+													) }
+												</a>
+											)
+										);
+									} )() }
 								</div>
 							</td>
 							<td>

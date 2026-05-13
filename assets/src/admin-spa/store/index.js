@@ -36,11 +36,23 @@ export const STORE_NAME = 'htmln/spa';
  * `selectedRules` est éphémère : initialisé à la liste complète P1..P8 au
  * boot, modifié par l'onglet Règles, perdu au reload (cf. décision post-rc1).
  *
+ * `normalizeView` est également éphémère (perdu au reload) mais survit au
+ * changement d'onglet primaire de l'App (`App.jsx` monte/démonte les vues —
+ * sans store, on perdrait tab/page/filters/sélection à chaque aller-retour).
+ *
+ * @typedef {Object} NormalizeViewState
+ * @property {'to_improve'|'normal'|'stale'}                                       tab                  Onglet interne F13 actif.
+ * @property {number}                                                              page                 Page de pagination (≥ 1).
+ * @property {number}                                                              perPage              Articles par page.
+ * @property {Object<string, *>}                                                   filters              Filtres FiltersBar (search/cat/year/month/builder/rules).
+ * @property {number[]}                                                            selectedPostIds      Post IDs cochés (F14.1). Array pour rester sérialisable Redux ; le composant le matérialise en Set pour `.has()`.
+ *
  * @typedef {Object} HtmlnSpaState
  * @property {?{normal: number, to_improve: number, stale: number, total: number}} diagnosticsStats     Compteurs F13 onglets (null = pas encore chargé).
  * @property {?{uuid: string, progress?: Object}}                                  currentStep          Pas F14 en cours (null = aucun pas actif).
  * @property {?Object<string, number>}                                             regressionThresholds Seuils γ courants (Settings 6.7).
  * @property {string[]}                                                            selectedRules        Sélection éphémère des règles à appliquer au prochain pas.
+ * @property {NormalizeViewState}                                                  normalizeView        État de l'onglet Normaliser persistant au switch d'onglets primaires.
  */
 
 /**
@@ -64,11 +76,28 @@ export const ALL_RULE_IDS = [
 	'P9',
 ];
 
+/**
+ * Defaults `normalizeView` — alignés sur l'ancien état local de `Normalize.jsx`
+ * (DEFAULT_TAB = `to_improve`, DEFAULT_PER_PAGE = 50, page = 1, filtres vides,
+ * aucune sélection). Toute évolution de ces defaults doit rester en miroir
+ * avec les constantes du composant pour éviter une dérive silencieuse.
+ *
+ * @type {NormalizeViewState}
+ */
+const DEFAULT_NORMALIZE_VIEW = {
+	tab: 'to_improve',
+	page: 1,
+	perPage: 50,
+	filters: {},
+	selectedPostIds: [],
+};
+
 const DEFAULT_STATE = {
 	diagnosticsStats: null,
 	currentStep: null,
 	regressionThresholds: null,
 	selectedRules: [ ...ALL_RULE_IDS ],
+	normalizeView: { ...DEFAULT_NORMALIZE_VIEW },
 };
 
 const actions = {
@@ -139,6 +168,59 @@ const actions = {
 	deselectAllRules() {
 		return { type: 'SET_SELECTED_RULES', ruleIds: [] };
 	},
+
+	/**
+	 * Met à jour partiellement l'état de la vue Normaliser. Accepte un
+	 * sous-ensemble de clés (tab, page, perPage, filters, selectedPostIds) ;
+	 * les clés absentes sont préservées. Permet à `Normalize.jsx` de
+	 * synchroniser plusieurs champs en un seul dispatch (ex. changement
+	 * d'onglet interne + reset de page à 1) — un seul re-render au lieu
+	 * de deux.
+	 *
+	 * @param {Partial<NormalizeViewState>} patch Patch partiel.
+	 */
+	setNormalizeView( patch ) {
+		return { type: 'SET_NORMALIZE_VIEW', patch };
+	},
+
+	/**
+	 * Bascule la sélection d'un post (F14.1) — additionne s'il est absent,
+	 * retire s'il est présent.
+	 *
+	 * @param {number}  postId  Identifiant de l'article.
+	 * @param {boolean} checked État cible (true = coché).
+	 */
+	toggleNormalizeSelectedPost( postId, checked ) {
+		return {
+			type: 'TOGGLE_NORMALIZE_SELECTED_POST',
+			postId: Number( postId ),
+			checked: Boolean( checked ),
+		};
+	},
+
+	/**
+	 * Coche/décoche en bloc tous les articles de la page courante (F14.1).
+	 *
+	 * @param {number[]} postIds Identifiants des articles à toggler.
+	 * @param {boolean}  checked État cible.
+	 */
+	toggleNormalizeSelectedPostsOnPage( postIds, checked ) {
+		return {
+			type: 'TOGGLE_NORMALIZE_SELECTED_POSTS_ON_PAGE',
+			postIds: Array.isArray( postIds )
+				? postIds.map( ( id ) => Number( id ) )
+				: [],
+			checked: Boolean( checked ),
+		};
+	},
+
+	/**
+	 * Vide la sélection d'articles. Appelé après finalisation d'un pas —
+	 * les articles confirmés ne doivent pas rester cochés.
+	 */
+	clearNormalizeSelectedPosts() {
+		return { type: 'CLEAR_NORMALIZE_SELECTED_POSTS' };
+	},
 };
 
 /**
@@ -181,6 +263,76 @@ function reducer( state = DEFAULT_STATE, action ) {
 				  );
 			return { ...state, selectedRules: next };
 		}
+		case 'SET_NORMALIZE_VIEW': {
+			const patch =
+				action.patch && 'object' === typeof action.patch
+					? action.patch
+					: {};
+			return {
+				...state,
+				normalizeView: { ...state.normalizeView, ...patch },
+			};
+		}
+		case 'TOGGLE_NORMALIZE_SELECTED_POST': {
+			const id = Number( action.postId );
+			if ( ! Number.isFinite( id ) ) {
+				return state;
+			}
+			const current = state.normalizeView.selectedPostIds;
+			const present = current.includes( id );
+			let next;
+			if ( action.checked ) {
+				next = present ? current : [ ...current, id ];
+			} else {
+				next = present ? current.filter( ( x ) => x !== id ) : current;
+			}
+			if ( next === current ) {
+				return state;
+			}
+			return {
+				...state,
+				normalizeView: {
+					...state.normalizeView,
+					selectedPostIds: next,
+				},
+			};
+		}
+		case 'TOGGLE_NORMALIZE_SELECTED_POSTS_ON_PAGE': {
+			const ids = Array.isArray( action.postIds )
+				? action.postIds
+						.map( ( x ) => Number( x ) )
+						.filter( ( x ) => Number.isFinite( x ) )
+				: [];
+			if ( 0 === ids.length ) {
+				return state;
+			}
+			const current = state.normalizeView.selectedPostIds;
+			let next;
+			if ( action.checked ) {
+				// Union sans doublon, ordre stable (existants d'abord).
+				const set = new Set( current );
+				ids.forEach( ( id ) => set.add( id ) );
+				next = Array.from( set );
+			} else {
+				const drop = new Set( ids );
+				next = current.filter( ( id ) => ! drop.has( id ) );
+			}
+			return {
+				...state,
+				normalizeView: {
+					...state.normalizeView,
+					selectedPostIds: next,
+				},
+			};
+		}
+		case 'CLEAR_NORMALIZE_SELECTED_POSTS':
+			if ( 0 === state.normalizeView.selectedPostIds.length ) {
+				return state;
+			}
+			return {
+				...state,
+				normalizeView: { ...state.normalizeView, selectedPostIds: [] },
+			};
 		default:
 			return state;
 	}
@@ -227,6 +379,15 @@ const selectors = {
 	 * @return {string[]} Liste dans l'ordre canonique.
 	 */
 	getSelectedRules: ( state ) => state.selectedRules,
+
+	/**
+	 * État de la vue Normaliser (tab/page/perPage/filters/selectedPostIds).
+	 * Préservé au switch d'onglets primaires de l'App ; perdu au reload.
+	 *
+	 * @param {HtmlnSpaState} state État du store.
+	 * @return {NormalizeViewState} État courant.
+	 */
+	getNormalizeView: ( state ) => state.normalizeView,
 };
 
 /**

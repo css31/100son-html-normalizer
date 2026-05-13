@@ -31,33 +31,41 @@ final class SettingsControllerTest extends TestCase {
 	//  register_routes
 	// =========================================================================
 
-	public function test_register_routes_registers_single_endpoint_pair(): void {
+	public function test_register_routes_registers_both_endpoint_pairs(): void {
 		$this->controller()->register_routes();
-		$this->assertCount( 1, $GLOBALS['son100_htmln_test_rest_routes'] );
-		$entry = $GLOBALS['son100_htmln_test_rest_routes'][0];
-		$this->assertSame( 'htmln/v1', $entry['namespace'] );
-		$this->assertSame( '/settings/regression-thresholds', $entry['route'] );
-		// `args` est une liste de méthodes (GET + POST) — pattern WP REST
-		// multi-handler par route.
-		$methods = array_map(
-			static fn( array $row ): string => $row['methods'],
-			$entry['args']
+		$this->assertCount( 2, $GLOBALS['son100_htmln_test_rest_routes'] );
+		$routes = array_column(
+			$GLOBALS['son100_htmln_test_rest_routes'],
+			null,
+			'route'
 		);
-		$this->assertContains( 'GET', $methods );
-		$this->assertContains( 'POST', $methods );
+		$this->assertArrayHasKey( '/settings/regression-thresholds', $routes );
+		$this->assertArrayHasKey( '/settings/external-sites', $routes );
+		foreach ( $routes as $entry ) {
+			$this->assertSame( 'htmln/v1', $entry['namespace'] );
+			// `args` est une liste de méthodes (GET + POST) — pattern WP REST
+			// multi-handler par route.
+			$methods = array_map(
+				static fn( array $row ): string => $row['methods'],
+				$entry['args']
+			);
+			$this->assertContains( 'GET', $methods );
+			$this->assertContains( 'POST', $methods );
+		}
 	}
 
 	public function test_register_routes_uses_manage_options_permission(): void {
 		$controller = $this->controller();
 		$controller->register_routes();
-		$entry = $GLOBALS['son100_htmln_test_rest_routes'][0];
-		foreach ( $entry['args'] as $row ) {
-			$this->assertIsArray( $row['permission_callback'] );
-			$this->assertSame( $controller, $row['permission_callback'][0] );
-			$this->assertSame(
-				'permission_check_manage_options',
-				$row['permission_callback'][1]
-			);
+		foreach ( $GLOBALS['son100_htmln_test_rest_routes'] as $entry ) {
+			foreach ( $entry['args'] as $row ) {
+				$this->assertIsArray( $row['permission_callback'] );
+				$this->assertSame( $controller, $row['permission_callback'][0] );
+				$this->assertSame(
+					'permission_check_manage_options',
+					$row['permission_callback'][1]
+				);
+			}
 		}
 	}
 
@@ -173,5 +181,104 @@ final class SettingsControllerTest extends TestCase {
 		$this->assertFalse(
 			$this->controller()->permission_check_manage_options( new WP_REST_Request() )
 		);
+	}
+
+	// =========================================================================
+	//  GET /settings/external-sites
+	// =========================================================================
+
+	public function test_get_external_sites_returns_defaults_when_option_empty(): void {
+		$response = $this->controller()->get_external_sites( new WP_REST_Request() );
+		$this->assertSame( 200, $response->get_status() );
+		$body = $response->get_data();
+		$this->assertSame(
+			SettingsRepository::EXTERNAL_SITES_DEFAULTS,
+			$body['sites']
+		);
+		$this->assertSame(
+			SettingsRepository::EXTERNAL_SITES_DEFAULTS,
+			$body['defaults']
+		);
+	}
+
+	public function test_get_external_sites_returns_persisted_overrides(): void {
+		update_option(
+			'son100_htmln_settings',
+			array(
+				'external_sites' => array(
+					'old_url'  => 'https://staging.example.com',
+					'prod_url' => 'https://www.example.com',
+				),
+			)
+		);
+		$response = $this->controller()->get_external_sites( new WP_REST_Request() );
+		$body     = $response->get_data();
+		$this->assertSame( 'https://staging.example.com', $body['sites']['old_url'] );
+		$this->assertSame( 'https://www.example.com', $body['sites']['prod_url'] );
+		// Defaults toujours retournés tels quels.
+		$this->assertSame(
+			SettingsRepository::EXTERNAL_SITES_DEFAULTS,
+			$body['defaults']
+		);
+	}
+
+	// =========================================================================
+	//  POST /settings/external-sites
+	// =========================================================================
+
+	public function test_post_external_sites_writes_and_returns_normalized_payload(): void {
+		$request = new WP_REST_Request();
+		$request->set_param(
+			'sites',
+			array(
+				'old_url'  => 'https://staging.example.com/',
+				'prod_url' => 'https://www.example.com',
+			)
+		);
+		$response = $this->controller()->update_external_sites( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$body = $response->get_data();
+		// Le slash final a été retiré.
+		$this->assertSame( 'https://staging.example.com', $body['sites']['old_url'] );
+		$this->assertSame( 'https://www.example.com', $body['sites']['prod_url'] );
+		// Persistance confirmée.
+		$settings = get_option( 'son100_htmln_settings', array() );
+		$this->assertSame(
+			'https://staging.example.com',
+			$settings['external_sites']['old_url']
+		);
+	}
+
+	public function test_post_external_sites_400_when_sites_missing(): void {
+		$response = $this->controller()->update_external_sites( new WP_REST_Request() );
+		$this->assertSame( 400, $response->get_status() );
+		$body = $response->get_data();
+		$this->assertSame( 'invalid_sites', $body['code'] );
+	}
+
+	public function test_post_external_sites_400_when_sites_not_array(): void {
+		$request = new WP_REST_Request();
+		$request->set_param( 'sites', 'oops' );
+		$response = $this->controller()->update_external_sites( $request );
+		$this->assertSame( 400, $response->get_status() );
+	}
+
+	public function test_post_external_sites_silently_normalizes_invalid_values(): void {
+		$request = new WP_REST_Request();
+		$request->set_param(
+			'sites',
+			array(
+				'old_url'   => 'javascript:alert(1)',
+				'prod_url'  => 'not a url',
+				'evil_key'  => 'https://evil.example.com',
+			)
+		);
+		$response = $this->controller()->update_external_sites( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$body = $response->get_data();
+		// Invalides → defauts, evil_key ignorée.
+		$this->assertSame( 'https://old.ma-maison-mag.fr', $body['sites']['old_url'] );
+		$this->assertSame( 'https://ma-maison-mag.fr', $body['sites']['prod_url'] );
+		$this->assertArrayNotHasKey( 'evil_key', $body['sites'] );
 	}
 }

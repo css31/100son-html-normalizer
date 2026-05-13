@@ -18,14 +18,16 @@ use WP_REST_Request;
 use WP_REST_Response;
 
 /**
- * Surface REST des réglages V1.0 — pour l'instant uniquement les 7 seuils γ
- * de régression structurelle (F15).
+ * Surface REST des réglages V1.0.
  *
  * Routes (namespace `htmln/v1`) :
  *
  *  - `GET  /settings/regression-thresholds` — `{ thresholds, defaults }`.
  *  - `POST /settings/regression-thresholds` — body `{ thresholds }`, retourne
  *    `{ thresholds }` après normalisation.
+ *  - `GET  /settings/external-sites` — `{ sites, defaults }`.
+ *  - `POST /settings/external-sites` — body `{ sites }`, retourne
+ *    `{ sites }` après normalisation.
  *
  * Toutes les routes : permission `manage_options` (cf. §14 hyp. 14).
  *
@@ -60,6 +62,19 @@ final class SettingsController extends BaseController {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'update_regression_thresholds' ),
+				'permission_callback' => $cap,
+			),
+		) );
+
+		register_rest_route( $ns, '/settings/external-sites', array(
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_external_sites' ),
+				'permission_callback' => $cap,
+			),
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'update_external_sites' ),
 				'permission_callback' => $cap,
 			),
 		) );
@@ -110,6 +125,53 @@ final class SettingsController extends BaseController {
 		$written = $this->settings->setRegressionThresholds( $payload );
 		return $this->respond( array(
 			'thresholds' => $written,
+		) );
+	}
+
+	/**
+	 * `GET /settings/external-sites`
+	 *
+	 * Réponse 200 : `{ sites: array{old_url: string, prod_url: string}, defaults: array{old_url: string, prod_url: string} }`.
+	 * Les `defaults` permettent à la SPA d'afficher un bouton « Restaurer
+	 * les valeurs par défaut » sans recoder la source de vérité côté client.
+	 *
+	 * @param WP_REST_Request $request Requête (inutilisée).
+	 * @return WP_REST_Response
+	 */
+	public function get_external_sites( WP_REST_Request $request ): WP_REST_Response {
+		unset( $request );
+		return $this->respond( array(
+			'sites'    => $this->settings->getExternalSites(),
+			'defaults' => SettingsRepository::EXTERNAL_SITES_DEFAULTS,
+		) );
+	}
+
+	/**
+	 * `POST /settings/external-sites`
+	 *
+	 * Body : `{ sites: array<string, mixed> }`. Seules les 2 clés canoniques
+	 * (`old_url`, `prod_url`) sont retenues. Toute valeur invalide (mauvais
+	 * schéma, vide, non-string) retombe sur le default côté repo.
+	 *
+	 * Réponse 200 : `{ sites }` après normalisation.
+	 * Réponse 400 si `sites` est absent ou n'est pas un objet — même contrat
+	 * que `update_regression_thresholds`.
+	 *
+	 * @param WP_REST_Request $request Requête.
+	 * @return WP_REST_Response
+	 */
+	public function update_external_sites( WP_REST_Request $request ): WP_REST_Response {
+		$payload = $request->get_param( 'sites' );
+		if ( ! is_array( $payload ) ) {
+			return $this->rest_error(
+				'invalid_sites',
+				'sites must be an object',
+				400,
+			);
+		}
+		$written = $this->settings->setExternalSites( $payload );
+		return $this->respond( array(
+			'sites' => $written,
 		) );
 	}
 }

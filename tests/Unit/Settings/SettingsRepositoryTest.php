@@ -187,4 +187,116 @@ final class SettingsRepositoryTest extends TestCase {
 		// Le sous-tableau a bien été écrit.
 		$this->assertSame( 3, $settings['regression_thresholds']['text_loss_pct'] );
 	}
+
+	// ============================================================
+	//  Sites externes (Old / Prod) — utilisés par l'onglet Normaliser.
+	// ============================================================
+
+	public function test_external_sites_returns_defaults(): void {
+		$sites = $this->repo->getExternalSites();
+		$this->assertSame(
+			array(
+				'old_url'  => 'https://old.ma-maison-mag.fr',
+				'prod_url' => 'https://ma-maison-mag.fr',
+			),
+			$sites
+		);
+	}
+
+	public function test_external_sites_respect_user_override(): void {
+		update_option(
+			'son100_htmln_settings',
+			array(
+				'external_sites' => array(
+					'old_url'  => 'https://staging.example.com',
+					'prod_url' => 'https://www.example.com',
+				),
+			)
+		);
+		$sites = $this->repo->getExternalSites();
+		$this->assertSame( 'https://staging.example.com', $sites['old_url'] );
+		$this->assertSame( 'https://www.example.com', $sites['prod_url'] );
+	}
+
+	public function test_external_sites_strip_trailing_slash(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_url'  => 'https://old.ma-maison-mag.fr/',
+				'prod_url' => 'https://ma-maison-mag.fr///',
+			)
+		);
+		$this->assertSame( 'https://old.ma-maison-mag.fr', $sites['old_url'] );
+		$this->assertSame( 'https://ma-maison-mag.fr', $sites['prod_url'] );
+	}
+
+	public function test_external_sites_fall_back_on_invalid_urls(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_url'  => 'javascript:alert(1)',
+				'prod_url' => 'not a url',
+			)
+		);
+		// Mauvais schéma / non-URL → defauts.
+		$this->assertSame( 'https://old.ma-maison-mag.fr', $sites['old_url'] );
+		$this->assertSame( 'https://ma-maison-mag.fr', $sites['prod_url'] );
+	}
+
+	public function test_external_sites_fall_back_on_non_string_values(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_url'  => null,
+				'prod_url' => 42,
+			)
+		);
+		$this->assertSame( 'https://old.ma-maison-mag.fr', $sites['old_url'] );
+		$this->assertSame( 'https://ma-maison-mag.fr', $sites['prod_url'] );
+	}
+
+	public function test_external_sites_ignores_unknown_keys(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_url'   => 'https://old.example.com',
+				'evil_url'  => 'https://malicious.example.com',
+			)
+		);
+		$this->assertArrayNotHasKey( 'evil_url', $sites );
+		$this->assertCount( 2, $sites );
+		$this->assertSame( 'https://old.example.com', $sites['old_url'] );
+	}
+
+	public function test_external_sites_preserve_other_settings(): void {
+		update_option(
+			'son100_htmln_settings',
+			array(
+				'f8_per_page'           => 100,
+				'regression_thresholds' => array( 'text_loss_pct' => 9 ),
+			)
+		);
+		$this->repo->setExternalSites( array( 'old_url' => 'https://o.example.com' ) );
+		$settings = get_option( 'son100_htmln_settings', array() );
+		$this->assertSame( 100, $settings['f8_per_page'] );
+		$this->assertSame( 9, $settings['regression_thresholds']['text_loss_pct'] );
+		$this->assertSame( 'https://o.example.com', $settings['external_sites']['old_url'] );
+	}
+
+	public function test_external_sites_falls_back_on_non_array_option(): void {
+		update_option(
+			'son100_htmln_settings',
+			array( 'external_sites' => 'broken' )
+		);
+		$sites = $this->repo->getExternalSites();
+		$this->assertSame( 'https://old.ma-maison-mag.fr', $sites['old_url'] );
+		$this->assertSame( 'https://ma-maison-mag.fr', $sites['prod_url'] );
+	}
+
+	public function test_external_sites_accepts_http_not_only_https(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_url'  => 'http://old.local',
+				'prod_url' => 'http://prod.local',
+			)
+		);
+		$this->assertSame( 'http://old.local', $sites['old_url'] );
+		$this->assertSame( 'http://prod.local', $sites['prod_url'] );
+	}
 }

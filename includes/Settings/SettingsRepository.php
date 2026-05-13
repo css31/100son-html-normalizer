@@ -266,4 +266,97 @@ class SettingsRepository {
 		/** @var array{text_loss_pct:int,words_loss_pct:int,paragraphs_loss_pct:int,headings_loss:int,images_loss:int,links_loss:int,lists_loss:int} $result */
 		return $result;
 	}
+
+	/**
+	 * Sites externes (domaines) où ouvrir un article depuis l'onglet Normaliser.
+	 *
+	 * Pendant la migration du corpus *Ma Maison Mag*, l'admin a besoin de
+	 * comparer un article rapidement entre l'ancienne version (« old ») et
+	 * la prod. Les deux URLs sont configurables côté Réglages — defaults
+	 * codés en dur sur les domaines historiques de MMM, mais l'option est
+	 * générique et pourra resservir.
+	 *
+	 * Conventions : pas de slash final (les URLs sont concaténées avec le
+	 * path du permalien côté SPA), schéma `http://` ou `https://` requis.
+	 * Une valeur invalide retombe sur le default — même contrat défensif
+	 * que les seuils γ.
+	 *
+	 * @var array{old_url: string, prod_url: string}
+	 */
+	public const EXTERNAL_SITES_DEFAULTS = array(
+		'old_url'  => 'https://old.ma-maison-mag.fr',
+		'prod_url' => 'https://ma-maison-mag.fr',
+	);
+
+	/**
+	 * Récupère les domaines externes (« Old » et « Prod ») configurés.
+	 *
+	 * Lecture du sous-tableau `external_sites` dans `son100_htmln_settings`,
+	 * fusionne avec les defaults pour garantir que les 2 clés sont toujours
+	 * présentes et valides.
+	 *
+	 * @return array{old_url: string, prod_url: string}
+	 */
+	public function getExternalSites(): array {
+		$settings = $this->get_settings();
+		$raw      = $settings['external_sites'] ?? array();
+		if ( ! is_array( $raw ) ) {
+			$raw = array();
+		}
+		return $this->normalize_external_sites( $raw );
+	}
+
+	/**
+	 * Persiste les 2 URLs des sites externes dans `son100_htmln_settings`.
+	 *
+	 * Normalisation silencieuse (cf. `setRegressionThresholds`) : une valeur
+	 * non-string, vide, ou qui ne ressemble pas à une URL `http(s)://host`
+	 * retombe sur le default. Le slash final est strippé pour fiabiliser la
+	 * concaténation avec un path côté SPA.
+	 *
+	 * @param array<string, mixed> $sites Tableau brut (probablement issu du body REST).
+	 * @return array{old_url: string, prod_url: string} Tableau normalisé tel qu'il vient d'être persisté.
+	 */
+	public function setExternalSites( array $sites ): array {
+		$normalized                     = $this->normalize_external_sites( $sites );
+		$settings                       = $this->get_settings();
+		$settings['external_sites']     = $normalized;
+		update_option( self::OPT_SETTINGS, $settings, false );
+		return $normalized;
+	}
+
+	/**
+	 * Normalise un tableau de domaines brut vers les 2 clés canoniques.
+	 *
+	 * Étapes par clé :
+	 *  1. Cast string + `trim()` ;
+	 *  2. `rtrim('/')` pour stripper le slash final ;
+	 *  3. Validation regex `^https?://<host non vide>` — refuse les espaces,
+	 *     schémas exotiques (`file://`, `javascript:`…) et les valeurs vides ;
+	 *  4. Fallback default si invalide.
+	 *
+	 * Pas d'appel à `esc_url_raw()` ici : l'option ne sert qu'à composer un
+	 * `href` côté SPA, qui passera par l'escape automatique de React. La
+	 * regex couvre le risque XSS (pas de `javascript:`/`data:` autorisés).
+	 *
+	 * @param array<string, mixed> $raw Tableau brut.
+	 * @return array{old_url: string, prod_url: string}
+	 */
+	private function normalize_external_sites( array $raw ): array {
+		$result = array();
+		foreach ( self::EXTERNAL_SITES_DEFAULTS as $key => $default ) {
+			$value = $raw[ $key ] ?? $default;
+			$value = is_string( $value ) ? trim( $value ) : '';
+			$value = rtrim( $value, '/' );
+			// Délimiteur `~` (et non `#`) : un `#` dans la classe terminerait
+			// prématurément le motif et préférerait la regex à toujours
+			// échouer — toutes les URLs retomberaient alors sur le default.
+			if ( '' === $value || 1 !== preg_match( '~^https?://[^\s/?#]+~i', $value ) ) {
+				$value = $default;
+			}
+			$result[ $key ] = $value;
+		}
+		/** @var array{old_url: string, prod_url: string} $result */
+		return $result;
+	}
 }

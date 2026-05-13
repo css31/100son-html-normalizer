@@ -25,12 +25,11 @@
  * sous `ScanBar` pour regrouper les deux actions principales (scan
  * du corpus + application des règles) dans une même zone haute.
  *
- * État local :
- *  - `currentTab`     — onglet actif (F13).
- *  - `currentPage`    — page de pagination (F13).
- *  - `selectedPostIds`— articles cochés (F14.1). Vides au mount.
- *
- * État partagé via store :
+ * État partagé via store `htmln/spa` :
+ *  - `normalizeView`  — tab / page / perPage / filters / selectedPostIds.
+ *    Persistant au switch d'onglets primaires de l'App (sans store, le
+ *    démontage de la vue lors d'un aller-retour `#/notes` ou `#/settings`
+ *    réinitialiserait toute la configuration courante).
  *  - `selectedRules`  — règles cochées (F14.2). Toutes par défaut.
  *    Éditable depuis l'onglet Règles.
  *
@@ -42,8 +41,8 @@
  */
 
 import { __, sprintf } from '@wordpress/i18n';
-import { useState, useCallback, useEffect } from '@wordpress/element';
-import { useSelect } from '@wordpress/data';
+import { useState, useCallback, useEffect, useMemo } from '@wordpress/element';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { Button } from '@wordpress/components';
 import TabsHeader from './Normalize/TabsHeader';
 import ArticlesTable from './Normalize/ArticlesTable';
@@ -59,33 +58,54 @@ import { useDiagnosticsFacets } from '../hooks/useDiagnosticsFacets';
 import { useStepRunner } from '../hooks/useStepRunner';
 import { useScanBatch } from '../hooks/useScanBatch';
 import { useBeforeunload } from '../hooks/useBeforeunload';
+import { useExternalSites } from '../hooks/useExternalSites';
 import { STORE_NAME, ALL_RULE_IDS } from '../store';
 import { formatRuleIdList } from '../utils/ruleLabels';
 
-const DEFAULT_PER_PAGE = 50;
-
-/**
- * @type {'to_improve'|'normal'|'stale'}
- */
-const DEFAULT_TAB = 'to_improve';
+// Les defaults (tab `to_improve`, perPage 50, page 1, filtres vides, aucune
+// sélection) vivent désormais dans `store/index.js > DEFAULT_NORMALIZE_VIEW`
+// pour survivre au mount/unmount provoqué par le routeur hash de `App.jsx`.
 
 /**
  * @return {JSX.Element} Vue Normalize complète.
  */
 export default function Normalize() {
-	const [ currentTab, setCurrentTab ] = useState( DEFAULT_TAB );
-	const [ currentPage, setCurrentPage ] = useState( 1 );
-	const [ perPage, setPerPage ] = useState( DEFAULT_PER_PAGE );
-	const [ selectedPostIds, setSelectedPostIds ] = useState( () => new Set() );
-	// Filtres post-rc3 (recherche + cat/year/month/builder). Conservés
-	// quand on bascule entre onglets internes (filtre croisé avec status).
-	const [ filters, setFilters ] = useState( {} );
+	// État de la vue persistant au switch d'onglets primaires de l'App
+	// (App.jsx démonte la vue à chaque changement de route, donc tout
+	// useState serait perdu). Cf. store `htmln/spa.normalizeView`.
+	const view = useSelect(
+		( select ) => select( STORE_NAME ).getNormalizeView(),
+		[]
+	);
+	const {
+		setNormalizeView,
+		toggleNormalizeSelectedPost,
+		toggleNormalizeSelectedPostsOnPage,
+		clearNormalizeSelectedPosts,
+	} = useDispatch( STORE_NAME );
+
+	const currentTab = view.tab;
+	const currentPage = view.page;
+	const perPage = view.perPage;
+	const filters = view.filters;
+	// Le store conserve un array (sérialisable Redux) ; le composant et
+	// `ArticlesTable` exigent un Set pour `.has()` / `.size`. Mémo pour
+	// éviter de recréer le Set à chaque render quand le tableau ne change pas.
+	const selectedPostIds = useMemo(
+		() => new Set( view.selectedPostIds ),
+		[ view.selectedPostIds ]
+	);
 
 	// Sélection des règles : lue depuis le store (alimentée par l'onglet Règles).
 	const selectedRules = useSelect(
 		( select ) => select( STORE_NAME ).getSelectedRules(),
 		[]
 	);
+
+	// Domaines externes (Old / Prod) — pour les boutons d'ouverture par ligne
+	// dans le tableau. On consomme `sites` en lecture seule ; la persistance
+	// est gérée depuis l'onglet Réglages.
+	const { sites: externalSites } = useExternalSites();
 
 	const {
 		stats,
@@ -115,8 +135,8 @@ export default function Normalize() {
 	const handleStepFinalized = useCallback( () => {
 		refetchStats();
 		refetchList();
-		setSelectedPostIds( new Set() );
-	}, [ refetchStats, refetchList ] );
+		clearNormalizeSelectedPosts();
+	}, [ refetchStats, refetchList, clearNormalizeSelectedPosts ] );
 
 	const {
 		isRunning,
@@ -138,25 +158,29 @@ export default function Normalize() {
 		refetchFacets();
 	}, [ refetchStats, refetchList, refetchFacets ] );
 
-	const handleFiltersChange = useCallback( ( nextFilters ) => {
-		setFilters( nextFilters );
-		// Tout changement de filtre remet à la page 1 — sinon on peut se
-		// retrouver hors plage si la nouvelle liste est plus courte.
-		setCurrentPage( 1 );
-	}, [] );
+	const handleFiltersChange = useCallback(
+		( nextFilters ) => {
+			// Tout changement de filtre remet à la page 1 — sinon on peut se
+			// retrouver hors plage si la nouvelle liste est plus courte.
+			// Un seul dispatch pour éviter le double re-render.
+			setNormalizeView( { filters: nextFilters, page: 1 } );
+		},
+		[ setNormalizeView ]
+	);
 
-	const handleChangePerPage = useCallback( ( nextPerPage ) => {
-		// Borne [1, MAX_PER_PAGE=200] côté REST de toute façon, mais on
-		// défend ici aussi pour la cohérence UI.
-		const clamped = Math.max(
-			1,
-			Math.min( 200, Number( nextPerPage ) || 50 )
-		);
-		setPerPage( clamped );
-		// Tout changement de per-page remet à la page 1 — l'offset
-		// précédent n'a plus de sens après changement de taille de page.
-		setCurrentPage( 1 );
-	}, [] );
+	const handleChangePerPage = useCallback(
+		( nextPerPage ) => {
+			// Borne [1, MAX_PER_PAGE=200] côté REST de toute façon, mais on
+			// défend ici aussi pour la cohérence UI. Reset à page 1 dans le
+			// même dispatch — l'offset précédent n'a plus de sens.
+			const clamped = Math.max(
+				1,
+				Math.min( 200, Number( nextPerPage ) || 50 )
+			);
+			setNormalizeView( { perPage: clamped, page: 1 } );
+		},
+		[ setNormalizeView ]
+	);
 
 	const {
 		isScanning,
@@ -193,10 +217,12 @@ export default function Normalize() {
 	// Verrou onglet pendant un pas (cf. cahier §13 — beforeunload natif).
 	useBeforeunload( isRunning );
 
-	const handleChangeTab = useCallback( ( nextTab ) => {
-		setCurrentTab( nextTab );
-		setCurrentPage( 1 );
-	}, [] );
+	const handleChangeTab = useCallback(
+		( nextTab ) => {
+			setNormalizeView( { tab: nextTab, page: 1 } );
+		},
+		[ setNormalizeView ]
+	);
 
 	const handleChangePage = useCallback(
 		( nextPage ) => {
@@ -204,44 +230,32 @@ export default function Normalize() {
 				1,
 				Math.min( totalPages || 1, nextPage )
 			);
-			setCurrentPage( clamped );
+			setNormalizeView( { page: clamped } );
 		},
-		[ totalPages ]
+		[ totalPages, setNormalizeView ]
 	);
 
 	useEffect( () => {
 		if ( totalPages > 0 && currentPage > totalPages ) {
-			setCurrentPage( 1 );
+			setNormalizeView( { page: 1 } );
 		}
-	}, [ totalPages, currentPage ] );
+	}, [ totalPages, currentPage, setNormalizeView ] );
 
-	const handleToggleArticle = useCallback( ( postId, checked ) => {
-		setSelectedPostIds( ( prev ) => {
-			const next = new Set( prev );
-			if ( checked ) {
-				next.add( postId );
-			} else {
-				next.delete( postId );
-			}
-			return next;
-		} );
-	}, [] );
+	const handleToggleArticle = useCallback(
+		( postId, checked ) => {
+			toggleNormalizeSelectedPost( postId, checked );
+		},
+		[ toggleNormalizeSelectedPost ]
+	);
 
 	const handleToggleAllOnPage = useCallback(
 		( checked ) => {
-			setSelectedPostIds( ( prev ) => {
-				const next = new Set( prev );
-				items.forEach( ( item ) => {
-					if ( checked ) {
-						next.add( item.post_id );
-					} else {
-						next.delete( item.post_id );
-					}
-				} );
-				return next;
-			} );
+			toggleNormalizeSelectedPostsOnPage(
+				items.map( ( item ) => item.post_id ),
+				checked
+			);
 		},
-		[ items ]
+		[ items, toggleNormalizeSelectedPostsOnPage ]
 	);
 
 	const handleApplyStep = useCallback( () => {
@@ -332,6 +346,7 @@ export default function Normalize() {
 				onToggleAllOnPage={ handleToggleAllOnPage }
 				disabled={ isRunning }
 				onViewDiff={ handleViewDiff }
+				externalSites={ externalSites }
 			/>
 
 			{ /* DiffModal — preview à la volée depuis le tableau (bouton ligne). */ }
