@@ -20,7 +20,13 @@
 
 import { __, sprintf } from '@wordpress/i18n';
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button, Notice, Spinner, TextControl } from '@wordpress/components';
+import {
+	Button,
+	Notice,
+	Spinner,
+	TextControl,
+	ToggleControl,
+} from '@wordpress/components';
 import { useSettings } from '../hooks/useSettings';
 import { useExternalSites } from '../hooks/useExternalSites';
 
@@ -405,16 +411,24 @@ function ExternalSitesSection() {
 		clearStatus,
 	} = useExternalSites();
 
-	// String state pour autoriser un input vide sans perdre le focus, même
-	// pattern que la section seuils γ ci-dessus.
+	// String state pour les inputs texte (URL + label) + boolean state pour
+	// les toggles. Le même `formValues` héberge les 6 clés ; le booléen
+	// reste typé booléen, on n'a pas besoin d'un stringification pour
+	// préserver le focus comme sur les TextControl.
 	const [ formValues, setFormValues ] = useState( {} );
+
+	const initFromSites = ( source ) => ( {
+		old_url: String( source.old_url ?? '' ),
+		old_label: String( source.old_label ?? '' ),
+		old_enabled: Boolean( source.old_enabled ?? true ),
+		prod_url: String( source.prod_url ?? '' ),
+		prod_label: String( source.prod_label ?? '' ),
+		prod_enabled: Boolean( source.prod_enabled ?? true ),
+	} );
 
 	useEffect( () => {
 		if ( sites && 0 === Object.keys( formValues ).length ) {
-			setFormValues( {
-				old_url: String( sites.old_url ?? '' ),
-				prod_url: String( sites.prod_url ?? '' ),
-			} );
+			setFormValues( initFromSites( sites ) );
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ sites ] );
@@ -423,7 +437,9 @@ function ExternalSitesSection() {
 		( key, raw ) => {
 			setFormValues( ( prev ) => ( {
 				...prev,
-				[ key ]: String( raw ),
+				// Pour les toggles, on garde le booléen tel quel ; pour les
+				// inputs texte, on stringifie comme avant.
+				[ key ]: 'boolean' === typeof raw ? raw : String( raw ),
 			} ) );
 			if ( isDirty || error ) {
 				clearStatus();
@@ -436,10 +452,7 @@ function ExternalSitesSection() {
 		if ( ! defaults ) {
 			return;
 		}
-		setFormValues( {
-			old_url: String( defaults.old_url ?? '' ),
-			prod_url: String( defaults.prod_url ?? '' ),
-		} );
+		setFormValues( initFromSites( defaults ) );
 		clearStatus();
 	}, [ defaults, clearStatus ] );
 
@@ -449,14 +462,16 @@ function ExternalSitesSection() {
 			try {
 				const normalized = await save( {
 					old_url: ( formValues.old_url ?? '' ).trim(),
+					old_label: ( formValues.old_label ?? '' ).trim(),
+					old_enabled: Boolean( formValues.old_enabled ),
 					prod_url: ( formValues.prod_url ?? '' ).trim(),
+					prod_label: ( formValues.prod_label ?? '' ).trim(),
+					prod_enabled: Boolean( formValues.prod_enabled ),
 				} );
-				// Resync : si l'utilisateur a tapé une URL invalide, le serveur
-				// l'a remplacée par le default — on reflète la valeur réelle.
-				setFormValues( {
-					old_url: String( normalized.old_url ?? '' ),
-					prod_url: String( normalized.prod_url ?? '' ),
-				} );
+				// Resync : si l'utilisateur a tapé une valeur invalide
+				// (URL bizarre, label vide), le serveur l'a remplacée par
+				// le default — on reflète la valeur réelle.
+				setFormValues( initFromSites( normalized ) );
 			} catch ( _err ) {
 				// Erreur affichée via <Notice>.
 			}
@@ -482,7 +497,7 @@ function ExternalSitesSection() {
 				<h2>{ __( 'Domaines externes', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'URLs des sites où ouvrir un article depuis l’onglet Normaliser (boutons « Old » et « Prod »). Schéma http:// ou https:// requis ; le slash final est retiré automatiquement. Une valeur invalide est remplacée par la valeur par défaut.',
+						'URLs des sites où ouvrir un article depuis l’onglet Normaliser. Pour chaque site, configurez l’URL, le libellé du bouton (5 caractères max) et si le bouton doit s’afficher. Schéma http:// ou https:// requis ; le slash final est retiré automatiquement. Une valeur invalide est remplacée par la valeur par défaut.',
 						'100son-html-normalizer'
 					) }
 				</p>
@@ -508,59 +523,28 @@ function ExternalSitesSection() {
 			) }
 
 			<form onSubmit={ handleSave } className="htmln-settings__form">
-				<fieldset className="htmln-settings__group">
-					<legend>
-						{ __( 'URLs des sites', '100son-html-normalizer' ) }
-					</legend>
-					<div className="htmln-settings__field">
-						<TextControl
-							label={ __(
-								'Ancien site (« Old »)',
-								'100son-html-normalizer'
-							) }
-							value={ formValues.old_url ?? '' }
-							onChange={ ( raw ) =>
-								handleChange( 'old_url', raw )
-							}
-							disabled={ isSaving }
-							help={ sprintf(
-								// translators: %s = URL par défaut.
-								__(
-									'Par défaut : %s.',
-									'100son-html-normalizer'
-								),
-								String( defaults?.old_url ?? '' )
-							) }
-							type="url"
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-						/>
-					</div>
-					<div className="htmln-settings__field">
-						<TextControl
-							label={ __(
-								'Site de production (« Prod »)',
-								'100son-html-normalizer'
-							) }
-							value={ formValues.prod_url ?? '' }
-							onChange={ ( raw ) =>
-								handleChange( 'prod_url', raw )
-							}
-							disabled={ isSaving }
-							help={ sprintf(
-								// translators: %s = URL par défaut.
-								__(
-									'Par défaut : %s.',
-									'100son-html-normalizer'
-								),
-								String( defaults?.prod_url ?? '' )
-							) }
-							type="url"
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-						/>
-					</div>
-				</fieldset>
+				<ExternalSiteFieldset
+					prefix="old"
+					legend={ __(
+						'Ancien site (« Old »)',
+						'100son-html-normalizer'
+					) }
+					formValues={ formValues }
+					defaults={ defaults }
+					isSaving={ isSaving }
+					onChange={ handleChange }
+				/>
+				<ExternalSiteFieldset
+					prefix="prod"
+					legend={ __(
+						'Site de production (« Prod »)',
+						'100son-html-normalizer'
+					) }
+					formValues={ formValues }
+					defaults={ defaults }
+					isSaving={ isSaving }
+					onChange={ handleChange }
+				/>
 
 				<div className="htmln-settings__actions">
 					<Button
@@ -585,6 +569,84 @@ function ExternalSitesSection() {
 				</div>
 			</form>
 		</section>
+	);
+}
+
+/**
+ * Fieldset par site (Old / Prod) — 3 contrôles : toggle d'affichage,
+ * libellé du bouton (5 chars max), URL.
+ *
+ * @param {Object}                                     props
+ * @param {'old'|'prod'}                               props.prefix     Préfixe des clés (`old_*` ou `prod_*`).
+ * @param {string}                                     props.legend     Légende du fieldset.
+ * @param {Object<string, string|boolean>}             props.formValues State partagé.
+ * @param {?Object<string, string|boolean>}            props.defaults   Defaults exposés par le serveur (pour helpText).
+ * @param {boolean}                                    props.isSaving   Désactive les inputs durant le POST.
+ * @param {(key: string, raw: string|boolean) => void} props.onChange   Handler unique.
+ * @return {JSX.Element} Fieldset.
+ */
+function ExternalSiteFieldset( {
+	prefix,
+	legend,
+	formValues,
+	defaults,
+	isSaving,
+	onChange,
+} ) {
+	const enabledKey = `${ prefix }_enabled`;
+	const labelKey = `${ prefix }_label`;
+	const urlKey = `${ prefix }_url`;
+	return (
+		<fieldset className="htmln-settings__group">
+			<legend>{ legend }</legend>
+			<div className="htmln-settings__field">
+				<ToggleControl
+					label={ __(
+						'Afficher le bouton',
+						'100son-html-normalizer'
+					) }
+					checked={ Boolean( formValues[ enabledKey ] ) }
+					onChange={ ( checked ) => onChange( enabledKey, checked ) }
+					disabled={ isSaving }
+					__nextHasNoMarginBottom
+				/>
+			</div>
+			<div className="htmln-settings__field">
+				<TextControl
+					label={ __(
+						'Libellé du bouton (5 caractères max)',
+						'100son-html-normalizer'
+					) }
+					value={ formValues[ labelKey ] ?? '' }
+					onChange={ ( raw ) => onChange( labelKey, raw ) }
+					disabled={ isSaving }
+					maxLength={ 5 }
+					help={ sprintf(
+						// translators: %s = libellé par défaut.
+						__( 'Par défaut : %s.', '100son-html-normalizer' ),
+						String( defaults?.[ labelKey ] ?? '' )
+					) }
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+				/>
+			</div>
+			<div className="htmln-settings__field">
+				<TextControl
+					label={ __( 'URL', '100son-html-normalizer' ) }
+					value={ formValues[ urlKey ] ?? '' }
+					onChange={ ( raw ) => onChange( urlKey, raw ) }
+					disabled={ isSaving }
+					help={ sprintf(
+						// translators: %s = URL par défaut.
+						__( 'Par défaut : %s.', '100son-html-normalizer' ),
+						String( defaults?.[ urlKey ] ?? '' )
+					) }
+					type="url"
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+				/>
+			</div>
+		</fieldset>
 	);
 }
 

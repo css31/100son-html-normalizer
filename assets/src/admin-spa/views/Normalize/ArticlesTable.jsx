@@ -132,22 +132,22 @@ function buildExternalUrl( permalink, baseUrl ) {
 }
 
 /**
- * @param {Object}                                 props
- * @param {Array}                                  props.items             Diagnostics paginés.
- * @param {number}                                 props.total             Total non paginé.
- * @param {number}                                 props.page              Page courante (≥ 1).
- * @param {number}                                 props.perPage           Articles par page.
- * @param {number}                                 props.totalPages        Nombre de pages.
- * @param {boolean}                                props.isLoading         Vrai durant le fetch.
- * @param {?string}                                props.error             Message d'erreur ou null.
- * @param {(p: number) => void}                    props.onChangePage      Callback changement de page.
- * @param {(n: number) => void}                    props.onChangePerPage   Callback changement de per-page (dropdown PaginationBar).
- * @param {Set<number>}                            props.selectedIds       IDs sélectionnés (F14.1).
- * @param {(id: number, checked: boolean) => void} props.onToggleArticle   Toggle d'un article.
- * @param {(checked: boolean) => void}             props.onToggleAllOnPage Toggle de tous les articles de la page.
- * @param {boolean}                                props.disabled          Désactive les checkboxes (pas en cours).
- * @param {(id: number) => void}                   props.onViewDiff        Callback bouton « Voir le diff » par ligne.
- * @param {?{old_url: string, prod_url: string}}   props.externalSites     URLs des sites externes (Old / Prod) — null tant que pas chargé.
+ * @param {Object}                                                                                                                   props
+ * @param {Array}                                                                                                                    props.items             Diagnostics paginés.
+ * @param {number}                                                                                                                   props.total             Total non paginé.
+ * @param {number}                                                                                                                   props.page              Page courante (≥ 1).
+ * @param {number}                                                                                                                   props.perPage           Articles par page.
+ * @param {number}                                                                                                                   props.totalPages        Nombre de pages.
+ * @param {boolean}                                                                                                                  props.isLoading         Vrai durant le fetch.
+ * @param {?string}                                                                                                                  props.error             Message d'erreur ou null.
+ * @param {(p: number) => void}                                                                                                      props.onChangePage      Callback changement de page.
+ * @param {(n: number) => void}                                                                                                      props.onChangePerPage   Callback changement de per-page (dropdown PaginationBar).
+ * @param {Set<number>}                                                                                                              props.selectedIds       IDs sélectionnés (F14.1).
+ * @param {(id: number, checked: boolean) => void}                                                                                   props.onToggleArticle   Toggle d'un article.
+ * @param {(checked: boolean) => void}                                                                                               props.onToggleAllOnPage Toggle de tous les articles de la page.
+ * @param {boolean}                                                                                                                  props.disabled          Désactive les checkboxes (pas en cours).
+ * @param {(id: number) => void}                                                                                                     props.onViewDiff        Callback bouton « Voir le diff » par ligne.
+ * @param {?{old_url: string, old_label: string, old_enabled: boolean, prod_url: string, prod_label: string, prod_enabled: boolean}} props.externalSites     Config des sites externes (Old / Prod) — null tant que pas chargé. Chaque site a son URL, son libellé de bouton (max 5 chars) et son toggle d'affichage.
  * @return {JSX.Element} Tableau + pagination.
  */
 export default function ArticlesTable( {
@@ -363,58 +363,78 @@ export default function ArticlesTable( {
 									) }
 									{ /* Boutons Old / Prod — ouvrent l'article
 									     sur les domaines configurés en Réglages.
-									     Affichés seulement si on a pu composer
-									     une URL valide (permalink + domaine ok). */ }
-									{ ( () => {
-										const oldHref = buildExternalUrl(
-											item.permalink,
-											externalSites?.old_url ?? ''
-										);
-										return (
-											oldHref && (
-												<a
-													href={ oldHref }
-													target="_blank"
-													rel="noopener noreferrer"
-													className="button button-small htmln-articles-table__site-btn"
-													title={ __(
-														'Ouvrir sur l’ancien site (nouvel onglet)',
-														'100son-html-normalizer'
-													) }
-												>
-													{ __(
-														'Old',
-														'100son-html-normalizer'
-													) }
-												</a>
-											)
-										);
-									} )() }
-									{ ( () => {
-										const prodHref = buildExternalUrl(
-											item.permalink,
-											externalSites?.prod_url ?? ''
-										);
-										return (
-											prodHref && (
-												<a
-													href={ prodHref }
-													target="_blank"
-													rel="noopener noreferrer"
-													className="button button-small htmln-articles-table__site-btn"
-													title={ __(
-														'Ouvrir sur le site de prod (nouvel onglet)',
-														'100son-html-normalizer'
-													) }
-												>
-													{ __(
-														'Prod',
-														'100son-html-normalizer'
-													) }
-												</a>
-											)
-										);
-									} )() }
+									     Pour chaque site : on n'affiche le bouton
+									     que si (a) le toggle `<site>_enabled`
+									     est `true` en config, (b) le permalien
+									     local est valide → URL composable. Le
+									     label est lui aussi configurable
+									     (`<site>_label`, 5 chars max), avec
+									     fallback `Old` / `Prod` si l'option n'est
+									     pas encore chargée. */ }
+									{ false !==
+										( externalSites?.old_enabled ??
+											true ) &&
+										( () => {
+											const oldHref = buildExternalUrl(
+												item.permalink,
+												externalSites?.old_url ?? ''
+											);
+											return (
+												oldHref && (
+													<a
+														href={ oldHref }
+														target="_blank"
+														rel="noopener noreferrer"
+														className="button button-small htmln-articles-table__site-btn"
+														title={ __(
+															'Ouvrir sur l’ancien site (nouvel onglet)',
+															'100son-html-normalizer'
+														) }
+													>
+														{ String(
+															externalSites?.old_label ??
+																''
+														).trim() ||
+															__(
+																'Old',
+																'100son-html-normalizer'
+															) }
+													</a>
+												)
+											);
+										} )() }
+									{ false !==
+										( externalSites?.prod_enabled ??
+											true ) &&
+										( () => {
+											const prodHref = buildExternalUrl(
+												item.permalink,
+												externalSites?.prod_url ?? ''
+											);
+											return (
+												prodHref && (
+													<a
+														href={ prodHref }
+														target="_blank"
+														rel="noopener noreferrer"
+														className="button button-small htmln-articles-table__site-btn"
+														title={ __(
+															'Ouvrir sur le site de prod (nouvel onglet)',
+															'100son-html-normalizer'
+														) }
+													>
+														{ String(
+															externalSites?.prod_label ??
+																''
+														).trim() ||
+															__(
+																'Prod',
+																'100son-html-normalizer'
+															) }
+													</a>
+												)
+											);
+										} )() }
 								</div>
 							</td>
 							<td>

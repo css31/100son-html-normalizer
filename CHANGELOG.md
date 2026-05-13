@@ -5,6 +5,37 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Réglages — libellé personnalisable et toggle d'affichage pour chaque bouton Old / Prod
+
+L'option `external_sites` passe de 2 à 6 clés. Chaque site (Old / Prod) expose désormais 3 champs configurables dans l'onglet Réglages :
+
+| Champ | Type | Validation |
+|---|---|---|
+| `<site>_url` | URL absolue | regex `^https?://host`, slash final retiré, fallback default si invalide (inchangé) |
+| `<site>_label` | Libellé du bouton (texte) | trim, max **5 caractères Unicode** via `mb_substr`, fallback default si chaîne vide |
+| `<site>_enabled` | Booléen (toggle d'affichage) | `filter_var FILTER_VALIDATE_BOOLEAN` (accepte aussi `'true'` / `'false'` strings) |
+
+Defaults : `old_label='Old'`, `prod_label='Prod'`, les deux `_enabled = true`.
+
+**Effet côté tableau Normaliser** : pour chaque ligne d'article, le bouton (Old/Prod) ne s'affiche que si son toggle `_enabled` est `true` ET si l'URL est valide ET si le permalien permet de composer une URL cible. Le libellé du bouton vient désormais de `<site>_label` (avec fallback `Old`/`Prod` si l'option n'est pas encore chargée).
+
+#### Backend
+
+- `SettingsRepository::EXTERNAL_SITES_DEFAULTS` étendu à 6 clés.
+- `SettingsRepository::normalize_external_sites()` refactoré pour dispatcher par suffixe de clé (`_url` / `_label` / `_enabled`) avec une normalisation typée. Nouveau helper privé `ends_with()` (polyfill PHP 8.0 pour `str_ends_with`).
+- Constante `EXTERNAL_SITE_LABEL_MAX_LENGTH = 5`.
+
+#### Frontend
+
+- `views/Settings.jsx` : extraction d'un sous-composant `<ExternalSiteFieldset prefix="old|prod" />` qui rend les 3 contrôles (`ToggleControl` Afficher le bouton + `TextControl` libellé `maxLength={5}` + `TextControl` URL). Le state `formValues` du composant parent porte les 6 clés ; helper `initFromSites` factorise l'init depuis sites / defaults / normalized.
+- `views/Normalize/ArticlesTable.jsx` : chaque bouton (Old/Prod) testé sur `externalSites.<prefix>_enabled` ET buildExternalUrl ; libellé = `externalSites.<prefix>_label.trim() || fallback __('Old'/'Prod')`. JSDoc de la prop `externalSites` mis à jour.
+
+#### Tests
+
+- +9 PHPUnit `SettingsRepositoryTest` couvrant : labels custom acceptés, troncature à 5 chars (ASCII), troncature en codepoints Unicode (`ééééé` ≠ 5 bytes), fallback sur label vide / non-string, toggle accepté en booléen, toggle accepté en string `'true'`/`'false'` (JSON), default `true`, payload partiel (seules les clés envoyées sont modifiées, les autres restent au default).
+- 2 tests existants ajustés (`test_external_sites_returns_defaults` : 6 clés attendues ; `test_external_sites_ignores_unknown_keys` : assertCount 2 → 6).
+- **715 PHPUnit verts** (vs 706, +9, 1554 assertions), PHPStan baseline inchangée, lint propre.
+
 ### Modale Diff — ajustements UI post-3e colonne
 
 Trois micro-ajustements visuels sur le bandeau métriques :

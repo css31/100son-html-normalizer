@@ -196,8 +196,12 @@ final class SettingsRepositoryTest extends TestCase {
 		$sites = $this->repo->getExternalSites();
 		$this->assertSame(
 			array(
-				'old_url'  => 'https://old.ma-maison-mag.fr',
-				'prod_url' => 'https://ma-maison-mag.fr',
+				'old_url'      => 'https://old.ma-maison-mag.fr',
+				'old_label'    => 'Old',
+				'old_enabled'  => true,
+				'prod_url'     => 'https://ma-maison-mag.fr',
+				'prod_label'   => 'Prod',
+				'prod_enabled' => true,
 			),
 			$sites
 		);
@@ -260,7 +264,8 @@ final class SettingsRepositoryTest extends TestCase {
 			)
 		);
 		$this->assertArrayNotHasKey( 'evil_url', $sites );
-		$this->assertCount( 2, $sites );
+		// 6 clés : old/prod × (url, label, enabled).
+		$this->assertCount( 6, $sites );
 		$this->assertSame( 'https://old.example.com', $sites['old_url'] );
 	}
 
@@ -298,5 +303,109 @@ final class SettingsRepositoryTest extends TestCase {
 		);
 		$this->assertSame( 'http://old.local', $sites['old_url'] );
 		$this->assertSame( 'http://prod.local', $sites['prod_url'] );
+	}
+
+	// ----- Libellés des boutons (max 5 caractères) -----
+
+	public function test_external_sites_accepts_custom_labels(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_label'  => 'Anc.',
+				'prod_label' => 'Prod',
+			)
+		);
+		$this->assertSame( 'Anc.', $sites['old_label'] );
+		$this->assertSame( 'Prod', $sites['prod_label'] );
+	}
+
+	public function test_external_sites_truncate_label_to_max_5_chars(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_label'  => 'TooLongLabel',
+				'prod_label' => 'ABCDEFGH',
+			)
+		);
+		$this->assertSame( 'TooLo', $sites['old_label'] );
+		$this->assertSame( 'ABCDE', $sites['prod_label'] );
+	}
+
+	public function test_external_sites_truncate_label_counts_unicode_codepoints(): void {
+		// `mb_substr` compte les codepoints — 'éééééXY' a 5 codepoints
+		// gardés (`ééééé`), pas 5 bytes (qui couperait au milieu d'un `é`).
+		$sites = $this->repo->setExternalSites(
+			array( 'old_label' => 'éééééXY' )
+		);
+		$this->assertSame( 'ééééé', $sites['old_label'] );
+	}
+
+	public function test_external_sites_fall_back_on_empty_label(): void {
+		// Un libellé vide après trim → default (un bouton doit avoir un
+		// texte pour être affiché).
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_label'  => '   ',
+				'prod_label' => '',
+			)
+		);
+		$this->assertSame( 'Old', $sites['old_label'] );
+		$this->assertSame( 'Prod', $sites['prod_label'] );
+	}
+
+	public function test_external_sites_fall_back_on_non_string_label(): void {
+		$sites = $this->repo->setExternalSites(
+			array( 'old_label' => 42, 'prod_label' => null )
+		);
+		$this->assertSame( 'Old', $sites['old_label'] );
+		$this->assertSame( 'Prod', $sites['prod_label'] );
+	}
+
+	// ----- Toggle d'activation par bouton -----
+
+	public function test_external_sites_accepts_enabled_booleans(): void {
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_enabled'  => true,
+				'prod_enabled' => false,
+			)
+		);
+		$this->assertTrue( $sites['old_enabled'] );
+		$this->assertFalse( $sites['prod_enabled'] );
+	}
+
+	public function test_external_sites_accepts_enabled_as_string(): void {
+		// Le payload REST peut sérialiser les booléens en strings selon le
+		// client — `FILTER_VALIDATE_BOOLEAN` accepte 'true' / 'false' /
+		// '1' / '0'.
+		$sites = $this->repo->setExternalSites(
+			array(
+				'old_enabled'  => 'true',
+				'prod_enabled' => 'false',
+			)
+		);
+		$this->assertTrue( $sites['old_enabled'] );
+		$this->assertFalse( $sites['prod_enabled'] );
+	}
+
+	public function test_external_sites_enabled_defaults_to_true(): void {
+		// Si la clé est absente, on retombe sur le default défini dans
+		// `EXTERNAL_SITES_DEFAULTS` (true pour les deux).
+		$sites = $this->repo->setExternalSites(
+			array( 'old_url' => 'https://o.example.com' )
+		);
+		$this->assertTrue( $sites['old_enabled'] );
+		$this->assertTrue( $sites['prod_enabled'] );
+	}
+
+	public function test_external_sites_partial_payload_keeps_defaults_for_missing_keys(): void {
+		// Cas typique du formulaire SPA qui n'envoie qu'un sous-ensemble
+		// (ex. l'utilisateur a modifié uniquement le label `old_label`).
+		// Toutes les autres clés retombent sur leur default.
+		$sites = $this->repo->setExternalSites(
+			array( 'old_label' => 'V1' )
+		);
+		$this->assertSame( 'V1', $sites['old_label'] );
+		$this->assertSame( 'https://old.ma-maison-mag.fr', $sites['old_url'] );
+		$this->assertTrue( $sites['old_enabled'] );
+		$this->assertSame( 'Prod', $sites['prod_label'] );
 	}
 }

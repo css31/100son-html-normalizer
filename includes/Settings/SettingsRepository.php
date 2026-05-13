@@ -281,21 +281,36 @@ class SettingsRepository {
 	 * Une valeur invalide retombe sur le default — même contrat défensif
 	 * que les seuils γ.
 	 *
-	 * @var array{old_url: string, prod_url: string}
+	 * Pour chaque site (old / prod), trois champs sont stockés :
+	 *  - `<site>_url`     : URL absolue (validation regex, slash final stripped) ;
+	 *  - `<site>_label`   : libellé du bouton dans le tableau Normaliser, max 5 caractères ;
+	 *  - `<site>_enabled` : booléen — si false, le bouton n'apparaît pas.
+	 *
+	 * @var array{old_url: string, old_label: string, old_enabled: bool, prod_url: string, prod_label: string, prod_enabled: bool}
 	 */
 	public const EXTERNAL_SITES_DEFAULTS = array(
-		'old_url'  => 'https://old.ma-maison-mag.fr',
-		'prod_url' => 'https://ma-maison-mag.fr',
+		'old_url'      => 'https://old.ma-maison-mag.fr',
+		'old_label'    => 'Old',
+		'old_enabled'  => true,
+		'prod_url'     => 'https://ma-maison-mag.fr',
+		'prod_label'   => 'Prod',
+		'prod_enabled' => true,
 	);
+
+	/**
+	 * Longueur maximale d'un libellé de bouton (mesurée en caractères Unicode
+	 * via `mb_strlen` — un emoji ou un caractère accentué = 1).
+	 */
+	private const EXTERNAL_SITE_LABEL_MAX_LENGTH = 5;
 
 	/**
 	 * Récupère les domaines externes (« Old » et « Prod ») configurés.
 	 *
 	 * Lecture du sous-tableau `external_sites` dans `son100_htmln_settings`,
-	 * fusionne avec les defaults pour garantir que les 2 clés sont toujours
+	 * fusionne avec les defaults pour garantir que les 6 clés sont toujours
 	 * présentes et valides.
 	 *
-	 * @return array{old_url: string, prod_url: string}
+	 * @return array{old_url: string, old_label: string, old_enabled: bool, prod_url: string, prod_label: string, prod_enabled: bool}
 	 */
 	public function getExternalSites(): array {
 		$settings = $this->get_settings();
@@ -307,15 +322,16 @@ class SettingsRepository {
 	}
 
 	/**
-	 * Persiste les 2 URLs des sites externes dans `son100_htmln_settings`.
+	 * Persiste les URLs + libellés + activations des sites externes dans
+	 * `son100_htmln_settings`.
 	 *
-	 * Normalisation silencieuse (cf. `setRegressionThresholds`) : une valeur
-	 * non-string, vide, ou qui ne ressemble pas à une URL `http(s)://host`
-	 * retombe sur le default. Le slash final est strippé pour fiabiliser la
-	 * concaténation avec un path côté SPA.
+	 * Normalisation silencieuse (cf. `setRegressionThresholds`) : valeur
+	 * non-string sur les URLs, label vide ou > 5 caractères, etc. retombent
+	 * sur le default. Le slash final des URLs est strippé pour fiabiliser
+	 * la concaténation avec un path côté SPA.
 	 *
 	 * @param array<string, mixed> $sites Tableau brut (probablement issu du body REST).
-	 * @return array{old_url: string, prod_url: string} Tableau normalisé tel qu'il vient d'être persisté.
+	 * @return array{old_url: string, old_label: string, old_enabled: bool, prod_url: string, prod_label: string, prod_enabled: bool} Tableau normalisé tel qu'il vient d'être persisté.
 	 */
 	public function setExternalSites( array $sites ): array {
 		$normalized                     = $this->normalize_external_sites( $sites );
@@ -326,37 +342,73 @@ class SettingsRepository {
 	}
 
 	/**
-	 * Normalise un tableau de domaines brut vers les 2 clés canoniques.
+	 * Normalise un tableau brut vers les 6 clés canoniques.
 	 *
-	 * Étapes par clé :
-	 *  1. Cast string + `trim()` ;
-	 *  2. `rtrim('/')` pour stripper le slash final ;
-	 *  3. Validation regex `^https?://<host non vide>` — refuse les espaces,
-	 *     schémas exotiques (`file://`, `javascript:`…) et les valeurs vides ;
-	 *  4. Fallback default si invalide.
+	 * Par type de clé :
+	 *  - `*_url`     : cast string, trim, rtrim('/'), validation regex
+	 *                  `^https?://<host>`. Fallback default si invalide.
+	 *  - `*_label`   : cast string, trim, troncature à 5 caractères Unicode
+	 *                  (`mb_substr`). Fallback default si chaîne vide après
+	 *                  trim — un libellé absent ne pourrait pas être affiché.
+	 *  - `*_enabled` : cast booléen (filter_var FILTER_VALIDATE_BOOLEAN pour
+	 *                  accepter `'true'`/`'false'` strings envoyés en JSON).
 	 *
 	 * Pas d'appel à `esc_url_raw()` ici : l'option ne sert qu'à composer un
 	 * `href` côté SPA, qui passera par l'escape automatique de React. La
 	 * regex couvre le risque XSS (pas de `javascript:`/`data:` autorisés).
 	 *
 	 * @param array<string, mixed> $raw Tableau brut.
-	 * @return array{old_url: string, prod_url: string}
+	 * @return array{old_url: string, old_label: string, old_enabled: bool, prod_url: string, prod_label: string, prod_enabled: bool}
 	 */
 	private function normalize_external_sites( array $raw ): array {
 		$result = array();
 		foreach ( self::EXTERNAL_SITES_DEFAULTS as $key => $default ) {
 			$value = $raw[ $key ] ?? $default;
-			$value = is_string( $value ) ? trim( $value ) : '';
-			$value = rtrim( $value, '/' );
-			// Délimiteur `~` (et non `#`) : un `#` dans la classe terminerait
-			// prématurément le motif et préférerait la regex à toujours
-			// échouer — toutes les URLs retomberaient alors sur le default.
-			if ( '' === $value || 1 !== preg_match( '~^https?://[^\s/?#]+~i', $value ) ) {
-				$value = $default;
+			if ( self::ends_with( $key, '_url' ) ) {
+				$value = is_string( $value ) ? trim( $value ) : '';
+				$value = rtrim( $value, '/' );
+				// Délimiteur `~` (et non `#`) : un `#` dans la classe terminerait
+				// prématurément le motif et la regex échouerait à tout coup.
+				if ( '' === $value || 1 !== preg_match( '~^https?://[^\s/?#]+~i', $value ) ) {
+					$value = $default;
+				}
+			} elseif ( self::ends_with( $key, '_label' ) ) {
+				$value = is_string( $value ) ? trim( $value ) : '';
+				if ( function_exists( 'mb_substr' ) ) {
+					$value = mb_substr( $value, 0, self::EXTERNAL_SITE_LABEL_MAX_LENGTH );
+				} else {
+					$value = substr( $value, 0, self::EXTERNAL_SITE_LABEL_MAX_LENGTH );
+				}
+				if ( '' === $value ) {
+					$value = $default;
+				}
+			} elseif ( self::ends_with( $key, '_enabled' ) ) {
+				// `filter_var(..., FILTER_VALIDATE_BOOLEAN)` accepte 'true' /
+				// 'false' / '1' / '0' (strings) ainsi que les booléens — utile
+				// car JSON sérialise parfois les bools en strings selon le
+				// client.
+				$value = (bool) filter_var( $value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );
 			}
 			$result[ $key ] = $value;
 		}
-		/** @var array{old_url: string, prod_url: string} $result */
+		/** @var array{old_url: string, old_label: string, old_enabled: bool, prod_url: string, prod_label: string, prod_enabled: bool} $result */
 		return $result;
+	}
+
+	/**
+	 * Polyfill `str_ends_with` (PHP 8.0+). On le redéfinit ici en interne
+	 * pour rester compatible avec un environnement de tests qui ne charge
+	 * pas forcément les built-ins string PHP 8.
+	 *
+	 * @param string $haystack Chaîne complète.
+	 * @param string $needle   Suffixe attendu.
+	 * @return bool
+	 */
+	private static function ends_with( string $haystack, string $needle ): bool {
+		$len = strlen( $needle );
+		if ( 0 === $len ) {
+			return true;
+		}
+		return $needle === substr( $haystack, -$len );
 	}
 }
