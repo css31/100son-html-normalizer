@@ -167,7 +167,10 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$this->assertStringNotContainsString( 'WHERE', $last_sql );
 		// Post-rc3 : la requête utilise désormais l'alias `d` (cf.
 		// `build_filter_clauses` qui partage le pattern entre list/count).
-		$this->assertStringContainsString( 'ORDER BY d.diagnosed_at DESC', $last_sql );
+		// Tri : `post_id DESC` depuis post-rc4 — IDs les plus récents
+		// d'abord (le tri par `diagnosed_at` était indéterministe à
+		// l'intérieur d'un lot de scan).
+		$this->assertStringContainsString( 'ORDER BY d.post_id DESC', $last_sql );
 	}
 
 	public function test_list_paginated_with_normal_status_excludes_stale(): void {

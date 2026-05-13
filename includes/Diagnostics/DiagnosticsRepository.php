@@ -174,7 +174,14 @@ class DiagnosticsRepository {
 		if ( '' !== $clauses['where'] ) {
 			$sql .= ' WHERE ' . $clauses['where'];
 		}
-		$sql .= ' ORDER BY d.diagnosed_at DESC LIMIT %d OFFSET %d';
+		// Tri par `post_id DESC` : l'utilisateur voit d'abord les articles
+		// les plus récemment créés (les IDs étant attribués chronologique-
+		// ment sur le corpus MMM). Tri par `diagnosed_at` était indéter-
+		// ministe à l'intérieur d'un lot de scan (même `DATETIME` à la
+		// seconde près) et donnait des séquences `ASC` à l'intérieur des
+		// lots. `post_id` étant UNIQUE sur la table (cf. Activator), pas
+		// besoin de tie-breaker.
+		$sql .= ' ORDER BY d.post_id DESC LIMIT %d OFFSET %d';
 		$params = array_merge( $clauses['params'], array( max( 1, $limit ), max( 0, $offset ) ) );
 		return $this->fetch_records( $this->wpdb->prepare( $sql, ...$params ) );
 	}
