@@ -509,20 +509,32 @@ function ExternalSitesSection() {
 			) }
 
 			<form onSubmit={ handleSave } className="htmln-settings__form">
-				<ExternalSiteFieldset
-					prefix="old"
-					legend={ __( 'Site 1 (dev)', '100son-html-normalizer' ) }
-					formValues={ formValues }
-					isSaving={ isSaving }
-					onChange={ handleChange }
-				/>
-				<ExternalSiteFieldset
-					prefix="prod"
-					legend={ __( 'Site 2 (prod)', '100son-html-normalizer' ) }
-					formValues={ formValues }
-					isSaving={ isSaving }
-					onChange={ handleChange }
-				/>
+				{ /* Les deux fieldsets sont disposés côte à côte sur la
+				     même rangée via `.htmln-settings__columns` (le même
+				     wrapper que celui des seuils γ). Sur écran étroit,
+				     `flex-wrap` rebascule en empilement vertical. */ }
+				<div className="htmln-settings__columns">
+					<ExternalSiteFieldset
+						prefix="old"
+						legend={ __(
+							'Site 1 (dev)',
+							'100son-html-normalizer'
+						) }
+						formValues={ formValues }
+						isSaving={ isSaving }
+						onChange={ handleChange }
+					/>
+					<ExternalSiteFieldset
+						prefix="prod"
+						legend={ __(
+							'Site 2 (prod)',
+							'100son-html-normalizer'
+						) }
+						formValues={ formValues }
+						isSaving={ isSaving }
+						onChange={ handleChange }
+					/>
+				</div>
 
 				<div className="htmln-settings__actions">
 					<Button

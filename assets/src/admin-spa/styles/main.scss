@@ -1128,17 +1128,18 @@
 /* Section secondaire dans la page Réglages (ex. « Domaines externes »),
  * séparée du formulaire principal par un trait léger + marge. Le trait
  * `border-top` reste full-width pour matcher visuellement le header de
- * la page ; on ne contraint que le contenu (description + fieldsets) à
- * la largeur naturelle d'un fieldset « Domaine externe » (~542 px) pour
- * que le `<p class="description">` s'aligne sur les `<fieldset>` en
- * dessous. */
+ * la page. Le `<header>` (titre + `<p class="description">`) est limité
+ * à 542 px — soit la largeur d'un fieldset « Domaine externe » sur la
+ * rangée en dessous : le bord droit de la description s'aligne ainsi
+ * sur le bord droit du premier fieldset. Le `<form>` hérite de sa
+ * `max-width: 1100px` par défaut pour accueillir les deux fieldsets
+ * côte à côte (cf. `.htmln-settings__columns`). */
 .htmln-settings__section {
 	margin-top: 32px;
 	padding-top: 24px;
 	border-top: 1px solid var( --htmln-border );
 
-	> .htmln-settings__header,
-	> .htmln-settings__form {
+	> .htmln-settings__header {
 		max-width: 542px;
 	}
 }
