@@ -343,10 +343,7 @@ export default function ArticlesTable( {
 							{ __( 'Constr.', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
-							{ __(
-								'Règles applicables',
-								'100son-html-normalizer'
-							) }
+							{ __( 'Règles', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
 							{ __( 'Violations', '100son-html-normalizer' ) }
