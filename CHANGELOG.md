@@ -5,6 +5,14 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — ajustements UI post-3e colonne
+
+Trois micro-ajustements visuels sur le bandeau métriques :
+
+- **Verrou de défilement activé par défaut** (`scrollSync: true`). C'est l'usage dominant de la modale Diff (comparer deux passages alignés). Le bouton cadenas permet de désactiver pour scroller un panneau indépendamment.
+- **Tableau « Règles appliquées » aligné à gauche** dans sa colonne (`align-items: flex-start` sur `.htmln-diff-modal__metrics-rules` — sans ça le `<h3>` et le `<table>` étaient stretchés sur toute la largeur de la 3e colonne, donnant un alignement visuel sur le bord droit).
+- **Tableau « Règles appliquées » accolé aux boutons** : `.htmln-diff-modal__metrics-aside` passe de `flex: 1 1 280px` à `flex: 0 1 auto` pour que la colonne du milieu ne s'étire plus afin de remplir tout l'espace dispo entre la table métriques et la table règles. La 3e colonne suit désormais immédiatement les boutons avec le seul `gap: 20px` du flex parent.
+
 ### Modale Diff — 3e colonne « Règles appliquées »
 
 Le bandeau métriques de la modale Diff gagne une **3e colonne** à côté du tableau métriques et de la colonne summary/toggles : un petit tableau qui liste les règles ayant effectivement matché sur `html_before` (countMatches > 0). Donne d'un coup d'œil « quelles règles ont fait quoi sur cet article », sans devoir basculer en vue Diff pour deviner.

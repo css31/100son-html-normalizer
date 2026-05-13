@@ -1178,16 +1178,20 @@
 }
 
 .htmln-diff-modal__metrics-aside {
-	flex: 1 1 280px;
+	/* `flex: 0 1 auto` (et non `1 1 280px` avant l'ajout de la 3e colonne) :
+	 * la colonne aside ne s'étire plus pour remplir tout l'espace dispo
+	 * entre la table métriques et la table « Règles appliquées ». Sans ce
+	 * fix, un grand vide apparaissait entre les boutons et la 3e colonne ;
+	 * désormais la 3e colonne est **accolée** aux boutons via le `gap: 20px`
+	 * du flex parent uniquement. */
+	flex: 0 1 auto;
 	min-width: 240px;
 	display: flex;
 	flex-direction: column;
 	/* `align-items: flex-start` (et non `stretch` par défaut) pour que la
 	 * phrase summary, la notice et la barre des boutons « Code source /
 	 * Rendu HTML » prennent chacune la largeur de leur contenu au lieu de
-	 * filer jusqu'au bord droit de la modale. Le `flex: 1 1 280px` de
-	 * cette colonne sert juste à consommer la place horizontale disponible
-	 * dans la rangée — pas à dilater ses enfants. */
+	 * filer jusqu'au bord droit de la modale. */
 	align-items: flex-start;
 	gap: 10px;
 
@@ -1211,12 +1215,18 @@
 
 /* 3e colonne — tableau « Règles appliquées » (post-P10). Liste les
  * `applied_rules` du payload (rule_id dont countMatches > 0). Largeur
- * libre dans la limite du contenu ; pas de stretch horizontal. */
+ * libre dans la limite du contenu ; pas de stretch horizontal.
+ *
+ * `align-items: flex-start` aligne le titre et le tableau **à gauche**
+ * de la colonne au lieu du `stretch` par défaut qui les ferait remplir
+ * toute la largeur (les rendant alignés sur le bord droit de la 3e
+ * colonne, vu que le tableau n'a pas de width:100%). */
 .htmln-diff-modal__metrics-rules {
 	flex: 0 1 auto;
 	max-width: 320px;
 	display: flex;
 	flex-direction: column;
+	align-items: flex-start;
 	gap: 6px;
 }
 

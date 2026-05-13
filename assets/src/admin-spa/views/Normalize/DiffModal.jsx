@@ -114,9 +114,11 @@ export default function DiffModal( {
 
 	// Verrou de synchronisation du défilement vertical entre les panneaux
 	// « Avant » et « Après » — actif sur les deux vues (code source + rendu
-	// HTML). Défaut désactivé : l'utilisateur l'active explicitement quand
-	// il veut comparer deux passages alignés.
-	const [ scrollSync, setScrollSync ] = useState( false );
+	// HTML). **Activé par défaut** : c'est l'usage dominant de la modale
+	// Diff (comparer deux passages alignés). L'utilisateur peut le
+	// désactiver via le bouton cadenas si jamais il veut scroller un
+	// panneau indépendamment.
+	const [ scrollSync, setScrollSync ] = useState( true );
 
 	// Toggle « surlignage stabylo » des suppressions/ajouts dans la vue
 	// Code source. **Activé par défaut** — c'est la valeur ajoutée centrale
