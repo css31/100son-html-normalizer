@@ -5,6 +5,39 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Fix P1 — retire aussi le wrapper de bloc Gutenberg `<!-- wp:paragraph -->`
+
+Avant le fix, sur un bloc Gutenberg `wp:paragraph` vide :
+
+```
+<!-- wp:paragraph -->
+<p></p>
+<!-- /wp:paragraph -->
+```
+
+P1 supprimait le `<p></p>` interne mais laissait les deux commentaires Gutenberg en place. Résultat : un bloc Gutenberg « squelette » inerte qui ressort comme une ligne vide invalide à l'édition. Cause : `DOMDocument` parse les commentaires Gutenberg comme des `DOMComment` siblings du `<p>` — P1 itérait sur `getElementsByTagName('p')` qui ne les voit pas.
+
+Fix : avant de supprimer un `<p>` vide, P1 cherche ses siblings immédiats (en sautant les `DOMText` de whitespace pur) :
+
+- `previousSibling` est-il un `DOMComment` qui matche `^\s*wp:paragraph(\s|$)` (l'attrs JSON optionnel est toléré) ?
+- `nextSibling` est-il un `DOMComment` qui matche `^\s*/wp:paragraph\s*$` ?
+
+Si oui pour les deux → P1 supprime tout le range inclusif (commentaire ouvrant + whitespace + `<p>` + whitespace + commentaire fermant). Sinon → comportement historique (suppression isolée du `<p>`).
+
+L'exception est restrictive : un `<p>` vide imbriqué dans un autre bloc Gutenberg (`wp:column`, `wp:group`…) ne déclenche **pas** la suppression des wrappers du bloc englobant — seuls les commentaires `wp:paragraph` adjacents directs comptent.
+
+**+11 tests `EmptyParagraphsRuleTest`** :
+- bloc Gutenberg vide complet supprimé (avec `<p></p>`, avec `&nbsp;`, avec attrs JSON `{"align":"center"}`) ;
+- bloc Gutenberg avec `<p>` non-vide intégralement préservé ;
+- deux blocs Gutenberg vides adjacents (les deux supprimés) ;
+- mix de blocs vides et pleins (seul le vide retiré) ;
+- `<p></p>` nu sans wrapper (comportement historique inchangé) ;
+- `<p></p>` dans un bloc `wp:column` (seul le `<p>` retiré, wrapper externe préservé) ;
+- commentaire orphelin (ouvrant sans fermant ou inversement) → pas de tentative de devinage ;
+- `countMatches()` toujours = 1 par paragraphe vide (unité métier inchangée).
+
+**668 PHPUnit verts** (vs 657, +11, 1486 assertions), PHPStan propre sur la règle éditée, 9 intégration verts.
+
 ### Label `Caractères` clarifié → `Caractères (espaces inclus)`
 
 Le bandeau métriques affichait « Caractères » sans préciser que les espaces sont comptés — source de confusion avec des outils externes (gedit, Word…) qui distinguent en général « caractères avec espaces » vs « sans espaces ». Comme la métrique du plugin est calculée via `mb_strlen()` du `textContent` (espaces inclus, mais NBSP normalisés en espaces simples), on clarifie le libellé partout où il apparaît côté utilisateur :

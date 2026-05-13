@@ -106,4 +106,89 @@ final class EmptyParagraphsRuleTest extends TestCase {
 		$after = $this->rule->apply( $html );
 		$this->assertSame( 0, $this->rule->countMatches( $after ) );
 	}
+
+	// =========================================================================
+	// Blocs Gutenberg `wp:paragraph` — retrait du wrapper de bloc
+	// =========================================================================
+
+	public function test_gutenberg_paragraph_block_wrapping_empty_p_is_fully_removed(): void {
+		$html = "<!-- wp:paragraph -->\n<p></p>\n<!-- /wp:paragraph -->";
+		// Tout le bloc disparait : commentaires + <p> + whitespace residuel.
+		$this->assertSame( '', trim( $this->rule->apply( $html ) ) );
+	}
+
+	public function test_gutenberg_paragraph_block_with_nbsp_p_is_fully_removed(): void {
+		$html = "<!-- wp:paragraph -->\n<p>&nbsp;</p>\n<!-- /wp:paragraph -->";
+		$this->assertSame( '', trim( $this->rule->apply( $html ) ) );
+	}
+
+	public function test_gutenberg_paragraph_block_with_json_attrs_is_fully_removed(): void {
+		// Variante avec attrs JSON sur le commentaire ouvrant (align, dropCap, etc.).
+		$html = '<!-- wp:paragraph {"align":"center"} --><p></p><!-- /wp:paragraph -->';
+		$this->assertSame( '', trim( $this->rule->apply( $html ) ) );
+	}
+
+	public function test_gutenberg_paragraph_block_with_non_empty_p_is_preserved(): void {
+		// Bloc Gutenberg avec un <p> non-vide : rien a faire.
+		$html = "<!-- wp:paragraph -->\n<p>texte</p>\n<!-- /wp:paragraph -->";
+		$this->assertHtmlEquals( $html, $this->rule->apply( $html ) );
+	}
+
+	public function test_two_adjacent_empty_gutenberg_paragraph_blocks_both_removed(): void {
+		$html = "<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->"
+			. "<!-- wp:paragraph --><p>&nbsp;</p><!-- /wp:paragraph -->";
+		$this->assertSame( '', trim( $this->rule->apply( $html ) ) );
+	}
+
+	public function test_mixed_empty_and_kept_gutenberg_paragraph_blocks(): void {
+		$html = "<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->"
+			. "<!-- wp:paragraph --><p>OK</p><!-- /wp:paragraph -->";
+		// Premier bloc supprime, second preserve.
+		$expected = "<!-- wp:paragraph --><p>OK</p><!-- /wp:paragraph -->";
+		$this->assertHtmlEquals( $expected, $this->rule->apply( $html ) );
+	}
+
+	public function test_bare_empty_p_without_gutenberg_wrapper_still_removed(): void {
+		// Comportement historique : un `<p></p>` qui n'est pas encadre par
+		// les commentaires Gutenberg est supprime tel quel (sans toucher
+		// au contexte autour).
+		$html     = '<div><p></p><p>texte</p></div>';
+		$expected = '<div><p>texte</p></div>';
+		$this->assertHtmlEquals( $expected, $this->rule->apply( $html ) );
+	}
+
+	public function test_empty_p_inside_other_gutenberg_block_does_not_remove_outer_wrapper(): void {
+		// Un `<p></p>` vide a l'interieur d'un bloc Gutenberg qui n'est
+		// PAS un `wp:paragraph` (ex. `wp:column`) — on supprime juste le
+		// `<p>`, le bloc englobant reste intact.
+		$html     = '<!-- wp:column --><div class="wp-block-column"><p></p><p>texte</p></div><!-- /wp:column -->';
+		$expected = '<!-- wp:column --><div class="wp-block-column"><p>texte</p></div><!-- /wp:column -->';
+		$this->assertHtmlEquals( $expected, $this->rule->apply( $html ) );
+	}
+
+	public function test_unmatched_opening_comment_does_not_trigger_full_removal(): void {
+		// Commentaire ouvrant present mais pas de fermant correspondant
+		// (cas degrade / corrompu) : on suppr juste le `<p>` et on laisse
+		// le commentaire orphelin tel quel — pas de tentative de "deviner".
+		$html     = '<!-- wp:paragraph --><p></p><div>texte</div>';
+		$expected = '<!-- wp:paragraph --><div>texte</div>';
+		$this->assertHtmlEquals( $expected, $this->rule->apply( $html ) );
+	}
+
+	public function test_unmatched_closing_comment_does_not_trigger_full_removal(): void {
+		$html     = '<div>texte</div><p></p><!-- /wp:paragraph -->';
+		$expected = '<div>texte</div><!-- /wp:paragraph -->';
+		$this->assertHtmlEquals( $expected, $this->rule->apply( $html ) );
+	}
+
+	public function test_count_matches_consistent_with_apply_on_gutenberg_blocks(): void {
+		// Un bloc Gutenberg vide compte pour 1 (= un `<p>` vide), comme
+		// avant le fix — la suppression des wrappers est un detail
+		// d'implementation, l'unite metier reste « 1 paragraphe vide ».
+		$html = "<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->";
+		$this->assertSame( 1, $this->rule->countMatches( $html ) );
+		// Et bien sur l'application est idempotente.
+		$after = $this->rule->apply( $html );
+		$this->assertSame( 0, $this->rule->countMatches( $after ) );
+	}
 }

@@ -4,6 +4,13 @@
  *
  * Supprime les `<p>` vides ou contenant uniquement du blanc / `&nbsp;`.
  *
+ * **Cas particulier Gutenberg** : quand le `<p>` vide est encadre par les
+ * commentaires de bloc `<!-- wp:paragraph -->` ... `<!-- /wp:paragraph -->`,
+ * on retire aussi ces deux commentaires (et le whitespace residuel entre
+ * eux). Sinon le bloc Gutenberg « squelette » reste dans `post_content`
+ * et provoque un bloc fantome (visible comme une ligne vide invalide
+ * dans l'editeur).
+ *
  * Cf. cahier §3.1 F2.P1 et §8 F2.P1.
  *
  * @package Cent_Son\Html_Normalizer
@@ -16,7 +23,10 @@ namespace Cent_Son\Html_Normalizer\Core\Rules;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
+use DOMComment;
 use DOMElement;
+use DOMNode;
+use DOMText;
 
 /**
  * Préréglage P1 : suppression des paragraphes vides.
@@ -61,9 +71,23 @@ final class EmptyParagraphsRule implements RuleInterface {
 			if ( ! $p instanceof DOMElement ) {
 				continue;
 			}
-			if ( self::is_empty_paragraph( $p ) ) {
-				$p->parentNode?->removeChild( $p );
+			if ( ! self::is_empty_paragraph( $p ) ) {
+				continue;
 			}
+
+			// Si le <p> vide est encadre par les commentaires Gutenberg de
+			// bloc paragraph, on supprime tout le bloc (commentaire ouvrant
+			// + <p> + commentaire fermant + whitespace residuel entre eux)
+			// pour eviter un bloc squelette inerte.
+			$opening = self::find_preceding_gutenberg_open_comment( $p );
+			$closing = self::find_following_gutenberg_close_comment( $p );
+			if ( null !== $opening && null !== $closing ) {
+				self::remove_range_inclusive( $opening, $closing );
+				continue;
+			}
+
+			// Sinon, suppression isolee du <p>.
+			$p->parentNode?->removeChild( $p );
 		}
 
 		return DomHtml::serialize_fragment( $doc );
@@ -88,6 +112,103 @@ final class EmptyParagraphsRule implements RuleInterface {
 			}
 		}
 		return $count;
+	}
+
+	/**
+	 * Trouve le commentaire Gutenberg `<!-- wp:paragraph -->` (ou variante
+	 * avec attrs JSON `<!-- wp:paragraph {"align":"center"} -->`) qui
+	 * precede directement le `<p>` dans le DOM, en sautant uniquement les
+	 * noeuds texte de whitespace pur. Retourne null sinon.
+	 *
+	 * @param DOMNode $p Paragraphe vide candidat.
+	 * @return ?DOMComment
+	 */
+	private static function find_preceding_gutenberg_open_comment( DOMNode $p ): ?DOMComment {
+		$cur = self::previous_sibling_skipping_whitespace( $p );
+		if ( ! $cur instanceof DOMComment ) {
+			return null;
+		}
+		// Tolere les espaces autour ; la signature Gutenberg est
+		// `wp:paragraph` eventuellement suivi d'un blanc (puis JSON d'attrs).
+		if ( 1 === preg_match( '/^\s*wp:paragraph(\s|$)/', $cur->data ) ) {
+			return $cur;
+		}
+		return null;
+	}
+
+	/**
+	 * Pendant du helper precedent pour le commentaire fermant
+	 * `<!-- /wp:paragraph -->`. Pas d'attrs possibles sur un fermant Gutenberg.
+	 *
+	 * @param DOMNode $p Paragraphe vide candidat.
+	 * @return ?DOMComment
+	 */
+	private static function find_following_gutenberg_close_comment( DOMNode $p ): ?DOMComment {
+		$cur = self::next_sibling_skipping_whitespace( $p );
+		if ( ! $cur instanceof DOMComment ) {
+			return null;
+		}
+		if ( 1 === preg_match( '#^\s*/wp:paragraph\s*$#', $cur->data ) ) {
+			return $cur;
+		}
+		return null;
+	}
+
+	/**
+	 * Sibling precedent en sautant les `DOMText` de whitespace pur (retour-
+	 * ligne / espace introduit par la lecture HTML formatee). Ne saute PAS
+	 * les autres types de noeuds — un commentaire intermediaire, par
+	 * exemple, casse la chaine et fait echouer la detection (intentionnel :
+	 * un bloc `wp:paragraph` est forcement adjacent a son `<p>`).
+	 *
+	 * @param DOMNode $node Noeud de depart.
+	 * @return ?DOMNode
+	 */
+	private static function previous_sibling_skipping_whitespace( DOMNode $node ): ?DOMNode {
+		$cur = $node->previousSibling;
+		while ( $cur instanceof DOMText && '' === trim( $cur->wholeText ) ) {
+			$cur = $cur->previousSibling;
+		}
+		return $cur;
+	}
+
+	/**
+	 * Pendant `next` du helper precedent.
+	 *
+	 * @param DOMNode $node Noeud de depart.
+	 * @return ?DOMNode
+	 */
+	private static function next_sibling_skipping_whitespace( DOMNode $node ): ?DOMNode {
+		$cur = $node->nextSibling;
+		while ( $cur instanceof DOMText && '' === trim( $cur->wholeText ) ) {
+			$cur = $cur->nextSibling;
+		}
+		return $cur;
+	}
+
+	/**
+	 * Supprime tous les noeuds de `$start` a `$end` inclus (en parcourant
+	 * `nextSibling`). On suppose que `$start` et `$end` ont le meme parent
+	 * (verifie par les helpers ci-dessus qui ne quittent pas la fratrie).
+	 *
+	 * @param DOMNode $start Premier noeud a supprimer.
+	 * @param DOMNode $end   Dernier noeud a supprimer.
+	 * @return void
+	 */
+	private static function remove_range_inclusive( DOMNode $start, DOMNode $end ): void {
+		$parent = $start->parentNode;
+		if ( null === $parent ) {
+			return;
+		}
+		$cur = $start;
+		while ( null !== $cur ) {
+			$next = $cur->nextSibling;
+			$parent->removeChild( $cur );
+			if ( $cur === $end ) {
+				return;
+			}
+			$cur = $next;
+		}
 	}
 
 	/**
