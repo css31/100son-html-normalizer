@@ -39,18 +39,34 @@ final class DiffControllerTest extends TestCase {
 			public function get_enabled_rules(): array {
 				return $this->rules;
 			}
+			public function get_rules_for_subset( array $rule_ids ): array {
+				$wanted = array_flip( array_map( 'strval', $rule_ids ) );
+				$subset = array();
+				foreach ( $this->rules as $r ) {
+					if ( isset( $wanted[ $r->id() ] ) ) {
+						$subset[] = $r;
+					}
+				}
+				return $subset;
+			}
 		};
 	}
 
-	private function fake_rule( string $id, callable $transform ): RuleInterface {
-		return new class( $id, $transform ) implements RuleInterface {
-			public function __construct( private string $rule_id, private mixed $transform ) {}
+	private function fake_rule( string $id, callable $transform, int $match_count = 0 ): RuleInterface {
+		return new class( $id, $transform, $match_count ) implements RuleInterface {
+			public function __construct(
+				private string $rule_id,
+				private mixed $transform,
+				private int $match_count
+			) {}
 			public function id(): string { return $this->rule_id; }
 			public function label(): string { return $this->rule_id; }
 			public function apply( string $html, array $context = array() ): string {
 				return ( $this->transform )( $html );
 			}
-			public function countMatches( string $html, array $context = array() ): int { return 0; }
+			public function countMatches( string $html, array $context = array() ): int {
+				return $this->match_count;
+			}
 		};
 	}
 
@@ -350,5 +366,66 @@ final class DiffControllerTest extends TestCase {
 		);
 
 		$this->assertSame( $clean, $response->get_data()['html_before'] );
+	}
+
+	// =========================================================================
+	//  applied_rules — sous-ensemble des rule_ids qui ont effectivement
+	//  matché sur `html_before` (countMatches > 0).
+	// =========================================================================
+
+	public function test_compute_diff_applied_rules_lists_rules_with_matches(): void {
+		$this->seed_post( 100, '<p>Texte</p>' );
+		// Trois règles candidates : P1 a 3 occurrences, P2 a 1, P3 a 0
+		// (donc P3 doit être exclu de `applied_rules`).
+		$p1 = $this->fake_rule( 'P1', static fn( string $h ): string => $h, 3 );
+		$p2 = $this->fake_rule( 'P2', static fn( string $h ): string => $h, 1 );
+		$p3 = $this->fake_rule( 'P3', static fn( string $h ): string => $h, 0 );
+
+		$response = $this->make_controller( array( $p1, $p2, $p3 ) )->compute_diff(
+			$this->make_request( array(
+				'id'       => 100,
+				'rule_ids' => array( 'P1', 'P2', 'P3' ),
+			) )
+		);
+
+		$body = $response->get_data();
+		$this->assertArrayHasKey( 'applied_rules', $body );
+		$this->assertCount( 2, $body['applied_rules'] );
+
+		$by_id = array();
+		foreach ( $body['applied_rules'] as $entry ) {
+			$by_id[ $entry['rule_id'] ] = $entry['occurrences'];
+		}
+		$this->assertSame( 3, $by_id['P1'] );
+		$this->assertSame( 1, $by_id['P2'] );
+		$this->assertArrayNotHasKey( 'P3', $by_id );
+	}
+
+	public function test_compute_diff_applied_rules_empty_when_no_match(): void {
+		$this->seed_post( 100, '<p>Texte</p>' );
+		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h, 0 );
+
+		$response = $this->make_controller( array( $noop ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$this->assertSame( array(), $response->get_data()['applied_rules'] );
+	}
+
+	public function test_compute_diff_applied_rules_excludes_rules_not_in_subset(): void {
+		// Une règle (P9) **active dans le registre** mais NON demandée dans
+		// `rule_ids` ne doit pas apparaître dans `applied_rules`, même si
+		// son countMatches serait positif.
+		$this->seed_post( 100, '<p>Texte</p>' );
+		$p1 = $this->fake_rule( 'P1', static fn( string $h ): string => $h, 2 );
+		$p9 = $this->fake_rule( 'P9', static fn( string $h ): string => $h, 5 );
+
+		$response = $this->make_controller( array( $p1, $p9 ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+		);
+
+		$body = $response->get_data();
+		$this->assertCount( 1, $body['applied_rules'] );
+		$this->assertSame( 'P1', $body['applied_rules'][0]['rule_id'] );
 	}
 }

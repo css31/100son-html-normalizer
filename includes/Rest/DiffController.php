@@ -76,9 +76,15 @@ final class DiffController extends BaseController {
 	 * l'application des `rule_ids` sur cet article, sans écrire.
 	 *
 	 * Body : `{ rule_ids: list<string> }`.
-	 * Réponse 200 : `{ html_before, html_after, metrics_before, metrics_after, warnings, unchanged, post_date, categories, builder_type, has_fossil_panels_data }`.
+	 * Réponse 200 : `{ html_before, html_after, metrics_before, metrics_after, warnings, unchanged, post_date, categories, builder_type, has_fossil_panels_data, applied_rules }`.
 	 * Réponse 400 si `rule_ids` vide.
 	 * Réponse 404 si article inconnu.
+	 *
+	 * `applied_rules` (post-rc4) : `list<{rule_id, occurrences}>` — sous-ensemble
+	 * des `rule_ids` qui ont effectivement quelque chose à toucher sur
+	 * `html_before` (countMatches > 0), dans l'ordre canonique du pipeline.
+	 * Sert à la 3e colonne du bandeau métriques de la modale Diff côté SPA :
+	 * « quelles règles ont fait quoi sur cet article ».
 	 *
 	 * Les 4 clés `post_date` / `categories` / `builder_type` / `has_fossil_panels_data`
 	 * (post-rc4) sont fournies pour alimenter le header de la modale Diff
@@ -131,6 +137,27 @@ final class DiffController extends BaseController {
 
 		$builder_type = $this->classifier->classify( $post_id );
 
+		// `applied_rules` (post-rc4) : sous-ensemble des `rule_ids` qui ont
+		// effectivement quelque chose à toucher sur `html_before` (countMatches
+		// > 0). Affiché dans la 3e colonne du bandeau métriques de la modale
+		// Diff pour donner d'un coup d'œil « quelles règles ont fait quoi sur
+		// cet article ». On itère sur `get_rules_for_subset` qui respecte
+		// l'ordre canonique du pipeline ET filtre déjà les règles désactivées
+		// par config — pas besoin de re-vérifier `is_preset_enabled` ici.
+		$applied_rules = array();
+		foreach ( $this->registry->get_rules_for_subset( $rule_ids ) as $rule ) {
+			$occurrences = $rule->countMatches(
+				$html_before,
+				array( 'post_id' => $post_id, 'source' => 'diff' )
+			);
+			if ( $occurrences > 0 ) {
+				$applied_rules[] = array(
+					'rule_id'     => $rule->id(),
+					'occurrences' => $occurrences,
+				);
+			}
+		}
+
 		// Normalisation pour l'affichage : on fait passer les deux chaînes
 		// par le meme couple `parse_fragment` / `serialize_fragment` que les
 		// regles DOM-aware. Sans ca, le panneau « Avant » contient le brut
@@ -160,6 +187,7 @@ final class DiffController extends BaseController {
 			'categories'              => $this->get_post_category_names( $post_id ),
 			'builder_type'            => $builder_type,
 			'has_fossil_panels_data'  => $this->has_fossil_panels_data( $post_id, $builder_type ),
+			'applied_rules'           => $applied_rules,
 		) );
 	}
 

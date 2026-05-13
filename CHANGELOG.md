@@ -5,6 +5,28 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — 3e colonne « Règles appliquées »
+
+Le bandeau métriques de la modale Diff gagne une **3e colonne** à côté du tableau métriques et de la colonne summary/toggles : un petit tableau qui liste les règles ayant effectivement matché sur `html_before` (countMatches > 0). Donne d'un coup d'œil « quelles règles ont fait quoi sur cet article », sans devoir basculer en vue Diff pour deviner.
+
+Format : 2 colonnes — N° de règle (label SPA : `P1.1`, `P2.2`, etc., monospace, couleur bleue) + titre humain (`Paragraphes vides`, `Titres autour d'images`…). Triée par ordre d'affichage UI (`compareRuleIdsByDisplayOrder`).
+
+#### Backend
+
+- `DiffController::compute_diff()` calcule `applied_rules: list<{rule_id, occurrences}>` avant de renvoyer le payload : pour chaque règle de `get_rules_for_subset($rule_ids)` (qui respecte déjà l'ordre canonique du pipeline et filtre les règles désactivées par config), on appelle `countMatches($html_before)`, on garde celles avec count > 0. Coût : ~10 appels `countMatches` (HTML reparsé via DOMDocument à chaque fois, mais acceptable — déjà fait par le pipeline juste après).
+
+#### Frontend
+
+- `DiffModal.jsx` — 3e colonne ajoutée dans `.htmln-diff-modal__metrics-row`, conditionnée à `payload.applied_rules.length > 0`. Tri par display order, label via `getRuleLabel`, titre via `getRuleTooltip` (helpers existants de `utils/ruleLabels.js`).
+- `styles/main.scss` — `.htmln-diff-modal__metrics-rules` (flex item de la rangée, max-width 320px) + `.htmln-diff-modal__metrics-rules-table` (double-classe pour battre les styles WP-admin sur `<table>`).
+
+#### Tests
+
+- +3 PHPUnit `DiffControllerTest` (rules matchant listées avec occurrences correctes, liste vide quand aucun match, rules hors subset exclues même si activées dans le registre).
+- `fake_rule()` helper du test étendu pour accepter un `match_count` optionnel.
+- `registry_with()` helper override aussi `get_rules_for_subset()` (sinon `is_preset_enabled` retombait sur la BDD options vide → toujours false → applied_rules toujours vide dans les tests).
+- **706 PHPUnit verts** (vs 703, +3), PHPStan baseline inchangée, lint propre.
+
 ### Nouvelle règle P10 — désencapsulation des `<p>` autour d'images
 
 Symétrique de P9 (qui désencapsule les `<h*><img></h*>`), P10 traite le même pattern sur les `<p>` :

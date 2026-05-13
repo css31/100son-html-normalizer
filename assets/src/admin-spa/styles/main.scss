@@ -1157,11 +1157,13 @@
 	}
 }
 
-/* Ligne « bandeau métriques » de DiffModal (post-rc4) — layout 2 colonnes
+/* Ligne « bandeau métriques » de DiffModal (post-rc4) — layout 3 colonnes
  * pour libérer un maximum de hauteur verticale en faveur de l'affichage du
  * code en dessous. La table métriques occupe la gauche à sa largeur
- * intrinsèque ; la colonne droite empile la phrase summary (taux de perte),
- * la notice « Aucun changement » et les boutons « Code source / Rendu HTML ».
+ * intrinsèque, la colonne du milieu empile la phrase summary (taux de
+ * perte), la notice « Aucun changement » et les boutons « Code source /
+ * Rendu HTML », et la 3e colonne liste les règles ayant matché sur cet
+ * article (post-P10).
  *
  * Pas de `align-items: flex-start` — on garde la valeur par défaut `stretch`
  * pour que la colonne aside s'étire à la pleine hauteur du tableau, ce qui
@@ -1204,6 +1206,61 @@
 	 * le bloc summary (+ notice éventuelle) et les boutons. */
 	.htmln-diff-modal__view-toggle {
 		margin-top: auto;
+	}
+}
+
+/* 3e colonne — tableau « Règles appliquées » (post-P10). Liste les
+ * `applied_rules` du payload (rule_id dont countMatches > 0). Largeur
+ * libre dans la limite du contenu ; pas de stretch horizontal. */
+.htmln-diff-modal__metrics-rules {
+	flex: 0 1 auto;
+	max-width: 320px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.htmln-diff-modal__metrics-rules-title {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var( --htmln-text-muted );
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Double-classe pour spécificité (battre les règles `<table>` génériques
+ * WP-admin) — même technique que `.htmln-metrics-diff`. */
+.htmln-diff-modal__metrics-rules-table.htmln-diff-modal__metrics-rules-table {
+	width: auto;
+	border-collapse: collapse;
+	font-size: 13px;
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border-strong );
+	border-radius: var( --htmln-radius );
+	overflow: hidden;
+
+	th,
+	td {
+		padding: 4px 10px;
+		text-align: left;
+		vertical-align: top;
+		border: 0;
+	}
+
+	/* La colonne N° (1er <th scope="row">) reste compacte, monospace pour
+	 * que les `P1.1` / `P10.2` etc. s'alignent visuellement. */
+	th {
+		font-family: SFMono-Regular, Menlo, Consolas, monospace;
+		font-weight: 600;
+		color: var( --htmln-color-info );
+		white-space: nowrap;
+		border-right: 1px solid var( --htmln-border );
+	}
+
+	tr + tr th,
+	tr + tr td {
+		border-top: 1px solid var( --htmln-border );
 	}
 }
 

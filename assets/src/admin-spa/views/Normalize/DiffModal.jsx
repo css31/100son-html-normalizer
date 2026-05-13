@@ -28,6 +28,11 @@ import { Modal, Button, Spinner } from '@wordpress/components';
 import { lock, unlock, brush } from '@wordpress/icons';
 import * as api from '../../api';
 import { sanitizeForIframe } from '../../utils/sanitizeForIframe';
+import {
+	getRuleLabel,
+	getRuleTooltip,
+	compareRuleIdsByDisplayOrder,
+} from '../../utils/ruleLabels';
 import { MetricsDiffSummary, MetricsDiffTable } from './MetricsDiffBar';
 import BuilderBadge from './BuilderBadge';
 import HighlightedCode from './HighlightedCode';
@@ -44,16 +49,17 @@ const VIEW = {
 
 /**
  * @typedef {Object} DiffPayload
- * @property {string}   html_before              HTML avant normalisation.
- * @property {string}   html_after               HTML après normalisation.
- * @property {Object}   metrics_before           Snapshot avant.
- * @property {Object}   metrics_after            Snapshot après.
- * @property {string[]} warnings                 Avertissements éventuels du Pipeline.
- * @property {boolean}  unchanged                Vrai si HTML identique.
- * @property {string}   [post_date]              Date de publication (`Y-m-d H:i:s`, vide si absente).
- * @property {string[]} [categories]             Noms de catégories de l'article.
- * @property {?string}  [builder_type]           Type de constructeur (siteorigin / gutenberg / …) ou null.
- * @property {boolean}  [has_fossil_panels_data] Vrai si Gutenberg avec vestige `panels_data` (alimente le badge orange).
+ * @property {string}                                        html_before              HTML avant normalisation.
+ * @property {string}                                        html_after               HTML après normalisation.
+ * @property {Object}                                        metrics_before           Snapshot avant.
+ * @property {Object}                                        metrics_after            Snapshot après.
+ * @property {string[]}                                      warnings                 Avertissements éventuels du Pipeline.
+ * @property {boolean}                                       unchanged                Vrai si HTML identique.
+ * @property {string}                                        [post_date]              Date de publication (`Y-m-d H:i:s`, vide si absente).
+ * @property {string[]}                                      [categories]             Noms de catégories de l'article.
+ * @property {?string}                                       [builder_type]           Type de constructeur (siteorigin / gutenberg / …) ou null.
+ * @property {boolean}                                       [has_fossil_panels_data] Vrai si Gutenberg avec vestige `panels_data` (alimente le badge orange).
+ * @property {Array<{rule_id: string, occurrences: number}>} [applied_rules]          Sous-ensemble des règles sélectionnées qui ont matché sur `html_before` (countMatches > 0), ordre canonique du pipeline.
  */
 
 /**
@@ -363,6 +369,48 @@ export default function DiffModal( {
 							/>
 						</div>
 					</div>
+
+					{ /* 3e colonne — tableau des règles qui ont effectivement
+					     matché sur `html_before` (countMatches > 0). Filtré
+					     côté serveur via `applied_rules` du payload pour ne
+					     pas charger inutilement le client. Trié par ordre
+					     d'affichage UI (P1.1, P1.2, P2.1, P2.2, P3…). */ }
+					{ Array.isArray( payload.applied_rules ) &&
+						payload.applied_rules.length > 0 && (
+							<div className="htmln-diff-modal__metrics-rules">
+								<h3 className="htmln-diff-modal__metrics-rules-title">
+									{ __(
+										'Règles appliquées',
+										'100son-html-normalizer'
+									) }
+								</h3>
+								<table className="htmln-diff-modal__metrics-rules-table">
+									<tbody>
+										{ [ ...payload.applied_rules ]
+											.sort( ( a, b ) =>
+												compareRuleIdsByDisplayOrder(
+													a.rule_id,
+													b.rule_id
+												)
+											)
+											.map( ( entry ) => (
+												<tr key={ entry.rule_id }>
+													<th scope="row">
+														{ getRuleLabel(
+															entry.rule_id
+														) }
+													</th>
+													<td>
+														{ getRuleTooltip(
+															entry.rule_id
+														) }
+													</td>
+												</tr>
+											) ) }
+									</tbody>
+								</table>
+							</div>
+						) }
 				</div>
 
 				{ VIEW.CODE === view && (
