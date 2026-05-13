@@ -5,6 +5,29 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Fix P6 — préserve le `style` du `<img>` dans les blocs Gutenberg `core/image`
+
+La règle **P6 (Styles inline)** strippait l'attribut `style="aspect-ratio:…;width:…;height:…;object-fit:…"` du `<img>` à l'intérieur d'un bloc `core/image` Gutenberg. Or ce `style` est **synchronisé** avec :
+
+- Le JSON `<!-- wp:image {"width":"…","height":"…","aspectRatio":"…","scale":"…"} -->` en amont.
+- La classe `is-resized` sur le `<figure>` parent.
+
+Retirer le `style` isolément cassait l'invariant attrs/HTML décrit dans `CLAUDE.md` §6 → le bloc s'affichait comme « contenu invalide » à la réouverture dans l'éditeur Gutenberg.
+
+Fix : P6 ignore désormais les `<img>` enfants directs d'un `<figure class*="wp-block-image">` (match avec frontière de mot pour éviter les faux positifs sur `wp-block-image-foo`). L'exception est étendue à `countMatches()` pour parité (un article 100 % Gutenberg dont seuls les `<img>` `core/image` ont des `style` ne déclenche plus P6 à tort).
+
+Scope du bug : limité aux 65 articles Gutenberg du corpus MMM-2 (sur 799). Les `<img>` hors `figure.wp-block-image` (cas classique des articles SiteOrigin et du HTML « libre ») restent traités normalement par P6.
+
+**+9 tests** `RemoveInlineStylesRuleTest` couvrant :
+- bloc `core/image` complet préservé (modes `keep_text_align=true` ET `keep_text_align=false`) ;
+- `countMatches()` retourne 0 sur ces blocs ;
+- frontière de mot respectée (`wp-block-image-foo` ≠ match) ;
+- `figcaption` ou autres enfants du même `<figure>` continuent d'être nettoyés normalement (l'exception est restrictive au seul `<img>` enfant direct) ;
+- multi-classes sur le `<figure>` (`foo wp-block-image bar`) ;
+- `<img>` dans une `<figure class="something-else">` ou directement dans `<p>` toujours nettoyé.
+
+**Total 657 PHPUnit verts** (+9 vs 648, 1474 assertions), PHPStan baseline 22 inchangée.
+
 ### Modale Diff — refonte UX complète post-rc4
 
 Cinq évolutions livrées en une seule passe sur la modale Diff (F14.3) pour rendre la lecture du diff radicalement plus rapide. Toutes intriquées sur `DiffModal.jsx` + `styles/main.scss`, donc regroupées ici.

@@ -165,4 +165,113 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 		$after = $rule->apply( $html );
 		$this->assertSame( 0, $rule->countMatches( $after ) );
 	}
+
+	// =========================================================================
+	//  Exception bloc Gutenberg `core/image` : le `style` du `<img>` est
+	//  synchronise avec le JSON `<!-- wp:image {width, height, aspectRatio,
+	//  scale} -->` en amont et la classe `is-resized` du `<figure>` parent.
+	//  Le retirer isolement = bloc "contenu invalide" a la reouverture
+	//  dans l'editeur Gutenberg. Cf. CLAUDE.md §6.
+	// =========================================================================
+
+	/**
+	 * Fragment representatif du bloc `core/image` du corpus MMM (article 22922).
+	 *
+	 * @return string
+	 */
+	private function gutenberg_image_block(): string {
+		return '<figure class="wp-block-image aligncenter size-full is-resized">'
+			. '<img src="https://example.com/img.jpg" alt="x" class="wp-image-22912"'
+			. ' style="aspect-ratio:1.3333333333333333;object-fit:contain;width:700px;height:auto"/>'
+			. '<figcaption class="wp-element-caption">Légende</figcaption>'
+			. '</figure>';
+	}
+
+	public function test_preserves_img_style_inside_wp_block_image_keep_align_mode(): void {
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = $this->gutenberg_image_block();
+		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
+	}
+
+	public function test_preserves_img_style_inside_wp_block_image_strict_mode(): void {
+		// Meme exception en mode strict (keep_text_align=false) : le bloc
+		// Gutenberg prime sur le strip generique.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = $this->gutenberg_image_block();
+		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
+	}
+
+	public function test_count_matches_skips_img_inside_wp_block_image(): void {
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = $this->gutenberg_image_block();
+		$this->assertSame( 0, $rule->countMatches( $input ) );
+	}
+
+	public function test_count_matches_strict_mode_also_skips_img_inside_wp_block_image(): void {
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = $this->gutenberg_image_block();
+		$this->assertSame( 0, $rule->countMatches( $input ) );
+	}
+
+	public function test_still_strips_img_outside_wp_block_image(): void {
+		// Un `<img style="...">` qui n'est PAS enfant d'un `<figure class*=
+		// 'wp-block-image'>` doit toujours etre nettoye normalement (cas
+		// frequent sur les articles SiteOrigin et le HTML "libre").
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = '<p><img src="a.jpg" style="width:100px; color:red"/></p>';
+		$this->assertHtmlEquals(
+			'<p><img src="a.jpg"/></p>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_still_strips_img_inside_figure_without_wp_block_image_class(): void {
+		// Un `<figure>` sans la classe `wp-block-image` (figure HTML "libre")
+		// : le `<img>` enfant est traite normalement.
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = '<figure class="something-else"><img src="a.jpg" style="width:100px"/></figure>';
+		$this->assertHtmlEquals(
+			'<figure class="something-else"><img src="a.jpg"/></figure>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_does_not_match_lookalike_class_wp_block_image_foo(): void {
+		// Test de la frontiere de mot dans la regex de la classe. Un
+		// `<figure class="wp-block-image-foo">` ne doit PAS declencher
+		// l'exception — la classe est differente.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<figure class="wp-block-image-foo"><img src="a.jpg" style="width:100px"/></figure>';
+		$this->assertHtmlEquals(
+			'<figure class="wp-block-image-foo"><img src="a.jpg"/></figure>',
+			$rule->apply( $input )
+		);
+	}
+
+	public function test_preserves_style_on_img_with_multiple_classes_on_figure(): void {
+		// La classe `wp-block-image` peut etre entouree d'autres classes
+		// (typique : `aligncenter size-full is-resized`). Match correct
+		// par la regex de frontiere de mot.
+		$rule  = new RemoveInlineStylesRule( true );
+		$input = '<figure class="foo wp-block-image bar"><img src="a.jpg" style="width:100px"/></figure>';
+		$this->assertHtmlEquals( $input, $rule->apply( $input ) );
+	}
+
+	public function test_still_strips_non_img_styled_inside_wp_block_image(): void {
+		// L'exception est restrictive : seul le `<img>` enfant direct est
+		// preserve. Une `<figcaption style="...">` ou autre element style
+		// dans le meme `<figure>` est nettoye normalement.
+		$rule  = new RemoveInlineStylesRule( false );
+		$input = '<figure class="wp-block-image">'
+			. '<img src="a.jpg" style="width:100px"/>'
+			. '<figcaption style="color:red">Légende</figcaption>'
+			. '</figure>';
+		$this->assertHtmlEquals(
+			'<figure class="wp-block-image">'
+			. '<img src="a.jpg" style="width:100px"/>'
+			. '<figcaption>Légende</figcaption>'
+			. '</figure>',
+			$rule->apply( $input )
+		);
+	}
 }

@@ -10,6 +10,15 @@
  *           Si rien ne reste, l'attribut est entierement supprime.
  *  - false : strip integralement l'attribut style sans exception.
  *
+ * **Exception `core/image` Gutenberg** : les `<img>` enfants directs d'un
+ * `<figure>` portant la classe `wp-block-image` sont **ignores** par la regle.
+ * Leur attribut `style="aspect-ratio:...;width:...;height:...;object-fit:..."`
+ * est synchronise avec le JSON `<!-- wp:image { width, height, aspectRatio,
+ * scale } -->` en amont du bloc et la classe `is-resized` sur le `<figure>`
+ * parent. Retirer le `style` seul desynchroniserait ces trois fois ce qui
+ * declenche un "contenu invalide" Gutenberg a la prochaine ouverture du
+ * bloc dans l'editeur. Cf. CLAUDE.md §6 (pieges) — invariant a respecter.
+ *
  * Cf. cahier section 3.1 F2.P6 et section 8 F2.P6.
  *
  * @package Cent_Son\Html_Normalizer
@@ -86,6 +95,9 @@ final class RemoveInlineStylesRule implements RuleInterface {
 		}
 
 		foreach ( $elements as $el ) {
+			if ( self::is_img_in_wp_block_image( $el ) ) {
+				continue;
+			}
 			if ( ! $this->keep_text_align ) {
 				$el->removeAttribute( 'style' );
 				continue;
@@ -109,6 +121,9 @@ final class RemoveInlineStylesRule implements RuleInterface {
 	 *  - keep_text_align=true  : seulement ceux dont au moins une declaration
 	 *    n'est pas text-align (les style="text-align: …" purs sont preserves
 	 *    a l'identique par apply() et ne sont donc PAS comptes).
+	 *
+	 * Les `<img>` enfants d'un `<figure class="wp-block-image …">` sont exclus
+	 * du comptage, parite avec l'exception appliquee dans `apply()`.
 	 */
 	public function countMatches( string $html, array $context = array() ): int {
 		if ( '' === trim( $html ) ) {
@@ -124,12 +139,16 @@ final class RemoveInlineStylesRule implements RuleInterface {
 		if ( false === $styled ) {
 			return 0;
 		}
-		if ( ! $this->keep_text_align ) {
-			return $styled->length;
-		}
 		$count = 0;
 		foreach ( $styled as $node ) {
 			if ( ! $node instanceof DOMElement ) {
+				continue;
+			}
+			if ( self::is_img_in_wp_block_image( $node ) ) {
+				continue;
+			}
+			if ( ! $this->keep_text_align ) {
+				++$count;
 				continue;
 			}
 			if ( self::has_non_text_align_declaration( (string) $node->getAttribute( 'style' ) ) ) {
@@ -166,6 +185,39 @@ final class RemoveInlineStylesRule implements RuleInterface {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Indique si un element est un `<img>` enfant direct d'un `<figure>`
+	 * portant la classe CSS `wp-block-image` — autrement dit le `<img>` d'un
+	 * bloc Gutenberg `core/image` natif.
+	 *
+	 * Pourquoi : l'attribut `style="aspect-ratio:...;width:...;height:..."`
+	 * de ces `<img>` est synchronise avec le JSON `<!-- wp:image {...} -->`
+	 * en amont et la classe `is-resized` du `<figure>` parent. Le retirer
+	 * isolement casse l'invariant Gutenberg → bloc affiche en "contenu
+	 * invalide" a la reouverture dans l'editeur. Cf. CLAUDE.md §6.
+	 *
+	 * Le match de classe se fait par regex avec frontiere de mot (espace
+	 * ou debut/fin) pour eviter les faux positifs sur d'eventuelles classes
+	 * comme `wp-block-image-foo`.
+	 *
+	 * @param DOMElement $el Element a tester.
+	 * @return bool
+	 */
+	private static function is_img_in_wp_block_image( DOMElement $el ): bool {
+		if ( 'img' !== strtolower( $el->tagName ) ) {
+			return false;
+		}
+		$parent = $el->parentNode;
+		if ( ! $parent instanceof DOMElement ) {
+			return false;
+		}
+		if ( 'figure' !== strtolower( $parent->tagName ) ) {
+			return false;
+		}
+		$classes = (string) $parent->getAttribute( 'class' );
+		return 1 === preg_match( '/(?:^|\s)wp-block-image(?:\s|$)/', $classes );
 	}
 
 	/**
