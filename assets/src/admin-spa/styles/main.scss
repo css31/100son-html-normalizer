@@ -1486,12 +1486,51 @@
 		border-top: 1px solid var( --htmln-border );
 	}
 
-	/* 3e colonne : nombre d'occurrences de la règle sur l'article courant
+	/* 1ʳᵉ colonne : checkbox de désactivation locale de la règle. Largeur
+	 * fixe étroite pour ne pas pousser le label, padding réduit, alignement
+	 * vertical centré. `CheckboxControl` de @wordpress/components a son
+	 * propre wrapping → on neutralise sa marge ici pour que le checkbox
+	 * tienne dans une ligne de hauteur normale. */
+	.htmln-diff-modal__metrics-rules-toggle {
+		width: 28px;
+		padding: 4px 6px;
+		vertical-align: middle;
+		border-right: 1px solid var( --htmln-border );
+
+		.components-base-control,
+		.components-checkbox-control,
+		.components-checkbox-control__input-container {
+			margin: 0;
+			padding: 0;
+		}
+
+		input[type='checkbox'] {
+			margin: 0;
+		}
+	}
+
+	/* État « règle désactivée localement » — la ligne reste cliquable pour
+	 * permettre la réactivation, mais visuellement atténuée pour signaler
+	 * qu'elle ne participe pas au diff courant. Transition douce sur
+	 * l'opacité pour rendre le toggle visible sans être brusque. */
+	tr.htmln-diff-modal__metrics-rules-row--disabled {
+		opacity: 0.55;
+		transition: opacity 120ms ease-out;
+
+		/* Le checkbox lui-même reste à 100 % d'opacité — sinon il devient
+		 * presque illisible à 0.55 alors que c'est l'élément interactif
+		 * principal. On cible l'`<td>` toggle pour annuler l'héritage. */
+		.htmln-diff-modal__metrics-rules-toggle {
+			opacity: 1.81818; /* 1 / 0.55, compense l'héritage */
+		}
+	}
+
+	/* 4e colonne : nombre d'occurrences de la règle sur l'article courant
 	 * (post-cascade). Aligné à droite avec une police monospace pour que
 	 * les chiffres s'alignent verticalement, et un padding gauche un peu
-	 * plus large pour aérer la lecture (la 2e colonne « description » est
+	 * plus large pour aérer la lecture (la 3e colonne « description » est
 	 * la plus dense). `border-left` reproduit le séparateur vertical de
-	 * la 1ʳᵉ colonne (`<th>` → `border-right`) pour distinguer visuellement
+	 * la 2ᵉ colonne (`<th>` → `border-right`) pour distinguer visuellement
 	 * la zone numérique. */
 	.htmln-diff-modal__metrics-rules-occ {
 		text-align: right;

@@ -30,7 +30,7 @@ import {
 	useRef,
 	useMemo,
 } from '@wordpress/element';
-import { Modal, Button, Spinner } from '@wordpress/components';
+import { Modal, Button, Spinner, CheckboxControl } from '@wordpress/components';
 import { lock, unlock, brush } from '@wordpress/icons';
 import * as api from '../../api';
 import { sanitizeForIframe } from '../../utils/sanitizeForIframe';
@@ -149,6 +149,47 @@ export default function DiffModal( {
 	// de `PRISM_MAX_CHARS`).
 	const [ showDiffMarks, setShowDiffMarks ] = useState( false );
 
+	// Désactivation **locale** par règle — l'utilisateur peut cocher/décocher
+	// chaque règle dans le tableau « Règles appliquées » pour voir l'effet
+	// isolé d'une règle sur le diff de cet article. État éphémère, jeté à la
+	// fermeture de la modale (pas de persistance, fermer/rouvrir repart d'un
+	// état propre). N'affecte PAS la sélection globale du SPA (`ruleIds`
+	// reçu en prop reste inchangé) — uniquement le sous-ensemble envoyé au
+	// serveur via `effectiveRuleIds` ci-dessous.
+	const [ localDisabledRules, setLocalDisabledRules ] = useState(
+		() => new Set()
+	);
+
+	// rule_ids effectivement appliqués au calcul de diff (sous-ensemble de
+	// la prop `ruleIds`, moins ceux désactivés localement). Mémoïsé pour la
+	// stabilité référentielle dans la dependency array de `fetchDiff`.
+	const effectiveRuleIds = useMemo(
+		() => ruleIds.filter( ( id ) => ! localDisabledRules.has( id ) ),
+		[ ruleIds, localDisabledRules ]
+	);
+
+	// Garde-fou : le backend renvoie HTTP 400 si `rule_ids = []`. On bloque
+	// donc la dernière checkbox active pour empêcher l'utilisateur d'arriver
+	// dans cet état invalide. `activeRulesCount` est dérivé de l'état local
+	// et non du payload — ce qui garantit que le contrôle reste correct même
+	// quand `payload.applied_rules` ne contient pas toutes les règles
+	// sélectionnées globalement (cas d'une règle à 0 occurrence).
+	const activeRulesCount = ruleIds.length - localDisabledRules.size;
+	const isLastActiveRule = ( ruleId ) =>
+		activeRulesCount <= 1 && ! localDisabledRules.has( ruleId );
+
+	const handleRuleToggle = useCallback( ( ruleId, enabled ) => {
+		setLocalDisabledRules( ( prev ) => {
+			const next = new Set( prev );
+			if ( enabled ) {
+				next.delete( ruleId );
+			} else {
+				next.add( ruleId );
+			}
+			return next;
+		} );
+	}, [] );
+
 	// Comptage des tokens et estimation de la durée du calcul de
 	// surlignage. Les tokens sont utilisés à la fois comme prédicteur
 	// du temps (cf. `utils/estimateDiffSeconds.js`) et comme row dans
@@ -195,6 +236,33 @@ export default function DiffModal( {
 		totalOccurrences
 	);
 	const isLongDiffExpected = estimatedDiffSeconds >= 5;
+
+	// Lignes à afficher dans le tableau « Règles appliquées » : union
+	// entre les règles présentes dans `payload.applied_rules` (= règles
+	// avec occurrences > 0 après cascade actuelle) ET les règles désactivées
+	// localement (qui peuvent avoir disparu de `applied_rules` si elles
+	// n'ont plus rien à toucher dans le sous-ensemble réduit). Cette union
+	// garantit que l'utilisateur peut toujours re-cocher une règle qu'il
+	// vient de décocher, même si elle est passée à 0 occurrence.
+	const visibleRules = useMemo( () => {
+		const fromApplied = Array.isArray( payload?.applied_rules )
+			? payload.applied_rules.map( ( r ) => r.rule_id )
+			: [];
+		const fromDisabled = Array.from( localDisabledRules );
+		const all = Array.from(
+			new Set( [ ...fromApplied, ...fromDisabled ] )
+		);
+		all.sort( compareRuleIdsByDisplayOrder );
+		return all.map( ( ruleId ) => {
+			const entry = payload?.applied_rules?.find(
+				( r ) => r.rule_id === ruleId
+			);
+			return {
+				rule_id: ruleId,
+				occurrences: entry ? Number( entry.occurrences ) || 0 : 0,
+			};
+		} );
+	}, [ payload, localDisabledRules ] );
 
 	// On déporte **systématiquement** le calcul du surlignage dans le
 	// Web Worker dès que le toggle est ON, peu importe la taille de
@@ -321,11 +389,17 @@ export default function DiffModal( {
 	}, [ view, payload, scrollSync, syncFromTo ] );
 
 	const fetchDiff = useCallback( async () => {
+		// Garde-fou : si l'utilisateur a désactivé toutes les règles
+		// (cas théorique — bloqué en UI par `isLastActiveRule`), on saute
+		// le fetch pour éviter un 400 inutile.
+		if ( 0 === effectiveRuleIds.length ) {
+			return;
+		}
 		setIsLoading( true );
 		setError( null );
 		try {
 			const result = await api.posts.diff( postId, {
-				rule_ids: ruleIds,
+				rule_ids: effectiveRuleIds,
 			} );
 			setPayload( result );
 		} catch ( err ) {
@@ -335,9 +409,12 @@ export default function DiffModal( {
 		} finally {
 			setIsLoading( false );
 		}
-	}, [ postId, ruleIds ] );
+	}, [ postId, effectiveRuleIds ] );
 
 	useEffect( () => {
+		// Le `useEffect` se redéclenche aussi quand `fetchDiff` change
+		// (= quand `effectiveRuleIds` change suite à un toggle local) — ce
+		// qui assure le re-fetch automatique sans logique additionnelle.
 		if ( ! initialPayload ) {
 			fetchDiff();
 		}
@@ -608,61 +685,102 @@ export default function DiffModal( {
 					</div>
 
 					{ /* Colonne 2 (droite) : tableau « Règles appliquées »
-					     — liste les `applied_rules` du payload (rule_id
-					     dont countMatches > 0). Placé en 2ᵉ enfant de la
-					     grille parente `__metrics-row` (1fr/1fr identique
-					     à `__pane-cols` en dessous), donc son bord gauche
-					     s'aligne précisément sur celui du pane « Après ».
-					     `align-items: start` sur la grille parente le
-					     colle en haut. Trié par ordre d'affichage UI
+					     interactif — chaque ligne porte une checkbox qui
+					     permet de désactiver localement la règle pour voir
+					     l'effet isolé sur le diff. Le toggle déclenche un
+					     re-fetch du `/posts/{id}/diff` avec le sous-ensemble
+					     `effectiveRuleIds`. État local à la modale (jeté à
+					     la fermeture), n'affecte PAS la sélection globale
+					     du SPA. La liste affichée est l'union de
+					     `applied_rules` (règles à occ > 0) et `localDisabledRules`
+					     (règles que l'utilisateur a décochées et veut pouvoir
+					     re-cocher). Trié par ordre d'affichage UI
 					     (P1.1, P1.2, P2.1, P2.2, P3…). */ }
-					{ Array.isArray( payload.applied_rules ) &&
-						payload.applied_rules.length > 0 && (
-							<div className="htmln-diff-modal__metrics-rules">
-								<h3 className="htmln-diff-modal__metrics-rules-title">
-									{ __(
-										'Règles appliquées',
-										'100son-html-normalizer'
-									) }
-								</h3>
-								<table className="htmln-diff-modal__metrics-rules-table">
-									<tbody>
-										{ [ ...payload.applied_rules ]
-											.sort( ( a, b ) =>
-												compareRuleIdsByDisplayOrder(
-													a.rule_id,
-													b.rule_id
-												)
-											)
-											.map( ( entry ) => (
-												<tr key={ entry.rule_id }>
-													<th scope="row">
-														{ getRuleLabel(
-															entry.rule_id
+					{ visibleRules.length > 0 && (
+						<div className="htmln-diff-modal__metrics-rules">
+							<h3 className="htmln-diff-modal__metrics-rules-title">
+								{ __(
+									'Règles appliquées',
+									'100son-html-normalizer'
+								) }
+							</h3>
+							<table className="htmln-diff-modal__metrics-rules-table">
+								<tbody>
+									{ visibleRules.map( ( entry ) => {
+										const isDisabled =
+											localDisabledRules.has(
+												entry.rule_id
+											);
+										const isLast = isLastActiveRule(
+											entry.rule_id
+										);
+										return (
+											<tr
+												key={ entry.rule_id }
+												className={
+													isDisabled
+														? 'htmln-diff-modal__metrics-rules-row--disabled'
+														: undefined
+												}
+											>
+												<td className="htmln-diff-modal__metrics-rules-toggle">
+													<CheckboxControl
+														label=""
+														checked={ ! isDisabled }
+														disabled={ isLast }
+														onChange={ ( next ) =>
+															handleRuleToggle(
+																entry.rule_id,
+																next
+															)
+														}
+														__nextHasNoMarginBottom
+														aria-label={ sprintf(
+															// translators: %s = libellé de règle (ex. P2.1).
+															__(
+																'Activer ou désactiver la règle %s pour ce diff',
+																'100son-html-normalizer'
+															),
+															getRuleLabel(
+																entry.rule_id
+															)
 														) }
-													</th>
-													<td>
-														{ getRuleTooltip(
-															entry.rule_id
-														) }
-													</td>
-													<td
-														className="htmln-diff-modal__metrics-rules-occ"
-														title={ __(
-															'Occurrences',
-															'100son-html-normalizer'
-														) }
-													>
-														{ Number(
-															entry.occurrences
-														) || 0 }
-													</td>
-												</tr>
-											) ) }
-									</tbody>
-								</table>
-							</div>
-						) }
+														title={
+															isLast
+																? __(
+																		'Au moins une règle doit rester active.',
+																		'100son-html-normalizer'
+																  )
+																: undefined
+														}
+													/>
+												</td>
+												<th scope="row">
+													{ getRuleLabel(
+														entry.rule_id
+													) }
+												</th>
+												<td>
+													{ getRuleTooltip(
+														entry.rule_id
+													) }
+												</td>
+												<td
+													className="htmln-diff-modal__metrics-rules-occ"
+													title={ __(
+														'Occurrences',
+														'100son-html-normalizer'
+													) }
+												>
+													{ entry.occurrences }
+												</td>
+											</tr>
+										);
+									} ) }
+								</tbody>
+							</table>
+						</div>
+					) }
 				</div>
 
 				{ VIEW.CODE === view && (

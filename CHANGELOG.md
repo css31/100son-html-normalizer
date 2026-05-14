@@ -5,6 +5,38 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — désactivation locale par règle (checkboxes inline)
+
+L'utilisateur peut désormais cocher/décocher chaque règle individuellement depuis la table « Règles appliquées » de la modale Diff pour voir l'effet isolé d'une règle sur le diff de l'article courant — sans toucher à la sélection globale du SPA (qui s'applique à tous les articles).
+
+#### Comportement
+
+- **Nouvelle colonne checkbox** en 1ʳᵉ position de la table « Règles appliquées ». Cochée par défaut = règle active. Décocher relance immédiatement `POST /posts/{id}/diff` avec le sous-ensemble réduit → le diff (`html_before` vs `html_after`), les métriques et l'estimation de durée se mettent à jour.
+- **Re-Worker automatique** si le pinceau est actif : le hook `useDiffHighlighting` détecte le changement de `html_before`/`html_after` et relance le Worker. Sur les articles lourds (par ex. 6690), chaque toggle déclenche un nouveau calcul de ~60 s — l'utilisateur peut suivre via le chrono `N / 391 s` habituel.
+- **Garde-fou « au moins une règle »** : si l'utilisateur tente de décocher la dernière règle active, la checkbox correspondante est `disabled` avec tooltip natif. Empêche un payload `rule_ids: []` qui produirait un 400 backend.
+- **Ligne désactivée reste visible** : l'union `payload.applied_rules ∪ localDisabledRules` garantit qu'une règle qu'on vient de décocher reste affichée (même si ses occurrences passent à 0 dans la nouvelle cascade) — sinon l'utilisateur ne pourrait plus la recocher. Opacité 0.55 + transition douce comme indication visuelle.
+- **État éphémère** : `localDisabledRules` est un `useState(new Set())` jeté au unmount. Fermer/rouvrir la modale repart d'un état propre — pas de persistance, pas de bouton « Réinitialiser » (KISS).
+
+#### Architecture
+
+- **State** : `localDisabledRules: Set<string>` dans `DiffModal`.
+- **Dérivations** : `effectiveRuleIds` (useMemo, alimentant `fetchDiff`), `visibleRules` (useMemo, alimentant la table), `isLastActiveRule` (helper pour le garde-fou).
+- **Re-fetch** : `fetchDiff` est déjà un `useCallback` qui prend `[postId, effectiveRuleIds]` en deps ; le `useEffect` mount appelle `fetchDiff()` et se redéclenche naturellement quand `effectiveRuleIds` change. Pas de logique additionnelle.
+- **UI** : `CheckboxControl` de `@wordpress/components` (pattern verbatim de `RulesFilterDropdown`).
+- **Aucun changement backend** — `DiffController::compute_diff()` accepte déjà n'importe quel sous-ensemble de `rule_ids` (pas de cache, traitement indépendant).
+
+#### Cas limites traités
+
+- **Race condition Worker** : l'`useEffect` du hook `useDiffHighlighting` fait `terminate()` du Worker précédent quand `before`/`after` changent (pattern `requestIdRef` déjà en place). Pas de fuite.
+- **Disparition d'une règle de la cascade** : si P6 désactivé fait passer P9 à 0 occurrences, P9 disparaît de `payload.applied_rules`. Mais comme `P9 ∉ localDisabledRules`, il disparaît aussi de `visibleRules` — comportement attendu (P9 « n'a plus rien à faire » dans ce sous-ensemble).
+- **Modale ouverte depuis `RegressionModal`** : l'`initialPayload` court-circuite le fetch initial, donc le toggle ne déclenche actuellement pas de re-fetch dans ce contexte. Cas marginal — à adresser dans une itération ultérieure si besoin.
+
+#### Stats
+
+- 724 PHPUnit verts inchangés (aucun test PHP impacté).
+- Bundle `admin-spa.js` : 148 → ~149 KiB (≈ 50 lignes JS supplémentaires).
+- 0 lint:js.
+
 ### Fix — cascade du comptage `applied_rules` dans `DiffController`
 
 Le payload REST `/posts/{id}/diff` retourne un tableau `applied_rules` qui liste, par règle activée, son nombre d'occurrences applicables. Avant ce fix, chaque règle voyait son `countMatches()` appelé sur **le même `$html_before` brut** (le post_content original), parallèlement au pipeline d'`apply()` qui produisait `$html_after` en cascade. Conséquence : P6, P9, P10 comptaient des occurrences dans des structures que P4 (Pinterest, qui tourne plus tôt dans l'ordre canonique) allait supprimer en amont.
