@@ -25,6 +25,7 @@ import { Fragment } from '@wordpress/element';
 import { Spinner, Button } from '@wordpress/components';
 import BuilderBadge from './BuilderBadge';
 import PaginationBar from './PaginationBar';
+import { buildExternalUrl } from '../../utils/buildExternalUrl';
 import {
 	getRuleLabel,
 	getRuleTooltip,
@@ -162,35 +163,6 @@ function StatusBadge( { item } ) {
 			) }
 		</span>
 	);
-}
-
-/**
- * Compose une URL d'ouverture vers un site externe en gardant le path du
- * permalien courant (slug, structure de permaliens) et en remplaçant juste
- * le scheme + host.
- *
- * Pourquoi pas un simple concat `domain + slug` : la structure de permaliens
- * peut être `/%category%/%postname%/`, `/blog/%postname%/`, etc. On préserve
- * exactement le path du permalien local — il est censé être identique sur
- * Old et Prod (corpus migré, même config).
- *
- * Retourne `null` si l'un des deux ingrédients manque ou est invalide.
- *
- * @param {string} permalink Permalien local (peut être absolu ou vide).
- * @param {string} baseUrl   URL absolue configurée (sans slash final).
- * @return {?string} URL absolue cible, ou null si impossible à composer.
- */
-function buildExternalUrl( permalink, baseUrl ) {
-	if ( ! permalink || ! baseUrl ) {
-		return null;
-	}
-	try {
-		const src = new URL( permalink );
-		const dest = new URL( baseUrl );
-		return `${ dest.origin }${ src.pathname }${ src.search }${ src.hash }`;
-	} catch ( _err ) {
-		return null;
-	}
 }
 
 /**

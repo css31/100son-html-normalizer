@@ -1416,6 +1416,27 @@
 		margin: 0;
 	}
 
+	/* Rangée des boutons « Ouvrir sur Site 1 / Site 2 », placée juste sous
+	 * le résumé des pertes. Mêmes choix visuels que la cellule équivalente
+	 * du tableau Normaliser (`htmln-articles-table__open-on-cell` +
+	 * `__site-btn`) : flex horizontal compact, font-size réduite, sans
+	 * décoration. Classes dédiées modale pour ne pas coupler la modale au
+	 * styling de la table. */
+	.htmln-diff-modal__open-on {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.htmln-diff-modal__open-on-btn {
+		flex: 0 0 auto;
+		font-size: 11px;
+		padding: 2px 8px;
+		line-height: 1.6;
+		white-space: nowrap;
+		text-decoration: none;
+	}
+
 	/* Pousse le toggle « Code source / Rendu HTML » tout en bas de la
 	 * colonne aside pour qu'il s'aligne sur le bas du tableau métriques
 	 * adjacent. `margin-top: auto` consomme tout l'espace résiduel entre

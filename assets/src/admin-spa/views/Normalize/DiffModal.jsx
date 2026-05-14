@@ -47,6 +47,8 @@ import { useDiffHighlighting } from '../../hooks/useDiffHighlighting';
 import { useElapsedTime } from '../../hooks/useElapsedTime';
 import { countDiffTokens } from '../../utils/countDiffTokens';
 import { estimateDiffSeconds } from '../../utils/estimateDiffSeconds';
+import { buildExternalUrl } from '../../utils/buildExternalUrl';
+import { useExternalSites } from '../../hooks/useExternalSites';
 
 /**
  * Modes d'affichage de la modale.
@@ -177,6 +179,27 @@ export default function DiffModal( {
 	const activeRulesCount = ruleIds.length - localDisabledRules.size;
 	const isLastActiveRule = ( ruleId ) =>
 		activeRulesCount <= 1 && ! localDisabledRules.has( ruleId );
+
+	// Sites externes configurés dans les Réglages (Site 1 dev / Site 2 prod).
+	// Utilisés pour rendre les boutons « Ouvrir sur… » sous le résumé des
+	// pertes — pareil que dans le tableau Normaliser mais ici contextuel
+	// à la modale Diff (l'utilisateur peut comparer le diff côté serveur
+	// avec le rendu réel sur les autres environnements en un clic).
+	// `permalink` vient du payload REST (cf. `DiffController::compute_diff`).
+	const { sites: externalSites } = useExternalSites();
+	const externalUrls = useMemo( () => {
+		const permalink = payload?.permalink ?? '';
+		const oldEnabled = false !== ( externalSites?.old_enabled ?? true );
+		const prodEnabled = false !== ( externalSites?.prod_enabled ?? true );
+		return {
+			old: oldEnabled
+				? buildExternalUrl( permalink, externalSites?.old_url ?? '' )
+				: null,
+			prod: prodEnabled
+				? buildExternalUrl( permalink, externalSites?.prod_url ?? '' )
+				: null,
+		};
+	}, [ payload, externalSites ] );
 
 	const handleRuleToggle = useCallback( ( ruleId, enabled ) => {
 		setLocalDisabledRules( ( prev ) => {
@@ -493,6 +516,60 @@ export default function DiffModal( {
 								} }
 							/>
 
+							{ /* Boutons « Ouvrir sur… » — version contextuelle
+							     des boutons Site 1 (dev) / Site 2 (prod) du
+							     tableau Normaliser, placée sous le résumé des
+							     pertes pour permettre une comparaison rapide
+							     entre le diff serveur et le rendu réel sur
+							     les environnements externes. Le permalien
+							     vient du payload REST. Chaque bouton n'est
+							     rendu que si son toggle est activé en config
+							     ET que l'URL composable n'est pas null. */ }
+							{ ( externalUrls.old || externalUrls.prod ) && (
+								<div className="htmln-diff-modal__open-on">
+									{ externalUrls.old && (
+										<a
+											href={ externalUrls.old }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="button button-small htmln-diff-modal__open-on-btn"
+											title={ __(
+												'Ouvrir sur le Site 1 dev (nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ String(
+												externalSites?.old_label ?? ''
+											).trim() ||
+												__(
+													'Old',
+													'100son-html-normalizer'
+												) }
+										</a>
+									) }
+									{ externalUrls.prod && (
+										<a
+											href={ externalUrls.prod }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="button button-small htmln-diff-modal__open-on-btn"
+											title={ __(
+												'Ouvrir sur le Site 2 prod (nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ String(
+												externalSites?.prod_label ?? ''
+											).trim() ||
+												__(
+													'Prod',
+													'100son-html-normalizer'
+												) }
+										</a>
+									) }
+								</div>
+							) }
+
 							{ payload.unchanged && (
 								<div className="notice notice-info">
 									<p>
@@ -536,7 +613,12 @@ export default function DiffModal( {
 										}
 										showTooltip
 										className="htmln-diff-modal__diff-marks-toggle"
-									/>
+									>
+										{ __(
+											'Surligner',
+											'100son-html-normalizer'
+										) }
+									</Button>
 									{ /* Avertissement pré-clic : visible quand
 								     l'article est volumineux ET que le surlignage
 								     n'a pas encore été activé. */ }

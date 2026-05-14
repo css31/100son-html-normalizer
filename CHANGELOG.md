@@ -5,6 +5,25 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — boutons « Ouvrir sur Site 1 / Site 2 » + libellé « Surligner » sur le bouton pinceau
+
+#### Boutons « Ouvrir sur… » sous le résumé des pertes
+
+La modale Diff expose désormais, dans la colonne aside (sous le `MetricsDiffSummary` qui affiche les pertes éventuelles), la même paire de boutons compacts `[Old]` `[Prod]` qui existe dans le tableau Normaliser — permettant d'ouvrir l'article courant sur les domaines externes configurés en Réglages (Site 1 dev / Site 2 prod) directement depuis la modale, sans avoir à fermer pour aller cliquer dans la table.
+
+- **Backend** : ajout de `permalink` au payload `POST /htmln/v1/posts/{id}/diff` via `(string) get_permalink( $post_id )`. Doc PHPDoc mise à jour.
+- **Frontend** : import de `useExternalSites` dans `DiffModal`. Nouveau `useMemo` `externalUrls` qui calcule les hrefs Site 1 et Site 2 à partir de `payload.permalink` + config externe. Rendu de `<div class="htmln-diff-modal__open-on">` placé dans `__metrics-aside` juste après `MetricsDiffSummary`.
+- **Factorisation** : la fonction `buildExternalUrl(permalink, baseUrl)` était auparavant locale à `ArticlesTable.jsx`. Extraite dans un nouvel utilitaire partagé `assets/src/admin-spa/utils/buildExternalUrl.js`. `ArticlesTable.jsx` l'importe désormais — la modale Diff aussi. Pas de duplication.
+- **Conditionnel** : un bouton n'apparaît que si son toggle `enabled` est `true` en Réglages ET que l'URL composable n'est pas null (`buildExternalUrl` retourne null si l'un des ingrédients manque). Si les deux sites sont désactivés, toute la rangée disparaît.
+
+Classes CSS dédiées modale (`.htmln-diff-modal__open-on`, `.htmln-diff-modal__open-on-btn`) — mêmes choix visuels que les classes de la table (`.htmln-articles-table__open-on-cell`, `__site-btn`) mais découplées pour ne pas coupler la modale au styling de la table.
+
+#### Libellé « Surligner » sur le bouton pinceau
+
+Le bouton pinceau de la rangée du haut de la toolbar (modale Diff) affichait jusqu'ici uniquement son icône. Il porte désormais le libellé `Surligner` à droite de l'icône — l'utilisateur identifie immédiatement la fonction sans passer par le tooltip. Tooltip et aria-label inchangés (le libellé textuel suffit, le tooltip riche reste utile pour expliquer l'effet exact).
+
+Implémentation : ajout des children `{ __('Surligner', '100son-html-normalizer') }` sur le `<Button icon={brush}>`. Le composant WP gère l'alignement icône+texte nativement.
+
 ### Modale Diff — désactivation locale par règle (checkboxes inline)
 
 L'utilisateur peut désormais cocher/décocher chaque règle individuellement depuis la table « Règles appliquées » de la modale Diff pour voir l'effet isolé d'une règle sur le diff de l'article courant — sans toucher à la sélection globale du SPA (qui s'applique à tous les articles).

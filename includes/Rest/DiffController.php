@@ -73,7 +73,7 @@ final class DiffController extends BaseController {
 	 * l'application des `rule_ids` sur cet article, sans écrire.
 	 *
 	 * Body : `{ rule_ids: list<string> }`.
-	 * Réponse 200 : `{ html_before, html_after, metrics_before, metrics_after, warnings, unchanged, post_date, categories, builder_type, has_fossil_panels_data, applied_rules }`.
+	 * Réponse 200 : `{ html_before, html_after, metrics_before, metrics_after, warnings, unchanged, post_date, categories, builder_type, has_fossil_panels_data, applied_rules, permalink }`.
 	 * Réponse 400 si `rule_ids` vide.
 	 * Réponse 404 si article inconnu.
 	 *
@@ -203,6 +203,12 @@ final class DiffController extends BaseController {
 			'builder_type'            => $builder_type,
 			'has_fossil_panels_data'  => $this->has_fossil_panels_data( $post_id, $builder_type ),
 			'applied_rules'           => $applied_rules,
+			// Permalien absolu de l'article — exposé pour permettre à la SPA
+			// de composer les URL « Ouvrir sur Site 1 / Site 2 » via
+			// `buildExternalUrl(permalink, externalSites.{old,prod}_url)`.
+			// `get_permalink()` retourne false sur erreur (jamais en pratique
+			// vu qu'on a déjà vérifié `$post` en amont), on caste en string vide.
+			'permalink'               => (string) get_permalink( $post_id ),
 		) );
 	}
 
