@@ -6,8 +6,11 @@
  *   - Statut (badge coloré + drapeau stale)
  *   - Règles applicables (liste compacte des `rule_id`)
  *   - Violations (somme des occurrences des règles applicables)
- *   - Mots (issu de `metrics.words`)
  *   - Dernier diagnostic (date relative)
+ *
+ * Note : la métrique `words` n'est pas exposée ici — elle reste accessible
+ * dans la modale Diff (`MetricsDiffBar`) où la comparaison avant/après a
+ * du sens. Inutile de la dupliquer dans une colonne du tableau.
  *
  * Pagination simple : précédent / suivant + indicateur « page X / Y ».
  * Le composant est purement présentation — la vue parente fournit les
@@ -356,9 +359,6 @@ export default function ArticlesTable( {
 							{ __( 'Occur.', '100son-html-normalizer' ) }
 						</th>
 						<th scope="col" className="manage-column">
-							{ __( 'Mots', '100son-html-normalizer' ) }
-						</th>
-						<th scope="col" className="manage-column">
 							{ __(
 								'Dernier diagnostic',
 								'100son-html-normalizer'
@@ -473,12 +473,6 @@ export default function ArticlesTable( {
 							</td>
 							<td>{ renderRuleIds( item.matching_rules ) }</td>
 							<td>{ sumViolations( item.matching_rules ) }</td>
-							<td>
-								{ item.metrics &&
-								Number.isFinite( item.metrics.words )
-									? item.metrics.words
-									: '—' }
-							</td>
 							<td>
 								<time
 									dateTime={ String(

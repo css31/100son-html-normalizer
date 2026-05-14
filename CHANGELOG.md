@@ -5,6 +5,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Normaliser — retrait de la colonne « Mots » du tableau
+
+La métrique `metrics.words` (calculée par `MetricsCalculator::compute()` sur le `textContent` du `post_content`) n'est plus affichée dans le tableau Normaliser. La colonne « Mots » est retirée du `<thead>` et du `<tbody>` de `ArticlesTable`. Le commentaire JSDoc en tête du composant est mis à jour pour préciser que `words` reste exposée dans la modale Diff (`MetricsDiffBar`) où la comparaison avant/après a du sens — pas la peine de la dupliquer dans une vue de liste où elle n'apportait pas de signal d'action.
+
+Aucun impact sur le backend : `metrics.words` continue d'être calculée et renvoyée dans le payload REST des diagnostics — uniquement le rendu du tableau change.
+
 ### Réglages — section Domaines externes : titres génériques, description, simplifications
 
 - Renommage des fieldsets : **« Ancien site (« Old ») » → « Site 1 (dev) »** et **« Site de production (« Prod ») » → « Site 2 (prod) »** — titres génériques qui collent mieux à l'usage (les deux boutons sont configurables librement pour pointer vers n'importe quel environnement). Les clés internes côté backend (`old_url`, `prod_url`, etc.) restent inchangées pour ne pas migrer l'option BDD.
