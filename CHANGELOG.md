@@ -5,6 +5,71 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Modale Diff — refonte du surlignage (Web Worker + Prism+marks fusionnés + chronomètre)
+
+Refonte complète de la vue « Code source » de la modale Diff pour résoudre un freeze observé sur l'article #16020 (~28k chars de SiteOrigin avec `data-style='{"…":…}'` partout) où `diffWordsWithSpace` bloquait le main thread environ une minute — Firefox affichait alors « Stop script » et la modale ne s'affichait jamais.
+
+#### 1. Calcul du surlignage déporté dans un Web Worker dédié
+
+Nouveau fichier `assets/src/admin-spa/workers/diffWorker.js` + hook `hooks/useDiffHighlighting.js`. Le worker reçoit `{ id, before, after }`, exécute `diffWordsWithSpace` + Prism (cf. point 2), et retourne `{ removedHtml, addedHtml }`. Le hook gère cycle de vie (terminate à l'unmount, race-condition via `requestIdRef` quand l'utilisateur change rapidement d'article). Le main thread reste 100 % réactif pendant tout le calcul — modale scrollable, fermable, chrono qui tick.
+
+L'event natif `error` du Worker est **logué** mais **n'updates plus l'état UI** : observé que Prism émet des warnings non fatals à l'init en contexte worker, qui s'affichaient à tort comme « Le calcul a échoué » avant que le résultat n'arrive. Seul un message `{ ok: false, error }` émis explicitement par notre propre `try/catch` worker signale désormais une vraie erreur.
+
+#### 2. Coloration syntaxique Prism + surlignage diff **simultanés**
+
+Auparavant le toggle pinceau était binaire : Prism OU marks, jamais les deux. Le commentaire historique dans `highlightHtmlWithDiff.js` qualifiait la fusion de « gros refactor » à cause du nesting HTML (un `<mark>` ne doit pas enjamber un `<span>` Prism, sinon HTML invalide).
+
+Nouveau module `workers/mergePrismAndDiff.js` qui implémente la fusion proprement :
+1. Prism est appliqué une seule fois sur la chaîne complète → produit le HTML coloré classique.
+2. La sortie Prism est parsée token-par-token (balise vs run de texte) avec la regex `/(<[^>]+>)|([^<]+)/g`.
+3. Les `<mark>` sont insérés aux frontières des fragments diffés. À chaque traversée de balise Prism, le `<mark>` ouvert est fermé avant et rouvert après — garantit du HTML valide.
+4. Les entités HTML (`&lt;`, `&gt;`, `&amp;`, `&quot;`) sont reconnues comme **1 caractère source** chacune mais émises telles quelles, pour conserver octet-pour-octet la sortie Prism.
+
+Le CSS était déjà prêt (commentaire prophétique `color: inherit` sur les `<mark>` « pour que les tokens Prism imbriqués conservent leur teinte »). Les couleurs Prism (vert pour `attr-value`, violet pour `attr-name`, bleu pour `tag`) restent visibles sous le fond jaune/vert clair des marks.
+
+Le worker embarque Prism et ses langages (`prism-markup`) via `import` ; `self.Prism.disableWorkerMessageHandler = true` est posé **avant** l'import pour empêcher Prism d'attacher son propre handler `message` qui entrerait en conflit avec le nôtre. Bundle worker passe de 16 KiB à ~40 KiB (le main bundle reste à 145 KiB — Prism déjà présent, dédupliqué par webpack).
+
+Fallback si la fusion plante : `try/catch` côté worker qui retombe sur l'ancien comportement (texte échappé + marks sans Prism). Garantit que la modale reste utilisable même sur un cas exotique non encore observé.
+
+#### 3. Toggle pinceau **désactivé par défaut**, opt-in explicite
+
+Sur les articles SiteOrigin lourds, même avec le Web Worker, le calcul peut prendre 60 s — pas la peine d'imposer l'attente sans le consentement de l'utilisateur. La modale ouvre maintenant en mode « Prism seul » (instantané). Un avertissement orange `⚠ Surlignage estimé : ~N s sur cet article.` s'affiche à côté du bouton pinceau pour les articles où l'estimation dépasse 5 s — l'utilisateur clique en connaissance de cause.
+
+#### 4. Chronomètre + estimation token-based
+
+Nouveau hook `hooks/useElapsedTime.js` qui chronomètre une opération asynchrone arbitraire (1 Hz). Pendant le calcul du worker, la toolbar affiche `⏳ Calcul du surlignage en cours… 12 / 391 s` (elapsed/estimated). À la fin : `✓ Surlignage calculé en 47 s` (persistant jusqu'au prochain calcul, utile pour comparer les articles).
+
+L'estimation vient de `utils/estimateDiffSeconds.js`, calibré empiriquement sur 3 articles du corpus MMM-2 :
+
+| Article | (N+M) | occ | D ≈ 60×occ | t prédit | t mesuré |
+|---|---:|---:|---:|---:|---:|
+| 374 | 12 326 | 76 | 4 560 | 8 s | 7 s |
+| 16020 | 16 959 | 92 | 5 520 | 75 s | 65 s |
+| 6690 | 23 287 | 233 | 13 980 | 391 s | >360 s |
+
+Le coût per-op `c` varie d'un facteur ~16 entre petit et gros article (cause probable : GC pressure + JIT au-delà de seuils d'array dans jsdiff), modélisé par une fonction par paliers : 1,5×10⁻⁷ / 8×10⁻⁷ / 1,2×10⁻⁶.
+
+Tokens estimés via `utils/countDiffTokens.js` qui mime exactement le tokenizer de `diffWordsWithSpace` (regex `(\s+|[()[\]{}'"]|\b)` + filtre des vides). Coût O(N), ~5 ms sur 28k chars — négligeable.
+
+#### 5. Garde-fous taille pour `highlightHtml` (Prism direct, hors worker)
+
+Quand le toggle pinceau est OFF, Prism colore directement le code dans `HighlightedCode`. Pour les articles très volumineux (> 80 000 chars), même Prism peut prendre quelques secondes — nouveau seuil `PRISM_MAX_CHARS = 80000` exporté par `utils/highlightHtml.js`. Au-delà, fallback `escapeHtml` (texte brut échappé, instantané) + Notice qui prévient l'utilisateur.
+
+Mutualisation de l'échappement HTML dans un nouvel utilitaire `utils/escapeHtml.js` (réutilisé par les voies sync et worker).
+
+#### 6. Layout toolbar et tableau Règles réorganisés
+
+- **Toolbar 2 rangées** : la rangée du haut groupe pinceau + avertissement + chrono ; la rangée du bas regroupe Code source / Rendu HTML + verrou de défilement. Séparation sémantique qui aère l'UI quand le statut du calcul est visible.
+- **Tableau « Règles appliquées »** sorti des 3 colonnes flexes et placé dans une grille 1fr/1fr (identique à `__pane-cols`) — son bord gauche s'aligne désormais sur le bord gauche du pane « Après » en dessous. `align-items: start` le colle en haut.
+- **Tableau métriques enrichi** : nouvelle ligne `HTML brut (caractères)` (= `html_before.length + html_after.length`, utile pour le diagnostic des temps de calcul). Le label « Listes » devient « Listes (ul/ol/li) » pour clarifier que c'est un agrégat de containers + items (perte « Listes : +4 » sur 1 `<ul>` à 3 items = 1 + 3 = 4, prêtait à confusion).
+- **Tableau Règles appliquées** : nouvelle colonne « Occurrences » (alignée à droite, monospace `tabular-nums`, séparateur vertical) — affiche le nombre exact de matches de chaque règle (P4 : 86, P6 : 14, etc.).
+
+#### Stats build
+
+- 715 → 724 PHPUnit verts (1577 assertions, suite inchangée — aucun test JS à toucher, le SPA n'en a pas).
+- Bundle `admin-spa.js` : 142 → 148 KiB. Bundle worker : 16 KiB → 41 KiB (3.8 + 37 — chunks séparés chargés via `importScripts`). Total compressé négligeable.
+- 0 lint:js, 22 PHPStan baseline (1 de moins après cleanup d'une dépendance morte dans `DiffController`).
+
 ### Normaliser — retrait de la colonne « Mots » du tableau
 
 La métrique `metrics.words` (calculée par `MetricsCalculator::compute()` sur le `textContent` du `post_content`) n'est plus affichée dans le tableau Normaliser. La colonne « Mots » est retirée du `<thead>` et du `<tbody>` de `ArticlesTable`. Le commentaire JSDoc en tête du composant est mis à jour pour préciser que `words` reste exposée dans la modale Diff (`MetricsDiffBar`) où la comparaison avant/après a du sens — pas la peine de la dupliquer dans une vue de liste où elle n'apportait pas de signal d'action.

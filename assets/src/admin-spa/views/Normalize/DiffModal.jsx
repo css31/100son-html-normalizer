@@ -23,7 +23,13 @@
  */
 
 import { __, sprintf } from '@wordpress/i18n';
-import { useEffect, useState, useCallback, useRef } from '@wordpress/element';
+import {
+	useEffect,
+	useState,
+	useCallback,
+	useRef,
+	useMemo,
+} from '@wordpress/element';
 import { Modal, Button, Spinner } from '@wordpress/components';
 import { lock, unlock, brush } from '@wordpress/icons';
 import * as api from '../../api';
@@ -36,6 +42,11 @@ import {
 import { MetricsDiffSummary, MetricsDiffTable } from './MetricsDiffBar';
 import BuilderBadge from './BuilderBadge';
 import HighlightedCode from './HighlightedCode';
+import { PRISM_MAX_CHARS } from '../../utils/highlightHtml';
+import { useDiffHighlighting } from '../../hooks/useDiffHighlighting';
+import { useElapsedTime } from '../../hooks/useElapsedTime';
+import { countDiffTokens } from '../../utils/countDiffTokens';
+import { estimateDiffSeconds } from '../../utils/estimateDiffSeconds';
 
 /**
  * Modes d'affichage de la modale.
@@ -121,13 +132,97 @@ export default function DiffModal( {
 	const [ scrollSync, setScrollSync ] = useState( true );
 
 	// Toggle « surlignage stabylo » des suppressions/ajouts dans la vue
-	// Code source. **Activé par défaut** — c'est la valeur ajoutée centrale
-	// de la modale Diff. Sous le capot, quand le toggle est ON,
-	// `highlightHtmlWithDiff` produit du texte brut HTML-escaped + `<mark>`
-	// (sans Prism). Quand le toggle est OFF, le chemin standard `highlightHtml`
-	// applique Prism pour coloriser les tokens. L'utilisateur bascule selon
-	// son besoin : lecture du diff (toggle ON) vs lecture du code (toggle OFF).
-	const [ showDiffMarks, setShowDiffMarks ] = useState( true );
+	// Code source. **Désactivé par défaut** — sur les articles SiteOrigin
+	// les plus lourds, le calcul `diffWordsWithSpace` (Myers) peut prendre
+	// jusqu'à une minute même déporté dans un Web Worker (cf. test sur
+	// l'article #16020 du corpus MMM-2). En partant OFF, la modale ouvre
+	// systématiquement avec une coloration Prism instantanée ; l'utilisateur
+	// active explicitement le surlignage quand il en a besoin, et un
+	// avertissement avec l'estimation du temps de calcul (cf.
+	// `utils/estimateDiffSeconds.js`) s'affiche à côté du bouton pinceau
+	// quand cette estimation dépasse 5 s.
+	//
+	// Sous le capot : toggle ON → `useDiffHighlighting` (Web Worker async),
+	// qui produit du HTML **combinant** coloration Prism et `<mark>` diff
+	// (les deux visibles simultanément, cf. `workers/mergePrismAndDiff.js`).
+	// Toggle OFF → `highlightHtml` (Prism seul, ou escape brut au-dessus
+	// de `PRISM_MAX_CHARS`).
+	const [ showDiffMarks, setShowDiffMarks ] = useState( false );
+
+	// Comptage des tokens et estimation de la durée du calcul de
+	// surlignage. Les tokens sont utilisés à la fois comme prédicteur
+	// du temps (cf. `utils/estimateDiffSeconds.js`) et comme row dans
+	// le tableau métriques (informatif pour l'utilisateur). Mémoïsé sur
+	// `payload` pour ne pas re-tokeniser à chaque render — coût O(N)
+	// d'environ 5 ms par côté sur 28k chars.
+	const tokenCounts = useMemo( () => {
+		if ( ! payload ) {
+			return { before: 0, after: 0 };
+		}
+		return {
+			before: countDiffTokens( payload.html_before ),
+			after: countDiffTokens( payload.html_after ),
+		};
+	}, [ payload ] );
+
+	// Total des occurrences de règles applicables sur cet article —
+	// sert au modèle de prédiction du temps de calcul. La mesure
+	// empirique sur le corpus MMM-2 montre que la distance d'édition
+	// Myers est très bien corrélée à ce total (`D ≈ 60 × occurrences`,
+	// ±14 % sur 374, 16020, 6690 — cf. JSDoc d'`estimateDiffSeconds`).
+	// `applied_rules` est null/absent si rien à appliquer → 0.
+	const totalOccurrences = useMemo( () => {
+		if ( ! payload || ! Array.isArray( payload.applied_rules ) ) {
+			return 0;
+		}
+		return payload.applied_rules.reduce(
+			( sum, entry ) => sum + ( Number( entry?.occurrences ) || 0 ),
+			0
+		);
+	}, [ payload ] );
+
+	// Estimation du temps de calcul du Web Worker en secondes, basée
+	// sur la formule `c × (N+M) × D` où `D ≈ 60 × occurrences` et `c`
+	// dépend du régime de taille (cf. JSDoc d'`estimateDiffSeconds`).
+	// Sert à :
+	//  1. Décider si on affiche l'avertissement « surlignage long »
+	//     à côté du bouton pinceau (seuil 5 s en dessous duquel
+	//     l'attente est imperceptible).
+	//  2. Personnaliser le texte de l'avertissement avec la valeur
+	//     estimée concrète au lieu d'une fourchette générique.
+	const estimatedDiffSeconds = estimateDiffSeconds(
+		tokenCounts.before + tokenCounts.after,
+		totalOccurrences
+	);
+	const isLongDiffExpected = estimatedDiffSeconds >= 5;
+
+	// On déporte **systématiquement** le calcul du surlignage dans le
+	// Web Worker dès que le toggle est ON, peu importe la taille de
+	// l'article. Sur des articles moyens (cf. #374, ~5 500 tokens),
+	// la voie sync `diffWordsWithSpace` peut freezer ~7 s — inacceptable
+	// même sur un article moyen. Le surcoût d'instancier un Worker
+	// (~50 ms de startup + bundle déjà en cache après le premier usage)
+	// est invisible à côté de cette latence. Le hook ne fait rien tant
+	// que `enabled` est `false`.
+	const workerEnabled = Boolean( payload ) && showDiffMarks;
+	const {
+		removedHtml: workerRemovedHtml,
+		addedHtml: workerAddedHtml,
+		isComputing: workerComputing,
+		error: workerError,
+	} = useDiffHighlighting(
+		payload?.html_before ?? '',
+		payload?.html_after ?? '',
+		workerEnabled
+	);
+
+	// Chronomètre purement informatif : compte les secondes pendant le
+	// calcul du worker, et fige la durée totale dans `lastDurationSeconds`
+	// quand le calcul se termine. Affiché à côté du spinner / message
+	// « calcul terminé » dans la toolbar (cf. plus bas, bloc __worker-status).
+	const { elapsedSeconds, lastDurationSeconds } =
+		useElapsedTime( workerComputing );
+
 	const beforeScrollerRef = useRef( null );
 	const afterScrollerRef = useRef( null );
 	// Drapeau anti-boucle : `el.scrollTop = X` re-déclenche un événement
@@ -283,100 +378,244 @@ export default function DiffModal( {
 				     reprendre la formulation de la demande). Sur écran étroit,
 				     `flex-wrap` rebascule en empilement vertical. */ }
 				<div className="htmln-diff-modal__metrics-row">
-					<MetricsDiffTable
-						before={ payload.metrics_before }
-						after={ payload.metrics_after }
-					/>
+					{ /* Colonne 1 (gauche) : tableau métriques + résumé +
+					     boutons. Wrapper flex pour conserver le comportement
+					     d'origine (table à gauche, aside à droite, wrap si
+					     écran étroit). Occupe naturellement la 1ʳᵉ cellule
+					     de la grille parente 1fr/1fr.
 
-					<div className="htmln-diff-modal__metrics-aside">
-						<MetricsDiffSummary
-							before={ payload.metrics_before }
-							after={ payload.metrics_after }
+					     On enrichit les snapshots avec `html_chars` (longueur
+					     brute en caractères des deux chaînes HTML) pour
+					     ajouter une row supplémentaire au tableau métriques.
+					     Calcul O(1) (le `.length` JS est caché par le moteur)
+					     — aucun impact perceptible sur le rendu. Cette clé
+					     n'existe que dans le contexte `DiffModal` ; pour
+					     `RegressionModal` qui n'a pas accès aux chaînes brutes,
+					     elle reste absente et `computeRows` filtre la row. */ }
+					<div className="htmln-diff-modal__metrics-row-left">
+						<MetricsDiffTable
+							before={ {
+								...payload.metrics_before,
+								html_chars: payload.html_before.length,
+							} }
+							after={ {
+								...payload.metrics_after,
+								html_chars: payload.html_after.length,
+							} }
 						/>
 
-						{ payload.unchanged && (
-							<div className="notice notice-info">
-								<p>
-									{ __(
-										'Aucun changement : les règles cochées ne modifient pas cet article.',
-										'100son-html-normalizer'
-									) }
-								</p>
-							</div>
-						) }
-
-						<div className="htmln-diff-modal__view-toggle">
-							<Button
-								variant={
-									VIEW.CODE === view ? 'primary' : 'secondary'
-								}
-								onClick={ () => setView( VIEW.CODE ) }
-							>
-								{ __(
-									'Code source',
-									'100son-html-normalizer'
-								) }
-							</Button>{ ' ' }
-							<Button
-								variant={
-									VIEW.RENDER === view
-										? 'primary'
-										: 'secondary'
-								}
-								onClick={ () => setView( VIEW.RENDER ) }
-							>
-								{ __( 'Rendu HTML', '100son-html-normalizer' ) }
-							</Button>{ ' ' }
-							<Button
-								icon={ scrollSync ? lock : unlock }
-								variant={ scrollSync ? 'primary' : 'secondary' }
-								onClick={ () =>
-									setScrollSync( ( prev ) => ! prev )
-								}
-								label={
-									scrollSync
-										? __(
-												'Verrou de défilement activé — cliquer pour libérer les deux panneaux',
-												'100son-html-normalizer'
-										  )
-										: __(
-												'Verrouiller le défilement vertical des deux panneaux',
-												'100son-html-normalizer'
-										  )
-								}
-								showTooltip
-								className="htmln-diff-modal__scroll-lock"
-							/>{ ' ' }
-							<Button
-								icon={ brush }
-								variant={
-									showDiffMarks ? 'primary' : 'secondary'
-								}
-								onClick={ () =>
-									setShowDiffMarks( ( prev ) => ! prev )
-								}
-								label={
-									showDiffMarks
-										? __(
-												'Surlignage des suppressions/ajouts activé — cliquer pour désactiver',
-												'100son-html-normalizer'
-										  )
-										: __(
-												'Surligner les suppressions (jaune) et les ajouts (vert) dans la vue code source',
-												'100son-html-normalizer'
-										  )
-								}
-								showTooltip
-								className="htmln-diff-modal__diff-marks-toggle"
+						<div className="htmln-diff-modal__metrics-aside">
+							<MetricsDiffSummary
+								before={ {
+									...payload.metrics_before,
+									html_chars: payload.html_before.length,
+								} }
+								after={ {
+									...payload.metrics_after,
+									html_chars: payload.html_after.length,
+								} }
 							/>
+
+							{ payload.unchanged && (
+								<div className="notice notice-info">
+									<p>
+										{ __(
+											'Aucun changement : les règles cochées ne modifient pas cet article.',
+											'100son-html-normalizer'
+										) }
+									</p>
+								</div>
+							) }
+
+							<div className="htmln-diff-modal__view-toggle">
+								{ /* Rangée 1 (au-dessus) : contrôles du surlignage
+							     diff — bouton pinceau + avertissement pré-clic
+							     pour les articles longs + chrono pendant le
+							     calcul + message « calculé en N s » après.
+							     Tous sémantiquement liés au calcul. */ }
+								<div className="htmln-diff-modal__view-toggle-row">
+									<Button
+										icon={ brush }
+										variant={
+											showDiffMarks
+												? 'primary'
+												: 'secondary'
+										}
+										onClick={ () =>
+											setShowDiffMarks(
+												( prev ) => ! prev
+											)
+										}
+										label={
+											showDiffMarks
+												? __(
+														'Surlignage activé (avec coloration syntaxique conservée) — cliquer pour désactiver',
+														'100son-html-normalizer'
+												  )
+												: __(
+														'Surligner les suppressions (jaune) et les ajouts (vert) par-dessus la coloration syntaxique',
+														'100son-html-normalizer'
+												  )
+										}
+										showTooltip
+										className="htmln-diff-modal__diff-marks-toggle"
+									/>
+									{ /* Avertissement pré-clic : visible quand
+								     l'article est volumineux ET que le surlignage
+								     n'a pas encore été activé. */ }
+									{ payload &&
+										isLongDiffExpected &&
+										! showDiffMarks && (
+											<span
+												className="htmln-diff-modal__worker-status htmln-diff-modal__worker-status--warning"
+												role="note"
+											>
+												<span aria-hidden="true">
+													⚠
+												</span>
+												<span className="htmln-diff-modal__worker-status-label">
+													{ sprintf(
+														// translators: %d = secondes estimées pour le calcul du surlignage.
+														__(
+															'Surlignage estimé : ~%d s sur cet article.',
+															'100son-html-normalizer'
+														),
+														Math.round(
+															estimatedDiffSeconds
+														)
+													) }
+												</span>
+											</span>
+										) }
+									{ /* Calcul Worker en cours : spinner + chrono /
+									     estimation. Affiche `elapsed / estimated s`
+									     pour donner un repère de progression à
+									     l'utilisateur pendant que le worker tourne.
+									     Si l'estimation est nulle (article sans
+									     règle applicable), on retombe sur le chrono
+									     seul (cas pratique très rare puisque le
+									     toggle pinceau ne déclenche un calcul que
+									     s'il y a quelque chose à montrer). */ }
+									{ workerComputing && (
+										<span
+											className="htmln-diff-modal__worker-status"
+											role="status"
+											aria-live="polite"
+										>
+											<Spinner />
+											<span className="htmln-diff-modal__worker-status-label">
+												{ estimatedDiffSeconds > 0
+													? sprintf(
+															// translators: 1 = secondes écoulées, 2 = secondes estimées au total.
+															__(
+																'Calcul du surlignage en cours… %1$d / %2$d s',
+																'100son-html-normalizer'
+															),
+															elapsedSeconds,
+															Math.round(
+																estimatedDiffSeconds
+															)
+													  )
+													: sprintf(
+															// translators: %d = secondes écoulées depuis le début du calcul.
+															__(
+																'Calcul du surlignage en cours… %d s',
+																'100son-html-normalizer'
+															),
+															elapsedSeconds
+													  ) }
+											</span>
+										</span>
+									) }
+									{ /* Calcul terminé : ✓ + durée totale, persistant. */ }
+									{ ! workerComputing &&
+										null !== lastDurationSeconds &&
+										null !== workerRemovedHtml && (
+											<span
+												className="htmln-diff-modal__worker-status htmln-diff-modal__worker-status--done"
+												role="status"
+											>
+												<span aria-hidden="true">
+													✓
+												</span>
+												<span className="htmln-diff-modal__worker-status-label">
+													{ sprintf(
+														// translators: %d = durée totale du calcul en secondes.
+														__(
+															'Surlignage calculé en %d s',
+															'100son-html-normalizer'
+														),
+														lastDurationSeconds
+													) }
+												</span>
+											</span>
+										) }
+								</div>
+								{ /* Rangée 2 (en dessous) : contrôles de vue —
+							     Code source / Rendu HTML + verrou de scroll. */ }
+								<div className="htmln-diff-modal__view-toggle-row">
+									<Button
+										variant={
+											VIEW.CODE === view
+												? 'primary'
+												: 'secondary'
+										}
+										onClick={ () => setView( VIEW.CODE ) }
+									>
+										{ __(
+											'Code source',
+											'100son-html-normalizer'
+										) }
+									</Button>{ ' ' }
+									<Button
+										variant={
+											VIEW.RENDER === view
+												? 'primary'
+												: 'secondary'
+										}
+										onClick={ () => setView( VIEW.RENDER ) }
+									>
+										{ __(
+											'Rendu HTML',
+											'100son-html-normalizer'
+										) }
+									</Button>{ ' ' }
+									<Button
+										icon={ scrollSync ? lock : unlock }
+										variant={
+											scrollSync ? 'primary' : 'secondary'
+										}
+										onClick={ () =>
+											setScrollSync( ( prev ) => ! prev )
+										}
+										label={
+											scrollSync
+												? __(
+														'Verrou de défilement activé — cliquer pour libérer les deux panneaux',
+														'100son-html-normalizer'
+												  )
+												: __(
+														'Verrouiller le défilement vertical des deux panneaux',
+														'100son-html-normalizer'
+												  )
+										}
+										showTooltip
+										className="htmln-diff-modal__scroll-lock"
+									/>
+								</div>
+							</div>
 						</div>
 					</div>
 
-					{ /* 3e colonne — tableau des règles qui ont effectivement
-					     matché sur `html_before` (countMatches > 0). Filtré
-					     côté serveur via `applied_rules` du payload pour ne
-					     pas charger inutilement le client. Trié par ordre
-					     d'affichage UI (P1.1, P1.2, P2.1, P2.2, P3…). */ }
+					{ /* Colonne 2 (droite) : tableau « Règles appliquées »
+					     — liste les `applied_rules` du payload (rule_id
+					     dont countMatches > 0). Placé en 2ᵉ enfant de la
+					     grille parente `__metrics-row` (1fr/1fr identique
+					     à `__pane-cols` en dessous), donc son bord gauche
+					     s'aligne précisément sur celui du pane « Après ».
+					     `align-items: start` sur la grille parente le
+					     colle en haut. Trié par ordre d'affichage UI
+					     (P1.1, P1.2, P2.1, P2.2, P3…). */ }
 					{ Array.isArray( payload.applied_rules ) &&
 						payload.applied_rules.length > 0 && (
 							<div className="htmln-diff-modal__metrics-rules">
@@ -407,6 +646,17 @@ export default function DiffModal( {
 															entry.rule_id
 														) }
 													</td>
+													<td
+														className="htmln-diff-modal__metrics-rules-occ"
+														title={ __(
+															'Occurrences',
+															'100son-html-normalizer'
+														) }
+													>
+														{ Number(
+															entry.occurrences
+														) || 0 }
+													</td>
 												</tr>
 											) ) }
 									</tbody>
@@ -417,33 +667,76 @@ export default function DiffModal( {
 
 				{ VIEW.CODE === view && (
 					<div className="htmln-diff-modal__pane htmln-diff-modal__pane--code">
-						<div className="htmln-diff-modal__col htmln-diff-modal__col--before">
-							<h3 className="htmln-diff-modal__col-title">
-								{ __( 'Avant', '100son-html-normalizer' ) }
-							</h3>
-							<HighlightedCode
-								ref={ beforeScrollerRef }
-								onScroll={ handleBeforeScroll }
-								code={ payload.html_before }
-								diffAgainst={
-									showDiffMarks ? payload.html_after : null
-								}
-								diffMode="removed"
-							/>
-						</div>
-						<div className="htmln-diff-modal__col htmln-diff-modal__col--after">
-							<h3 className="htmln-diff-modal__col-title">
-								{ __( 'Après', '100son-html-normalizer' ) }
-							</h3>
-							<HighlightedCode
-								ref={ afterScrollerRef }
-								onScroll={ handleAfterScroll }
-								code={ payload.html_after }
-								diffAgainst={
-									showDiffMarks ? payload.html_before : null
-								}
-								diffMode="added"
-							/>
+						{ /* Bandeau d'info pour les articles volumineux. Trois
+						     cas possibles :
+						       - workerError : le Worker n'a pas pu démarrer
+						         ou a planté → on tombe sur le fallback
+						         « texte brut sans marks », et on prévient ;
+						       - workerComputing : déjà signalé via le
+						         spinner dans la toolbar, pas de Notice ici
+						         pour ne pas alourdir ;
+						       - !showDiffMarks + html > PRISM_MAX_CHARS :
+						         Prism désactivé pour cause de taille. */ }
+						{ workerEnabled && workerError && (
+							<div className="notice notice-warning">
+								<p>
+									{ __(
+										'Le calcul du surlignage a échoué. Le contenu est affiché sans marques. Détail technique :',
+										'100son-html-normalizer'
+									) }{ ' ' }
+									<code>{ String( workerError ) }</code>
+								</p>
+							</div>
+						) }
+						{ ! showDiffMarks &&
+							Math.max(
+								payload.html_before.length,
+								payload.html_after.length
+							) > PRISM_MAX_CHARS && (
+								<div className="notice notice-info">
+									<p>
+										{ __(
+											'Article volumineux : la coloration syntaxique est désactivée pour préserver la réactivité du navigateur. Le contenu reste affiché en texte brut.',
+											'100son-html-normalizer'
+										) }
+									</p>
+								</div>
+							) }
+						<div className="htmln-diff-modal__pane-cols">
+							<div className="htmln-diff-modal__col htmln-diff-modal__col--before">
+								<h3 className="htmln-diff-modal__col-title">
+									{ __( 'Avant', '100son-html-normalizer' ) }
+								</h3>
+								<HighlightedCode
+									ref={ beforeScrollerRef }
+									onScroll={ handleBeforeScroll }
+									code={ payload.html_before }
+									diffMode="removed"
+									precomputedHtml={
+										workerEnabled &&
+										'string' === typeof workerRemovedHtml
+											? workerRemovedHtml
+											: null
+									}
+								/>
+							</div>
+							<div className="htmln-diff-modal__col htmln-diff-modal__col--after">
+								<h3 className="htmln-diff-modal__col-title">
+									{ __( 'Après', '100son-html-normalizer' ) }
+								</h3>
+								<HighlightedCode
+									ref={ afterScrollerRef }
+									onScroll={ handleAfterScroll }
+									code={ payload.html_after }
+									diffMode="added"
+									precomputedHtml={
+										workerEnabled &&
+										'string' === typeof workerAddedHtml
+											? workerAddedHtml
+											: null
+									}
+								/>
+							</div>
 						</div>
 					</div>
 				) }

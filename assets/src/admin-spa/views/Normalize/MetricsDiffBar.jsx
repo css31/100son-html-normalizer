@@ -38,7 +38,17 @@ const NUMBER_FORMAT = new Intl.NumberFormat( 'fr-FR' );
  * un agrégat — son `getValue` somme les 6 niveaux. Toutes les autres
  * lisent directement le snapshot.
  *
- * @type {Array<{key: string, label: string}>}
+ * `html_chars` (longueur brute de `post_content` en caractères UTF-16)
+ * porte le flag `excludeFromSummary: true` : la perte d'octets HTML est
+ * attendue par construction (on retire styles inline, `<br>` excédentaires,
+ * wrappers SiteOrigin), donc l'inclure dans le calcul du warning « pire
+ * perte » créerait du faux positif. La row s'affiche dans le tableau mais
+ * ne participe pas au verdict du summary. Aussi : la clé n'est injectée
+ * que par `DiffModal` (qui a accès aux chaînes `html_before` / `html_after`
+ * du payload REST) — pour `RegressionModal` qui n'expose que les snapshots,
+ * elle est absente → la ligne est filtrée par `computeRows`.
+ *
+ * @type {Array<{key: string, label: string, excludeFromSummary?: boolean}>}
  */
 function getRowDefs() {
 	return [
@@ -57,7 +67,15 @@ function getRowDefs() {
 		{ key: 'headings', label: __( 'Titres', '100son-html-normalizer' ) },
 		{ key: 'images', label: __( 'Images', '100son-html-normalizer' ) },
 		{ key: 'links', label: __( 'Liens', '100son-html-normalizer' ) },
-		{ key: 'lists', label: __( 'Listes', '100son-html-normalizer' ) },
+		{
+			key: 'lists',
+			label: __( 'Listes (ul/ol/li)', '100son-html-normalizer' ),
+		},
+		{
+			key: 'html_chars',
+			label: __( 'HTML brut (caractères)', '100son-html-normalizer' ),
+			excludeFromSummary: true,
+		},
 	];
 }
 
@@ -88,26 +106,28 @@ function getValue( snapshot, key ) {
 
 /**
  * @typedef {Object} RowData
- * @property {string}                  key    Clé canonique de métrique (ex. `chars`).
- * @property {string}                  label  Libellé localisé pour la cellule label.
- * @property {number}                  before Valeur de la métrique avant normalisation.
- * @property {number}                  after  Valeur de la métrique après normalisation.
- * @property {number}                  delta  Delta absolu (after − before).
- * @property {number}                  pct    Pourcentage relatif (positif = gain, négatif = perte).
- * @property {boolean}                 isNew  `before === 0 && after > 0` — le « % » n'a pas de sens, on n'affichera que `+N`.
- * @property {'gain'|'loss'|'neutral'} sev    Sévérité visuelle pour la classe CSS du delta.
+ * @property {string}                  key                Clé canonique de métrique (ex. `chars`).
+ * @property {string}                  label              Libellé localisé pour la cellule label.
+ * @property {number}                  before             Valeur de la métrique avant normalisation.
+ * @property {number}                  after              Valeur de la métrique après normalisation.
+ * @property {number}                  delta              Delta absolu (after − before).
+ * @property {number}                  pct                Pourcentage relatif (positif = gain, négatif = perte).
+ * @property {boolean}                 isNew              `before === 0 && after > 0` — le « % » n'a pas de sens, on n'affichera que `+N`.
+ * @property {'gain'|'loss'|'neutral'} sev                Sévérité visuelle pour la classe CSS du delta.
+ * @property {boolean}                 excludeFromSummary Si vrai, la row est rendue dans le tableau mais ignorée par `buildSummary` (cf. `html_chars` qui décroît par construction).
  */
 
 /**
  * Construit une ligne de tableau avec ses dérivées (delta, pct, sévérité).
  *
- * @param {string} key    Clé canonique de métrique.
- * @param {string} label  Libellé localisé.
- * @param {number} before Valeur avant.
- * @param {number} after  Valeur après.
+ * @param {string}  key                Clé canonique de métrique.
+ * @param {string}  label              Libellé localisé.
+ * @param {number}  before             Valeur avant.
+ * @param {number}  after              Valeur après.
+ * @param {boolean} excludeFromSummary Si vrai, la row est ignorée par `buildSummary` (cf. `html_chars`).
  * @return {RowData} Ligne enrichie prête à être rendue.
  */
-function buildRow( key, label, before, after ) {
+function buildRow( key, label, before, after, excludeFromSummary = false ) {
 	const delta = after - before;
 	let sev = 'neutral';
 	let pct = 0;
@@ -127,7 +147,17 @@ function buildRow( key, label, before, after ) {
 		pct = ( delta / before ) * 100;
 	}
 
-	return { key, label, before, after, delta, pct, sev, isNew };
+	return {
+		key,
+		label,
+		before,
+		after,
+		delta,
+		pct,
+		sev,
+		isNew,
+		excludeFromSummary,
+	};
 }
 
 /**
@@ -177,7 +207,12 @@ function formatDelta( row ) {
  * @return {{kind: 'ok'|'warning', message: string}} Verdict + texte localisé.
  */
 function buildSummary( rows ) {
-	const losses = rows.filter( ( r ) => r.delta < 0 );
+	// On exclut les rows marquées `excludeFromSummary` (typiquement
+	// `html_chars` — la perte d'octets HTML brut est attendue par
+	// construction et ne reflète pas une régression de contenu).
+	const losses = rows.filter(
+		( r ) => r.delta < 0 && ! r.excludeFromSummary
+	);
 	if ( 0 === losses.length ) {
 		return {
 			kind: 'ok',
@@ -237,12 +272,13 @@ function buildSummary( rows ) {
  */
 function computeRows( before, after ) {
 	return getRowDefs()
-		.map( ( { key, label } ) =>
+		.map( ( def ) =>
 			buildRow(
-				key,
-				label,
-				getValue( before, key ),
-				getValue( after, key )
+				def.key,
+				def.label,
+				getValue( before, def.key ),
+				getValue( after, def.key ),
+				Boolean( def.excludeFromSummary )
 			)
 		)
 		.filter( ( r ) => ! ( 0 === r.before && 0 === r.after ) );

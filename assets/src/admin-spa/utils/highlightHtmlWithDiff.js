@@ -2,11 +2,16 @@
  * highlightHtmlWithDiff — surlignage des fragments propres à `code` par
  * rapport à `against`, **sans** coloration syntaxique Prism.
  *
- * Utilisé par `HighlightedCode` quand la modale Diff a son toggle
- * « surlignage » activé. Sert à mettre en valeur visuellement, sur le
- * panneau « Avant », les portions qui n'existent plus dans « Après »
- * (mode `'removed'`), et en miroir sur « Après » ce qui est nouveau
- * (mode `'added'`).
+ * **STATUT** : voie sync héritée, conservée comme fallback défensif et
+ * pour la signature publique de `<HighlightedCode>` (prop `diffAgainst`).
+ * Le chemin nominal pour le surlignage est désormais le worker async
+ * `workers/diffWorker.js` qui produit du HTML **combinant** Prism et
+ * `<mark>` via `workers/mergePrismAndDiff.js`. `DiffModal` n'appelle plus
+ * cette voie sync — elle reste accessible aux autres callers éventuels.
+ *
+ * Utilisé pour mettre en valeur visuellement, sur le panneau « Avant », les
+ * portions qui n'existent plus dans « Après » (mode `'removed'`), et en
+ * miroir sur « Après » ce qui est nouveau (mode `'added'`).
  *
  * **Pourquoi pas de Prism quand le surlignage est actif** : Prism est
  * synchrone et appelle des regex lourdes. L'appliquer par fragment
@@ -20,6 +25,16 @@
  *  - Surlignage OFF (default) → Prism actif, code coloré, pas de marks.
  *  - Surlignage ON → marks jaunes/verts, code en texte brut, calcul
  *    instantané sans freeze.
+ *
+ * **Garde-fou taille (DIFF_MARKS_MAX_CHARS)** : `diffWordsWithSpace` est
+ * un Myers diff en O((N+M)·D) sur les **tokens**, qui sur du HTML
+ * SiteOrigin lourd (`data-style='{"…":…}'` génère des tokens à la pelle)
+ * peut prendre plusieurs minutes et freezer le main thread — Firefox
+ * affiche alors « Stop script / Debug script » et la modale ne s'affiche
+ * jamais. Au-delà de 40 000 caractères cumulés (before + after), on
+ * désactive le surlignage : on retourne simplement `escapeHtml(code)`.
+ * La modale détecte ce cas et affiche un Notice à l'utilisateur (cf.
+ * `DiffModal.jsx`, prop `isLargePayload`).
  *
  * Algorithme :
  *  1. `diffWordsWithSpace(before, after)` produit un tableau de
@@ -38,21 +53,22 @@
  */
 
 import { diffWordsWithSpace } from 'diff';
+import { escapeHtml } from './escapeHtml';
 
 /**
- * Échappe les caractères spéciaux HTML pour permettre l'injection sûre
- * du texte brut dans `dangerouslySetInnerHTML`.
+ * Seuil au-delà duquel le surlignage est désactivé (somme de `code.length`
+ * et `against.length`). Valeur empirique calée pour qu'un article SiteOrigin
+ * type « riche » (panel-layout + `data-style='{"…":…}'` sur chaque cellule)
+ * reste sous la barre, et que les articles vraiment monstres (corpus MMM-2
+ * id 16020 = 28 501 + 15 033 = 43 534 chars) basculent en mode dégradé.
  *
- * @param {string} text Texte brut.
- * @return {string} Texte HTML-safe.
+ * Exporté pour permettre à `DiffModal` de détecter le cas et afficher un
+ * Notice explicatif sans appeler la fonction (qui retournerait juste un
+ * fallback sans signaler la dégradation).
+ *
+ * @type {number}
  */
-function escapeHtml( text ) {
-	return String( text )
-		.replace( /&/g, '&amp;' )
-		.replace( /</g, '&lt;' )
-		.replace( />/g, '&gt;' )
-		.replace( /"/g, '&quot;' );
-}
+export const DIFF_MARKS_MAX_CHARS = 40000;
 
 /**
  * @param {string}              code    Chaîne à afficher (panneau actif).
@@ -68,6 +84,13 @@ export function highlightHtmlWithDiff( code, against, mode ) {
 		// Pas de diff demandé → on retourne juste le texte échappé.
 		// Le caller `HighlightedCode` n'arrive ici que si `diffAgainst`
 		// est une string ; ce fallback est défensif.
+		return escapeHtml( code );
+	}
+
+	// Garde-fou taille : au-delà du seuil, on saute `diffWordsWithSpace`
+	// (qui pourrait freezer plusieurs secondes) et on retourne juste le
+	// texte échappé. Le surlignage est perdu mais l'article reste lisible.
+	if ( code.length + against.length > DIFF_MARKS_MAX_CHARS ) {
 		return escapeHtml( code );
 	}
 
