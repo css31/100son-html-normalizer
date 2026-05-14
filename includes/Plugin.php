@@ -237,7 +237,7 @@ final class Plugin {
 			),
 			new DiagnosticsController( $batch_runner, $diag_repo, new BuilderClassifier() ),
 			new PostsController( $settings, $post_normalizer, $so_detector ),
-			new DiffController( $preset_registry, $pipeline, $metrics, new BuilderClassifier() ),
+			new DiffController( $preset_registry, $metrics, new BuilderClassifier() ),
 			new SettingsController( $settings ),
 			new PresetsController( $settings, $preset_registry ),
 			new NotesController( $rich_notes ),

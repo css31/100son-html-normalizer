@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Rest;
 
-use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
@@ -99,7 +98,6 @@ final class DiffControllerTest extends TestCase {
 	private function make_controller( array $rules = array() ): DiffController {
 		return new DiffController(
 			$this->registry_with( $rules ),
-			new Pipeline(),
 			new MetricsCalculator(),
 			new BuilderClassifier(),
 		);

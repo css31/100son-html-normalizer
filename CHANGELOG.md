@@ -5,6 +5,36 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Fix — cascade du comptage `applied_rules` dans `DiffController`
+
+Le payload REST `/posts/{id}/diff` retourne un tableau `applied_rules` qui liste, par règle activée, son nombre d'occurrences applicables. Avant ce fix, chaque règle voyait son `countMatches()` appelé sur **le même `$html_before` brut** (le post_content original), parallèlement au pipeline d'`apply()` qui produisait `$html_after` en cascade. Conséquence : P6, P9, P10 comptaient des occurrences dans des structures que P4 (Pinterest, qui tourne plus tôt dans l'ordre canonique) allait supprimer en amont.
+
+Exemple sur l'article #6690 : P6 affichait `100 occurrences` parce qu'il voyait les 86 `<span style="z-index:8675309…">` Pinterest (signature forme B) que P4 retire. Sur le HTML réellement transformé par P6 (sortie post-P4), il n'y a en fait que 14 styles inline à nettoyer. Pareil sur 16020 (P6 : 46 → 13) et 374 (P6 : 24 → 0).
+
+#### Fix
+
+Fusion des deux passes dans `DiffController::compute_diff()` : au lieu d'appeler `Pipeline::applySubset()` puis une boucle `countMatches()` indépendante, on traverse maintenant les règles dans l'ordre canonique et, **à chaque étape**, on compte les occurrences sur l'état HTML courant **avant** d'appliquer la règle. Le `$current` final = `$html_after`. Le pattern `try/catch + check is_string + push warnings` est repris à l'identique de `Pipeline::run()` (qui reste utilisé tel quel par les autres consommateurs — pages V0.1).
+
+Cleanup : la propriété `$pipeline` du constructeur de `DiffController` n'est plus utilisée → retirée (et son import + son passage dans `Plugin.php` et `DiffControllerTest.php`).
+
+#### Effets observés
+
+Les **totaux par article** restent identiques (74→76, 92, 233 pour 374/16020/6690), mais la **répartition par règle** change drastiquement parce que les paragraphes vides libérés par P4 sont maintenant attribués à P1 plutôt que comptés sur le HTML brut. Pour 6690 :
+
+| Règle | Avant | Après |
+|---|---:|---:|
+| P4 (Pinterest) | 86 | 86 (inchangé) |
+| P6 (styles inline) | 100 | **14** |
+| P1 (paragraphes vides) | 32 | **118** |
+| P7 (listes ASCII) | 3 | 3 |
+| P10 (paragraphes-images) | 12 | 12 |
+
+La constante `D_PER_OCCURRENCE = 60` dans `utils/estimateDiffSeconds.js` reste valide — la formule de prédiction du temps n'est pas affectée puisque les totaux ne bougent pas.
+
+#### Sécurité
+
+`html_after` reste bit-identique avant/après le fix : on reproduit exactement la cascade de `Pipeline::run()`, on ajoute juste le `countMatches()` à chaque étape. Aucun risque de régression sur le rendu du diff. 724 PHPUnit verts inchangés.
+
 ### Modale Diff — refonte du surlignage (Web Worker + Prism+marks fusionnés + chronomètre)
 
 Refonte complète de la vue « Code source » de la modale Diff pour résoudre un freeze observé sur l'article #16020 (~28k chars de SiteOrigin avec `data-style='{"…":…}'` partout) où `diffWordsWithSpace` bloquait le main thread environ une minute — Firefox affichait alors « Stop script » et la modale ne s'affichait jamais.

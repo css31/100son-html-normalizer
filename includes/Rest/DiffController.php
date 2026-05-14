@@ -14,7 +14,6 @@ namespace Cent_Son\Html_Normalizer\Rest;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
-use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
@@ -43,13 +42,11 @@ final class DiffController extends BaseController {
 
 	/**
 	 * @param PresetRegistry    $registry   Source des règles (filtrage par rule_ids).
-	 * @param Pipeline          $pipeline   Moteur applySubset.
 	 * @param MetricsCalculator $metrics    Snapshot avant/après.
 	 * @param BuilderClassifier $classifier Typage du constructeur d'origine pour le header de la modale.
 	 */
 	public function __construct(
 		private readonly PresetRegistry $registry,
-		private readonly Pipeline $pipeline,
 		private readonly MetricsCalculator $metrics,
 		private readonly BuilderClassifier $classifier,
 	) {}
@@ -121,42 +118,60 @@ final class DiffController extends BaseController {
 
 		$html_before = (string) $post->post_content;
 		$warnings    = array();
-		$html_after  = $this->pipeline->applySubset(
-			$this->registry->get_enabled_rules(),
-			$rule_ids,
-			$html_before,
-			array(
-				'post_id' => $post_id,
-				'source'  => 'diff',
-			),
-			$warnings
+		$context     = array(
+			'post_id' => $post_id,
+			'source'  => 'diff',
 		);
 
-		$before = $this->metrics->compute( $html_before );
-		$after  = $this->metrics->compute( $html_after );
-
-		$builder_type = $this->classifier->classify( $post_id );
-
-		// `applied_rules` (post-rc4) : sous-ensemble des `rule_ids` qui ont
-		// effectivement quelque chose à toucher sur `html_before` (countMatches
-		// > 0). Affiché dans la 3e colonne du bandeau métriques de la modale
-		// Diff pour donner d'un coup d'œil « quelles règles ont fait quoi sur
-		// cet article ». On itère sur `get_rules_for_subset` qui respecte
-		// l'ordre canonique du pipeline ET filtre déjà les règles désactivées
-		// par config — pas besoin de re-vérifier `is_preset_enabled` ici.
+		// Cascade fusionnée : on traverse les règles dans l'ordre canonique
+		// du pipeline et, **à chaque étape**, on compte les occurrences sur
+		// l'état HTML courant AVANT d'appliquer la règle. C'est la sémantique
+		// correcte du `applied_rules` retourné dans le payload — sans cette
+		// cascade, les règles tardives (ex. P6) comptaient des occurrences
+		// dans des structures que les règles précédentes (ex. P4 sur les
+		// Pinterest) allaient supprimer, gonflant artificiellement les totaux
+		// affichés et faussant l'estimation du temps de surlignage côté SPA
+		// (cf. `assets/src/admin-spa/utils/estimateDiffSeconds.js`).
+		//
+		// Le pattern try/catch + check `is_string` est repris à l'identique
+		// de `Pipeline::run()` — on n'y délègue plus parce qu'on a besoin
+		// d'intercaler le `countMatches()` entre chaque `apply()`. `Pipeline`
+		// lui-même reste utilisé par d'autres consommateurs (pages V0.1).
+		$current       = $html_before;
 		$applied_rules = array();
 		foreach ( $this->registry->get_rules_for_subset( $rule_ids ) as $rule ) {
-			$occurrences = $rule->countMatches(
-				$html_before,
-				array( 'post_id' => $post_id, 'source' => 'diff' )
-			);
+			$occurrences = $rule->countMatches( $current, $context );
 			if ( $occurrences > 0 ) {
 				$applied_rules[] = array(
 					'rule_id'     => $rule->id(),
 					'occurrences' => $occurrences,
 				);
 			}
+			try {
+				$result = $rule->apply( $current, $context );
+				if ( ! is_string( $result ) ) {
+					$warnings[] = sprintf(
+						'Rule %s returned non-string output, skipping.',
+						$rule->id()
+					);
+					continue;
+				}
+				$current = $result;
+			} catch ( \Throwable $e ) {
+				$warnings[] = sprintf(
+					'Rule %s threw exception: %s',
+					$rule->id(),
+					$e->getMessage()
+				);
+				// On continue avec la sortie précédente intacte.
+			}
 		}
+		$html_after = $current;
+
+		$before = $this->metrics->compute( $html_before );
+		$after  = $this->metrics->compute( $html_after );
+
+		$builder_type = $this->classifier->classify( $post_id );
 
 		// Normalisation pour l'affichage : on fait passer les deux chaînes
 		// par le meme couple `parse_fragment` / `serialize_fragment` que les
