@@ -21,7 +21,13 @@
  * sélecteurs sont disponibles dès le premier render.
  */
 
-import { createReduxStore, register } from '@wordpress/data';
+import { createReduxStore, register, select, subscribe } from '@wordpress/data';
+
+/**
+ * Clé localStorage pour la sélection persistée des règles. Préfixée pour
+ * éviter toute collision avec d'autres plugins WP sur le même domaine.
+ */
+const SELECTED_RULES_STORAGE_KEY = 'htmln-spa.selectedRules';
 
 /**
  * Identifiant du store. Exporté pour pouvoir l'utiliser dans
@@ -33,10 +39,15 @@ export const STORE_NAME = 'htmln/spa';
  * État initial — toutes les valeurs `null` signalent « pas encore chargé »
  * et permettent aux vues d'afficher un skeleton/loader avant le premier fetch.
  *
- * `selectedRules` est éphémère : initialisé à la liste complète R1..R16 au
- * boot, modifié par l'onglet Règles, perdu au reload (cf. décision post-rc1).
+ * `selectedRules` est **persisté dans `localStorage`** (clé
+ * `htmln-spa.selectedRules`) depuis post-rc4. Au premier chargement, la
+ * sélection précédemment cochée est restaurée via `loadPersistedSelectedRules()`.
+ * Si aucune sélection n'a jamais été stockée (first install / localStorage
+ * indisponible), on retombe sur la liste complète R1..R16. Toute mutation
+ * (toggle / selectAll / deselectAll) est répliquée dans `localStorage` par
+ * la souscription du store en bas de ce module.
  *
- * `normalizeView` est également éphémère (perdu au reload) mais survit au
+ * `normalizeView` est éphémère (perdu au reload) mais survit au
  * changement d'onglet primaire de l'App (`App.jsx` monte/démonte les vues —
  * sans store, on perdrait tab/page/filters/sélection à chaque aller-retour).
  *
@@ -99,11 +110,67 @@ const DEFAULT_NORMALIZE_VIEW = {
 	selectedPostIds: [],
 };
 
+/**
+ * Lit la sélection persistée depuis `localStorage`. Filtre les IDs inconnus
+ * (cas où une règle a été supprimée entre deux versions) et préserve
+ * l'ordre canonique. Retombe sur la liste complète si :
+ *  - `window.localStorage` indisponible (SSR, mode privé restreint, etc.),
+ *  - aucune entrée stockée (first install),
+ *  - JSON invalide (corruption),
+ *  - tableau vide stocké ?  → non, on respecte le choix « rien sélectionné ».
+ *
+ * @return {string[]} Liste des IDs cochés.
+ */
+function loadPersistedSelectedRules() {
+	if ( 'undefined' === typeof window || ! window.localStorage ) {
+		return [ ...ALL_RULE_IDS ];
+	}
+	try {
+		const raw = window.localStorage.getItem( SELECTED_RULES_STORAGE_KEY );
+		if ( null === raw ) {
+			return [ ...ALL_RULE_IDS ];
+		}
+		const parsed = JSON.parse( raw );
+		if ( ! Array.isArray( parsed ) ) {
+			return [ ...ALL_RULE_IDS ];
+		}
+		// On respecte un tableau vide (utilisateur a tout décoché volontairement),
+		// mais on filtre les IDs inconnus et on rétablit l'ordre canonique.
+		return ALL_RULE_IDS.filter( ( id ) => parsed.includes( id ) );
+	} catch ( err ) {
+		return [ ...ALL_RULE_IDS ];
+	}
+}
+
+/**
+ * Persiste la sélection dans `localStorage`. Silencieuse en cas de
+ * quota dépassé ou de stockage désactivé — la persistance est un
+ * confort, pas une garantie fonctionnelle.
+ *
+ * @param {string[]} ruleIds Sélection à sauvegarder.
+ * @return {void}
+ */
+function persistSelectedRules( ruleIds ) {
+	if ( 'undefined' === typeof window || ! window.localStorage ) {
+		return;
+	}
+	try {
+		window.localStorage.setItem(
+			SELECTED_RULES_STORAGE_KEY,
+			JSON.stringify( ruleIds )
+		);
+	} catch ( err ) {
+		// QuotaExceededError, SecurityError (mode privé Safari, etc.) :
+		// no-op. L'utilisateur reverra la sélection complète au prochain
+		// reload, c'est acceptable.
+	}
+}
+
 const DEFAULT_STATE = {
 	diagnosticsStats: null,
 	currentStep: null,
 	regressionThresholds: null,
-	selectedRules: [ ...ALL_RULE_IDS ],
+	selectedRules: loadPersistedSelectedRules(),
 	normalizeView: { ...DEFAULT_NORMALIZE_VIEW },
 };
 
@@ -411,5 +478,27 @@ export const storeConfig = {
 const store = createReduxStore( STORE_NAME, storeConfig );
 
 register( store );
+
+/**
+ * Souscription : recopie `selectedRules` dans `localStorage` à chaque
+ * changement de référence. Le test d'égalité référentielle suffit car le
+ * reducer retourne toujours un nouveau tableau quand la sélection bouge —
+ * voir `SET_SELECTED_RULES` / `TOGGLE_SELECTED_RULE`. Les autres actions
+ * touchant l'état (currentStep, normalizeView, etc.) ne déclenchent pas
+ * d'écriture inutile grâce à ce test.
+ */
+( () => {
+	if ( 'undefined' === typeof window || ! window.localStorage ) {
+		return;
+	}
+	let prev = select( STORE_NAME ).getSelectedRules();
+	subscribe( () => {
+		const next = select( STORE_NAME ).getSelectedRules();
+		if ( next !== prev ) {
+			persistSelectedRules( next );
+			prev = next;
+		}
+	}, STORE_NAME );
+} )();
 
 export { store };

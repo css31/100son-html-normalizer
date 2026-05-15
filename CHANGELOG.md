@@ -5,6 +5,17 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Persistance localStorage de la sélection de règles
+
+Le store `htmln/spa.selectedRules` était jusqu'ici purement mémoire — au rechargement de la page, toutes les règles redevenaient cochées par défaut, balayant le travail de filtrage de l'utilisateur. Désormais persisté dans `localStorage` (clé `htmln-spa.selectedRules`) :
+
+- **Lecture** : au boot du store, `loadPersistedSelectedRules()` lit la clé, parse le JSON, filtre les IDs inconnus (sécurité contre une règle supprimée entre deux versions) et restaure l'ordre canonique. Tableau vide respecté (l'utilisateur a tout décoché volontairement → on garde ce choix).
+- **Écriture** : `subscribe()` sur le store détecte tout changement de référence de `selectedRules` et appelle `persistSelectedRules()` qui sérialise via `JSON.stringify`. Test d'égalité référentielle pour éviter les écritures inutiles déclenchées par d'autres actions (currentStep, normalizeView, etc.).
+- **Fallback safe** : si `window.localStorage` est indisponible (mode privé Safari strict, SSR, quota plein) ou si le JSON est corrompu, on retombe sur la liste complète `[...ALL_RULE_IDS]` (comportement antérieur).
+- **First install** : aucune clé en BDD → liste complète cochée (rétro-compat).
+
+Aucun changement REST/BDD côté serveur — la persistance reste 100 % côté navigateur (le store reste cohérent au sein d'un onglet ouvert, et chaque navigateur garde sa propre sélection).
+
 ### Règles destructives (`LossyRule`) + bucket `pending_articles` séparé
 
 **Problème observé** : R3 (Shareaholic) appliquée à tout le corpus laissait 100 articles avec encore des occurrences. Diagnostic : le `RegressionDetector` (seuils par défaut `text_loss_pct = 0` et `words_loss_pct = 0`) bloquait l'écriture sur 100 articles dont le retrait du shortcode `[shareaholic id="..."]` causait une perte mesurable de caractères/mots. Ces articles tombaient en `regression_pending`, mais **le compteur du step les classait erronément en `errored_articles`** — d'où la fausse impression de "scan terminé" alors qu'un arbitrage admin était en attente.

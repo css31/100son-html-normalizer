@@ -2,8 +2,9 @@
  * Rules — vue racine de l'onglet « Règles » (post-rc1).
  *
  * Liste les 16 règles R1-R16 avec, pour chacun :
- *  - une **case « Sélectionnée pour le prochain pas »** (store mémoire,
- *    partagée avec la vue Normaliser) ;
+ *  - une **case « Sélectionnée pour le prochain pas »** (store +
+ *    `localStorage`, partagée avec la vue Normaliser ; conservée d'une
+ *    session à l'autre) ;
  *  - un **toggle « Activée par défaut »** (BDD, persisté via REST) ;
  *  - la **description** rendue depuis PresetRegistry (HTML serveur de
  *    confiance, `dangerouslySetInnerHTML` autorisé) ;
@@ -14,7 +15,9 @@
  *    qui illustre l'effet de la règle.
  *
  * Persistance :
- *  - Sélection éphémère : store `htmln/spa.selectedRules` (perdue au reload).
+ *  - Sélection : store `htmln/spa.selectedRules` répliqué dans
+ *    `localStorage` (clé `htmln-spa.selectedRules`) → préservée d'un
+ *    rechargement à l'autre. First install : toutes les règles cochées.
  *  - `enabled` + paramètres : option WP `son100_htmln_presets` via
  *    POST /presets/<id>. Cohabite avec la page V0.1 PHP — les deux
  *    écrivent dans la même clé d'option.
@@ -169,7 +172,7 @@ export default function Rules() {
 				<h2>{ __( 'Règles', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'Les 16 règles du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain lot et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Règles » (V0.1).',
+						'Les 16 règles du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » pilote le prochain lot et reste conservée d’une session à l’autre (stockage local du navigateur). Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Règles » (V0.1).',
 						'100son-html-normalizer'
 					) }
 				</p>
