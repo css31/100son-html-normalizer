@@ -34,7 +34,7 @@ final class StepsRepositoryTest extends TestCase {
 		$this->wpdb->get_row_queue[] = array(
 			'id'                  => '12',
 			'step_uuid'           => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-			'applied_rules'       => '["P1","P5"]',
+			'applied_rules'       => '["R1","R5"]',
 			'affected_post_ids'   => '[100,101,102]',
 			'total_articles'      => '3',
 			'successful_articles' => '2',
@@ -48,7 +48,7 @@ final class StepsRepositoryTest extends TestCase {
 		$record = $this->repo->find_by_uuid( 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' );
 		$this->assertInstanceOf( StepRecord::class, $record );
 		$this->assertSame( 12, $record->id );
-		$this->assertSame( array( 'P1', 'P5' ), $record->applied_rules );
+		$this->assertSame( array( 'R1', 'R5' ), $record->applied_rules );
 		$this->assertSame( array( 100, 101, 102 ), $record->affected_post_ids );
 		$this->assertSame( 3, $record->total_articles );
 		$this->assertSame( 2, $record->successful_articles );
@@ -62,7 +62,7 @@ final class StepsRepositoryTest extends TestCase {
 		$this->wpdb->insert_return = 1;
 		$id = $this->repo->insert_running(
 			'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-			array( 'P1', 'P5' ),
+			array( 'R1', 'R5' ),
 			array( 100, 101, 102 ),
 			5,
 			'2026-05-09 10:00:00'
@@ -78,7 +78,7 @@ final class StepsRepositoryTest extends TestCase {
 		$this->assertNull( $inserted['finished_at'] );
 		$this->assertSame( '2026-05-09 10:00:00', $inserted['started_at'] );
 		// applied_rules et affected_post_ids doivent etre serialises en JSON.
-		$this->assertSame( '["P1","P5"]', $inserted['applied_rules'] );
+		$this->assertSame( '["R1","R5"]', $inserted['applied_rules'] );
 		$this->assertSame( '[100,101,102]', $inserted['affected_post_ids'] );
 	}
 
@@ -92,7 +92,7 @@ final class StepsRepositoryTest extends TestCase {
 		$this->wpdb->update_return = 1;
 		$ok = $this->repo->finalize(
 			'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-			10, 2, 1,
+			10, 2, 1, 3,
 			'2026-05-09 10:30:00'
 		);
 		$this->assertTrue( $ok );
@@ -102,6 +102,7 @@ final class StepsRepositoryTest extends TestCase {
 		$this->assertSame( 10, $update['data']['successful_articles'] );
 		$this->assertSame( 2, $update['data']['refused_articles'] );
 		$this->assertSame( 1, $update['data']['errored_articles'] );
+		$this->assertSame( 3, $update['data']['pending_articles'] );
 		$this->assertSame( '2026-05-09 10:30:00', $update['data']['finished_at'] );
 		$this->assertSame( array( 'step_uuid' => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' ), $update['where'] );
 	}
@@ -111,7 +112,7 @@ final class StepsRepositoryTest extends TestCase {
 		$this->wpdb->get_row_queue[] = array(
 			'id'                  => 1,
 			'step_uuid'           => 'uuid',
-			'applied_rules'       => '["P1"]',
+			'applied_rules'       => '["R1"]',
 			'affected_post_ids'   => '[100,101]',
 			'total_articles'      => 2,
 			'successful_articles' => 0,
@@ -146,7 +147,7 @@ final class StepsRepositoryTest extends TestCase {
 			array(
 				'id'                  => 1,
 				'step_uuid'           => 'unfinished-1',
-				'applied_rules'       => '["P1"]',
+				'applied_rules'       => '["R1"]',
 				'affected_post_ids'   => '[100]',
 				'total_articles'      => 1,
 				'successful_articles' => 0,
@@ -234,5 +235,47 @@ final class StepsRepositoryTest extends TestCase {
 		$this->assertStringContainsString( 'COUNT(*)', $last_sql );
 		$this->assertStringContainsString( 'started_at >= ', $last_sql );
 		$this->assertStringContainsString( 'started_at <= ', $last_sql );
+	}
+
+	// =========================================================================
+	//  last_applied_for_rule (verrou « règle appliquée au corpus »)
+	// =========================================================================
+
+	public function test_last_applied_for_rule_returns_null_when_no_match(): void {
+		$this->wpdb->get_var_queue[] = null;
+		$this->assertNull( $this->repo->last_applied_for_rule( 'R5' ) );
+	}
+
+	public function test_last_applied_for_rule_returns_null_when_empty_string(): void {
+		$this->wpdb->get_var_queue[] = '';
+		$this->assertNull( $this->repo->last_applied_for_rule( 'R5' ) );
+	}
+
+	public function test_last_applied_for_rule_returns_datetime_when_match(): void {
+		$this->wpdb->get_var_queue[] = '2026-05-14 12:34:56';
+		$this->assertSame(
+			'2026-05-14 12:34:56',
+			$this->repo->last_applied_for_rule( 'R5' )
+		);
+	}
+
+	public function test_last_applied_for_rule_filters_on_finished_and_json_search(): void {
+		$this->wpdb->get_var_queue[] = '2026-05-14 12:34:56';
+		$this->repo->last_applied_for_rule( 'R5' );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'MAX(finished_at)', $last_sql );
+		$this->assertStringContainsString( 'finished_at IS NOT NULL', $last_sql );
+		$this->assertStringContainsString( 'JSON_SEARCH(applied_rules', $last_sql );
+		$this->assertStringContainsString( "'one'", $last_sql );
+		$this->assertStringContainsString( 'R5', $last_sql );
+	}
+
+	public function test_last_applied_for_rule_does_not_substring_match(): void {
+		// JSON_SEARCH('one', 'R1') ne doit pas matcher 'R10' — assuré par MySQL,
+		// mais on vérifie côté SQL qu'on passe bien la chaîne exacte (pas LIKE '%R5%').
+		$this->wpdb->get_var_queue[] = null;
+		$this->repo->last_applied_for_rule( 'R1' );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringNotContainsString( 'LIKE', $last_sql );
 	}
 }

@@ -1,53 +1,39 @@
 /**
- * Renommage d'affichage des rule_ids côté SPA.
+ * Labels, tooltips et ordre d'affichage des rule_ids côté SPA.
  *
- * Les IDs internes (P1..P10) sont **stables côté code et base de
+ * Les IDs internes (R1..R14) sont **stables côté code et base de
  * données** — DiagnosticRecord, son100_htmln_diagnostics.matching_rules,
  * son100_htmln_steps.applied_rules, l'option son100_htmln_presets et
  * les routes REST utilisent tous ces IDs bruts. Ne JAMAIS modifier
  * ces IDs (migration data coûteuse + perte de traçabilité historique).
  *
- * Cette table fait juste le mapping `ID interne → label affiché` que
- * la SPA applique dans toutes les cellules où un rule_id apparaît
- * (onglet Règles, colonne Règles applicables du tableau Normaliser,
- * footer de sélection, drawer d'historique, modales Diff/Régression).
+ * **Régime actuel** (post 2026-05-15) : l'affichage reproduit l'ID
+ * interne tel quel. Plus de remapping famille (`R1.1`, `R1.2`, `R2.1`,
+ * `R2.2`) qui avait été introduit aux versions rc2/rc3 puis retiré
+ * faute de bénéfice tangible — la cohabitation `R1.1` côté SPA vs `R1`
+ * partout ailleurs (README, CHANGELOG, tests PHP, PresetRegistry,
+ * BDD, REST) créait une charge cognitive sans contrepartie.
  *
- * Choix éditoriaux :
- *  - `P1` (paragraphes vides) → **P1.1** car P10 (paragraphes autour
- *    d'images) couvre une famille adjacente sur les `<p>` — regrouper
- *    sous P1.x rend l'arbre des règles plus lisible.
- *  - `P10` → **P1.2** : déplacé directement après P1.1 dans l'ordre
- *    d'affichage.
- *  - `P2` (titres vides) → **P2.1** car P9 (titres autour d'images)
- *    couvre une famille adjacente sur les `<hN>` — regrouper sous P2.x
- *    rend l'arbre des règles plus lisible.
- *  - `P9` → **P2.2** : déplacé directement après P2.1 dans l'ordre
- *    d'affichage (cf. `RULE_DISPLAY_ORDER`).
+ * `RULE_DISPLAY_LABELS` est conservé vide pour préserver l'API
+ * publique (`getRuleLabel`) au cas où un futur besoin justifierait
+ * un remapping ponctuel.
  *
  * L'ordre d'EXÉCUTION du pipeline (cf. `PresetRegistry::PRESETS` côté
- * PHP) reste P3 → P4 → P8 → P6 → P7 → P5 → P9 → P10 → P1 → P2. C'est
- * l'ordre d'affichage UI qui change, pas l'ordre d'exécution.
+ * PHP) reste `R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2`.
+ * `RULE_DISPLAY_ORDER` ci-dessous gouverne l'affichage UI uniquement
+ * (ordre naturel R1..R14).
  */
 
 /**
  * Map ID interne → label affiché.
  *
- * Tout ID absent retombe sur lui-même via `getRuleLabel`.
+ * Vide par défaut : `getRuleLabel('R9')` retourne `'R9'`. Cette
+ * indirection est préservée pour permettre un remapping futur sans
+ * toucher aux composants consommateurs.
  *
  * @type {Object<string, string>}
  */
-export const RULE_DISPLAY_LABELS = {
-	P1: 'P1.1',
-	P2: 'P2.1',
-	P3: 'P3',
-	P4: 'P4',
-	P5: 'P5',
-	P6: 'P6',
-	P7: 'P7',
-	P8: 'P8',
-	P9: 'P2.2',
-	P10: 'P1.2',
-};
+export const RULE_DISPLAY_LABELS = {};
 
 /**
  * Map ID interne → titre humain court (plain text, pour `title=`
@@ -61,16 +47,22 @@ export const RULE_DISPLAY_LABELS = {
  * @type {Object<string, string>}
  */
 export const RULE_TOOLTIPS = {
-	P1: 'Paragraphes vides',
-	P2: 'Titres vides',
-	P3: 'Shortcodes Shareaholic',
-	P4: 'Artefacts Pinterest',
-	P5: '<br> excessifs',
-	P6: 'Styles inline',
-	P7: 'Listes ASCII',
-	P8: 'Récupération sémantique des styles',
-	P9: "Titres autour d'images",
-	P10: "Paragraphes autour d'images",
+	R1: 'Paragraphes vides',
+	R2: 'Titres vides',
+	R3: 'Shortcodes Shareaholic',
+	R4: 'Artefacts Pinterest',
+	R5: '<br> excessifs',
+	R6: 'Styles inline',
+	R7: 'Listes ASCII',
+	R8: 'Récupération sémantique des styles',
+	R9: "Titres autour d'images",
+	R10: "Paragraphes autour d'images",
+	R11: 'Disposition des h4 (légende / crédit / gras)',
+	R12: 'Titres mixtes image + légende',
+	R13: 'Promotion h2-chapô',
+	R14: 'Marquage chapô (1er p + crédits)',
+	R15: 'Fusion balises inline en double',
+	R16: 'Préfixes de titre (numéros, puces)',
 };
 
 /**
@@ -78,30 +70,36 @@ export const RULE_TOOLTIPS = {
  * position dans la liste des cards Règles + dans toutes les listes
  * triées par display order.
  *
- * Ordre choisi : P1(=P1.1), P10(=P1.2), P2(=P2.1), P9(=P2.2), P3,
- * P4, P5, P6, P7, P8. Les paires P1.x et P2.x sont contiguës ; les
- * autres restent dans l'ordre naturel.
+ * Ordre naturel R1..R14.
  *
  * @type {Object<string, number>}
  */
 export const RULE_DISPLAY_ORDER = {
-	P1: 1,
-	P10: 2,
-	P2: 3,
-	P9: 4,
-	P3: 5,
-	P4: 6,
-	P5: 7,
-	P6: 8,
-	P7: 9,
-	P8: 10,
+	R1: 1,
+	R2: 2,
+	R3: 3,
+	R4: 4,
+	R5: 5,
+	R6: 6,
+	R7: 7,
+	R8: 8,
+	R9: 9,
+	R10: 10,
+	R11: 11,
+	R12: 12,
+	R13: 13,
+	R14: 14,
+	R15: 15,
+	R16: 16,
 };
 
 /**
  * Retourne le label à afficher pour un rule_id donné.
  *
- * @param {string} id ID interne (ex. `P9`).
- * @return {string} Label (ex. `P2.2`), ou `id` lui-même si inconnu.
+ * `RULE_DISPLAY_LABELS` est vide par défaut : retombe sur l'ID lui-même.
+ *
+ * @param {string} id ID interne (ex. `R9`).
+ * @return {string} Label (par défaut identique à `id`).
  */
 export function getRuleLabel( id ) {
 	const str = String( id ?? '' );
@@ -149,7 +147,7 @@ export function compareRuleIdsByDisplayOrder( a, b ) {
 /**
  * Formate une liste de rule_ids (ou d'objets `{rule_id}`) en chaîne
  * lisible triée selon l'ordre d'affichage, avec labels mappés.
- * Ex. `[{rule_id:'P9'}, {rule_id:'P1'}]` → `'P1, P2.2'`.
+ * Ex. `[{rule_id:'R9'}, {rule_id:'R1'}]` → `'R1, R9'`.
  *
  * @param {Array<string|{rule_id?: string}>} entries Liste mixte d'IDs ou d'objets matching_rules.
  * @return {string} Chaîne formatée ou `—` si la liste est vide.

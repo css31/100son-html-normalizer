@@ -37,7 +37,7 @@
  * payload REST `/posts/{id}/diff`, qui depuis la cascade dans
  * `DiffController` compte chaque règle sur l'état HTML APRÈS application
  * des règles précédentes (et non plus sur le HTML brut). Cela rééquilibre
- * la répartition par règle (P6 sur 6690 baisse de 100 à 14, P1 monte de
+ * la répartition par règle (R6 sur 6690 baisse de 100 à 14, R1 monte de
  * 32 à 118 — Pinterest emportent leurs styles ET libèrent des `<p>` vides),
  * mais les totaux par article restent stables, donc la constante 60 tient.
  *

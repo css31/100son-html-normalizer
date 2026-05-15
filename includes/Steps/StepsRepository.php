@@ -138,6 +138,33 @@ class StepsRepository {
 	}
 
 	/**
+	 * Date (`finished_at`) la plus récente d'un pas FINI ayant appliqué
+	 * la règle `$rule_id`. Retourne `null` si la règle n'a jamais été
+	 * appliquée (ou si aucun pas la concernant n'est terminé).
+	 *
+	 * Implémenté via `JSON_SEARCH` sur la colonne `applied_rules` (JSON
+	 * list de `rule_id`). MySQL 5.7+ / MariaDB 10.2+ requis (déjà exigé
+	 * par WP 6.8). Sémantique stricte : `'one'` retourne le chemin
+	 * trouvé ou NULL — pas de faux positif (`R1` ne matche pas `R10`).
+	 *
+	 * @param string $rule_id Identifiant interne (ex. `R5`).
+	 * @return string|null Datetime MySQL (`Y-m-d H:i:s`) ou null.
+	 */
+	public function last_applied_for_rule( string $rule_id ): ?string {
+		$sql = $this->wpdb->prepare(
+			"SELECT MAX(finished_at) FROM `{$this->table}`
+			 WHERE finished_at IS NOT NULL
+			   AND JSON_SEARCH(applied_rules, 'one', %s) IS NOT NULL",
+			$rule_id
+		);
+		$value = $this->wpdb->get_var( $sql );
+		if ( null === $value || '' === $value ) {
+			return null;
+		}
+		return (string) $value;
+	}
+
+	/**
 	 * Nombre de pas dans une fenêtre temporelle. Sert au calcul de
 	 * `total_pages` côté SPA (F16).
 	 *
@@ -187,6 +214,7 @@ class StepsRepository {
 			successful_articles: 0,
 			refused_articles: 0,
 			errored_articles: 0,
+			pending_articles: 0,
 			per_article_results: array(),
 			user_id: $user_id,
 			started_at: $started,
@@ -240,6 +268,7 @@ class StepsRepository {
 	 * @param int         $successful_articles Total succès.
 	 * @param int         $refused_articles    Total refus admin.
 	 * @param int         $errored_articles    Total erreurs.
+	 * @param int         $pending_articles    Total articles en `regression_pending` non arbitrés.
 	 * @param string|null $finished_at         Datetime MySQL ; défaut = now().
 	 * @return bool Vrai si l'update a effectué un changement.
 	 */
@@ -248,6 +277,7 @@ class StepsRepository {
 		int $successful_articles,
 		int $refused_articles,
 		int $errored_articles,
+		int $pending_articles = 0,
 		?string $finished_at = null
 	): bool {
 		$finished = $finished_at ?? gmdate( 'Y-m-d H:i:s' );
@@ -257,6 +287,7 @@ class StepsRepository {
 				'successful_articles' => $successful_articles,
 				'refused_articles'    => $refused_articles,
 				'errored_articles'    => $errored_articles,
+				'pending_articles'    => $pending_articles,
 				'finished_at'         => $finished,
 			),
 			array( 'step_uuid' => $uuid )

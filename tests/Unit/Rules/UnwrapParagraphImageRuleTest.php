@@ -1,8 +1,8 @@
 <?php
 /**
- * Tests UnwrapParagraphImageRule (P10).
+ * Tests UnwrapParagraphImageRule (R10).
  *
- * Symétrique de UnwrapHeadingImageRuleTest (P9) appliqué aux `<p>`.
+ * Symétrique de UnwrapHeadingImageRuleTest (R9) appliqué aux `<p>`.
  * Couvre :
  *  - Cas canonique : `<p><img></p>` → `<img>` (article 19087 du corpus MMM).
  *  - Wrappers internes préservés (`<a>`, `<figure>`, `<picture>`).
@@ -35,7 +35,7 @@ final class UnwrapParagraphImageRuleTest extends TestCase {
 	}
 
 	public function test_id_is_P10(): void {
-		$this->assertSame( 'P10', $this->rule->id() );
+		$this->assertSame( 'R10', $this->rule->id() );
 	}
 
 	public function test_label_is_not_empty(): void {
@@ -78,7 +78,7 @@ final class UnwrapParagraphImageRuleTest extends TestCase {
 		// NBSP autour du `<img>` : le matching de "pseudo-vide" les ignore
 		// (traités comme blancs), donc le `<p>` est bien désencapsulé. En
 		// revanche l'unwrap **préserve tous les enfants** y compris les
-		// NBSP — cohérent avec P9. Le cleanup éventuel des NBSP orphelins
+		// NBSP — cohérent avec R9. Le cleanup éventuel des NBSP orphelins
 		// est hors scope de cette règle (à la charge d'une règle dédiée ou
 		// d'un nettoyage manuel post-pipeline).
 		$input    = '<p>&nbsp;<img src="x.jpg" alt="x">&nbsp;</p>';
@@ -103,7 +103,7 @@ final class UnwrapParagraphImageRuleTest extends TestCase {
 	}
 
 	public function test_preserves_empty_p_without_image(): void {
-		// `<p>` vide sans image — c'est P1 qui s'en occupe, pas P10.
+		// `<p>` vide sans image — c'est R1 qui s'en occupe, pas R10.
 		$input = '<p></p>';
 		$this->assertHtmlEquals( $input, $this->rule->apply( $input ) );
 	}
@@ -136,13 +136,13 @@ final class UnwrapParagraphImageRuleTest extends TestCase {
 	// =========================================================================
 
 	public function test_does_not_unwrap_heading_with_image(): void {
-		// P10 ne traite que les `<p>` — les `<h*>` sont la responsabilité de P9.
+		// R10 ne traite que les `<p>` — les `<h*>` sont la responsabilité de R9.
 		$input = '<h2><img src="x.jpg" alt="x"></h2>';
 		$this->assertHtmlEquals( $input, $this->rule->apply( $input ) );
 	}
 
 	public function test_does_not_unwrap_div_with_image(): void {
-		// `<div>` ≠ `<p>` ; P10 limite stricte.
+		// `<div>` ≠ `<p>` ; R10 limite stricte.
 		$input = '<div><img src="x.jpg" alt="x"></div>';
 		$this->assertHtmlEquals( $input, $this->rule->apply( $input ) );
 	}
@@ -170,7 +170,7 @@ final class UnwrapParagraphImageRuleTest extends TestCase {
 	}
 
 	public function test_count_matches_does_not_count_headings(): void {
-		// P9 traite les `<h*>`, pas P10.
+		// R9 traite les `<h*>`, pas R10.
 		$html = '<h2><img src="x.jpg" alt="x"></h2><p><img src="y.jpg" alt="y"></p>';
 		$this->assertSame( 1, $this->rule->countMatches( $html ) );
 	}

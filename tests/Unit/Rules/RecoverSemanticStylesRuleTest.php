@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P8 — RecoverSemanticStylesRule.
+ * Tests R8 — RecoverSemanticStylesRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -19,7 +19,7 @@ final class RecoverSemanticStylesRuleTest extends TestCase {
 
 	public function test_id_and_label(): void {
 		$rule = new RecoverSemanticStylesRule();
-		$this->assertSame( 'P8', $rule->id() );
+		$this->assertSame( 'R8', $rule->id() );
 		$this->assertNotEmpty( $rule->label() );
 	}
 

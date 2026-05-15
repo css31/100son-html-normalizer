@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P7 — AsciiListRule.
+ * Tests R7 — AsciiListRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -19,7 +19,7 @@ final class AsciiListRuleTest extends TestCase {
 
 	public function test_id_and_label(): void {
 		$rule = new AsciiListRule();
-		$this->assertSame( 'P7', $rule->id() );
+		$this->assertSame( 'R7', $rule->id() );
 		$this->assertNotEmpty( $rule->label() );
 	}
 

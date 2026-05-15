@@ -1,6 +1,6 @@
 <?php
 /**
- * P6 — RemoveInlineStylesRule.
+ * R6 — RemoveInlineStylesRule.
  *
  * Supprime les attributs `style="..."` du HTML.
  *
@@ -28,7 +28,7 @@
  * declenche un "contenu invalide" Gutenberg a la prochaine ouverture du
  * bloc dans l'editeur. Cf. CLAUDE.md §6 (pieges) — invariant a respecter.
  *
- * Cf. cahier section 3.1 F2.P6 et section 8 F2.P6.
+ * Cf. cahier section 3.1 F2.R6 et section 8 F2.R6.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -44,7 +44,7 @@ use DOMElement;
 use DOMXPath;
 
 /**
- * Preset P6 : suppression des styles inline.
+ * Preset R6 : suppression des styles inline.
  */
 final class RemoveInlineStylesRule implements RuleInterface {
 
@@ -68,7 +68,7 @@ final class RemoveInlineStylesRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P6';
+		return 'R6';
 	}
 
 	/**

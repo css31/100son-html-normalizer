@@ -127,8 +127,8 @@ final class DiffController extends BaseController {
 		// du pipeline et, **à chaque étape**, on compte les occurrences sur
 		// l'état HTML courant AVANT d'appliquer la règle. C'est la sémantique
 		// correcte du `applied_rules` retourné dans le payload — sans cette
-		// cascade, les règles tardives (ex. P6) comptaient des occurrences
-		// dans des structures que les règles précédentes (ex. P4 sur les
+		// cascade, les règles tardives (ex. R6) comptaient des occurrences
+		// dans des structures que les règles précédentes (ex. R4 sur les
 		// Pinterest) allaient supprimer, gonflant artificiellement les totaux
 		// affichés et faussant l'estimation du temps de surlignage côté SPA
 		// (cf. `assets/src/admin-spa/utils/estimateDiffSeconds.js`).
@@ -215,7 +215,7 @@ final class DiffController extends BaseController {
 	/**
 	 * Normalise une chaine HTML pour l'affichage dans la modale Diff —
 	 * round-trip via le meme helper `DomHtml` que les regles DOM-aware
-	 * (P1, P2, P4, P6, P7, P8). Effets visibles :
+	 * (R1, R2, R4, R6, R7, R8). Effets visibles :
 	 *  - double-espaces entre attributs reduits a un simple ;
 	 *  - espace avant `>` retire en fin de tag ;
 	 *  - auto-fermeture XHTML `<img …/>` reserialisee en HTML5 `<img …>` ;

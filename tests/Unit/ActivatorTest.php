@@ -27,7 +27,7 @@ final class ActivatorTest extends TestCase {
 
 	public function test_db_version_constant_is_set(): void {
 		// Cohérence : la constante doit être bumpée a chaque évolution de schema.
-		$this->assertSame( '2.1.0', Activator::DB_VERSION );
+		$this->assertSame( '2.2.0', Activator::DB_VERSION );
 	}
 
 	public function test_activate_seeds_settings_option(): void {
@@ -41,8 +41,8 @@ final class ActivatorTest extends TestCase {
 		Activator::activate();
 		$presets = $GLOBALS['son100_htmln_options']['son100_htmln_presets'] ?? null;
 		$this->assertIsArray( $presets );
-		// Les 9 presets doivent etre presents et actives par defaut.
-		foreach ( [ 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' ] as $id ) {
+		// Les 16 presets doivent etre presents et actives par defaut.
+		foreach ( [ 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16' ] as $id ) {
 			$this->assertArrayHasKey( $id, $presets, "Preset $id manquant" );
 			$this->assertTrue( $presets[ $id ]['enabled'] );
 		}

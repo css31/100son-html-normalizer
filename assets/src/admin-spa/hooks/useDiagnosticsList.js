@@ -30,7 +30,7 @@ import * as api from '../api';
  * @property {number}   [year]     Année (>0).
  * @property {number}   [month]    Mois (1-12).
  * @property {string}   [builder]  siteorigin / gutenberg / other / out.
- * @property {string[]} [rule_ids] IDs internes (P1..P9), filtre OR sur règles applicables.
+ * @property {string[]} [rule_ids] IDs internes (R1..R12), filtre OR sur règles applicables.
  */
 
 /**
@@ -64,7 +64,7 @@ function serializeFilters( filters ) {
 		out.builder = String( filters.builder );
 	}
 	if ( Array.isArray( filters.rule_ids ) && filters.rule_ids.length > 0 ) {
-		// On laisse `apiFetch` sérialiser en `?rule_ids[]=P1&rule_ids[]=P5`
+		// On laisse `apiFetch` sérialiser en `?rule_ids[]=R1&rule_ids[]=R5`
 		// via la convention array native — WP-REST parse en array PHP.
 		out.rule_ids = filters.rule_ids.map( String );
 	}

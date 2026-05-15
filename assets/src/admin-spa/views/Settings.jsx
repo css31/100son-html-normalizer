@@ -69,7 +69,7 @@ const FIELDS = [
 		unit: 'pct',
 		max: 100,
 		hint: __(
-			'Pourcentage de paragraphes que la normalisation peut supprimer (paragraphes vides éliminés par P1, etc.). Default : 5 %.',
+			'Pourcentage de paragraphes que la normalisation peut supprimer (paragraphes vides éliminés par R1, etc.). Default : 5 %.',
 			'100son-html-normalizer'
 		),
 	},

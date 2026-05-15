@@ -44,7 +44,7 @@ final class PresetsControllerTest extends TestCase {
 			$routes
 		);
 		$this->assertContains( '/presets', $paths );
-		$this->assertContains( '/presets/(?P<id>P(?:10|[1-9]))', $paths );
+		$this->assertContains( '/presets/(?P<id>R(?:1[0-6]|[1-9]))', $paths );
 	}
 
 	public function test_register_routes_uses_manage_options_permission(): void {
@@ -60,32 +60,32 @@ final class PresetsControllerTest extends TestCase {
 	//  GET /presets
 	// =========================================================================
 
-	public function test_list_returns_ten_presets_in_canonical_order(): void {
+	public function test_list_returns_sixteen_presets_in_canonical_order(): void {
 		$response = $this->controller()->list_presets( new WP_REST_Request() );
 		$this->assertSame( 200, $response->get_status() );
 		$body = $response->get_data();
-		$this->assertCount( 10, $body['presets'] );
+		$this->assertCount( 16, $body['presets'] );
 		$ids = array_map(
 			static fn( array $p ): string => $p['id'],
 			$body['presets']
 		);
-		// Ordre numérique P1..P10 (l'API trie par id pour l'UI, distinct du
-		// pipeline order qui est P3→P4→P8→P6→P7→P5→P9→P10→P1→P2).
+		// Ordre numérique R1..R16 (l'API trie par id pour l'UI, distinct du
+		// pipeline order qui est R3→R4→R8→R13→R14→R6→R7→R5→R15→R16→R9→R12→R11→R10→R1→R2).
 		$this->assertSame(
-			array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10' ),
+			array( 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16' ),
 			$ids
 		);
 	}
 
 	public function test_list_exposes_label_description_and_defaults_per_preset(): void {
 		$body = $this->controller()->list_presets( new WP_REST_Request() )->get_data();
-		$p5   = $this->find_preset( $body['presets'], 'P5' );
+		$p5   = $this->find_preset( $body['presets'], 'R5' );
 		$this->assertNotEmpty( $p5['label'] );
 		$this->assertNotEmpty( $p5['description'] );
 		$this->assertTrue( $p5['has_options'] );
 		$this->assertSame( 2, $p5['defaults']['threshold'] );
 
-		$p1 = $this->find_preset( $body['presets'], 'P1' );
+		$p1 = $this->find_preset( $body['presets'], 'R1' );
 		$this->assertFalse( $p1['has_options'] );
 		$this->assertSame( array(), $p1['defaults'] );
 	}
@@ -94,22 +94,22 @@ final class PresetsControllerTest extends TestCase {
 		update_option(
 			'son100_htmln_presets',
 			array(
-				'P5' => array(
+				'R5' => array(
 					'enabled'   => true,
 					'threshold' => 7,
 				),
-				'P6' => array(
+				'R6' => array(
 					'enabled'         => false,
 					'keep_text_align' => false,
 				),
 			)
 		);
 		$body = $this->controller()->list_presets( new WP_REST_Request() )->get_data();
-		$p5   = $this->find_preset( $body['presets'], 'P5' );
+		$p5   = $this->find_preset( $body['presets'], 'R5' );
 		$this->assertTrue( $p5['enabled'] );
 		$this->assertSame( 7, $p5['params']['threshold'] );
 
-		$p6 = $this->find_preset( $body['presets'], 'P6' );
+		$p6 = $this->find_preset( $body['presets'], 'R6' );
 		$this->assertFalse( $p6['enabled'] );
 		$this->assertFalse( $p6['params']['keep_text_align'] );
 	}
@@ -118,7 +118,7 @@ final class PresetsControllerTest extends TestCase {
 		update_option(
 			'son100_htmln_presets',
 			array(
-				'P7' => array(
+				'R7' => array(
 					'enabled'        => true,
 					'threshold'      => 3,
 					'markers'        => array(
@@ -131,7 +131,7 @@ final class PresetsControllerTest extends TestCase {
 		);
 		$p7 = $this->find_preset(
 			$this->controller()->list_presets( new WP_REST_Request() )->get_data()['presets'],
-			'P7'
+			'R7'
 		);
 		$this->assertSame( 3, $p7['params']['threshold'] );
 		$this->assertTrue( $p7['params']['markers']['dash'] );
@@ -148,14 +148,14 @@ final class PresetsControllerTest extends TestCase {
 		update_option(
 			'son100_htmln_presets',
 			array(
-				'P5' => array(
+				'R5' => array(
 					'enabled'   => true,
 					'threshold' => 5,
 				),
 			)
 		);
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P5' );
+		$request->set_param( 'id', 'R5' );
 		$request->set_param( 'enabled', false );
 		$response = $this->controller()->update_preset( $request );
 		$this->assertSame( 200, $response->get_status() );
@@ -166,7 +166,7 @@ final class PresetsControllerTest extends TestCase {
 
 	public function test_update_sanitizes_p5_threshold_out_of_range(): void {
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P5' );
+		$request->set_param( 'id', 'R5' );
 		$request->set_param( 'params', array( 'threshold' => 50 ) ); // > max 20
 		$response = $this->controller()->update_preset( $request );
 		$preset   = $response->get_data()['preset'];
@@ -176,7 +176,7 @@ final class PresetsControllerTest extends TestCase {
 
 	public function test_update_writes_p7_markers_and_filters_empty_custom(): void {
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P7' );
+		$request->set_param( 'id', 'R7' );
 		$request->set_param(
 			'params',
 			array(
@@ -199,7 +199,7 @@ final class PresetsControllerTest extends TestCase {
 
 	public function test_update_p8_mappings_default_to_true_when_missing(): void {
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P8' );
+		$request->set_param( 'id', 'R8' );
 		$request->set_param( 'enabled', true );
 		$preset = $this->controller()->update_preset( $request )->get_data()['preset'];
 		// Pas de payload `mappings` → defaults true/true.
@@ -209,7 +209,7 @@ final class PresetsControllerTest extends TestCase {
 
 	public function test_update_ignores_params_for_paramless_rules(): void {
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P1' );
+		$request->set_param( 'id', 'R1' );
 		$request->set_param( 'params', array( 'evil_param' => 'oops' ) );
 		$preset = $this->controller()->update_preset( $request )->get_data()['preset'];
 		$this->assertSame( array(), $preset['params'] );
@@ -219,7 +219,7 @@ final class PresetsControllerTest extends TestCase {
 		// La regex de la route empêche normalement d'arriver ici, mais le
 		// filet doit fonctionner.
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P99' );
+		$request->set_param( 'id', 'R99' );
 		$response = $this->controller()->update_preset( $request );
 		$this->assertSame( 404, $response->get_status() );
 		$this->assertSame( 'preset_not_found', $response->get_data()['code'] );
@@ -227,13 +227,13 @@ final class PresetsControllerTest extends TestCase {
 
 	public function test_update_persists_to_option(): void {
 		$request = new WP_REST_Request();
-		$request->set_param( 'id', 'P6' );
+		$request->set_param( 'id', 'R6' );
 		$request->set_param( 'enabled', true );
 		$request->set_param( 'params', array( 'keep_text_align' => false ) );
 		$this->controller()->update_preset( $request );
 		$presets = get_option( 'son100_htmln_presets', array() );
-		$this->assertTrue( $presets['P6']['enabled'] );
-		$this->assertFalse( $presets['P6']['keep_text_align'] );
+		$this->assertTrue( $presets['R6']['enabled'] );
+		$this->assertFalse( $presets['R6']['keep_text_align'] );
 	}
 
 	// =========================================================================

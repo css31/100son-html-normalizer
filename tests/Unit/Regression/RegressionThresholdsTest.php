@@ -84,4 +84,32 @@ final class RegressionThresholdsTest extends TestCase {
 		$this->assertSame( $original->links_loss, $decoded->links_loss );
 		$this->assertSame( $original->lists_loss, $decoded->lists_loss );
 	}
+
+	public function test_relax_text_checks_for_lossy_sets_text_and_words_to_100(): void {
+		$strict = new RegressionThresholds(
+			text_loss_pct: 0,
+			words_loss_pct: 0,
+			paragraphs_loss_pct: 5,
+			headings_loss: 0,
+			images_loss: 0,
+			links_loss: 0,
+			lists_loss: 0,
+		);
+		$relaxed = $strict->relax_text_checks_for_lossy();
+		$this->assertSame( 100, $relaxed->text_loss_pct );
+		$this->assertSame( 100, $relaxed->words_loss_pct );
+		// Structurels conservés à l'identique.
+		$this->assertSame( 5, $relaxed->paragraphs_loss_pct );
+		$this->assertSame( 0, $relaxed->headings_loss );
+		$this->assertSame( 0, $relaxed->images_loss );
+		$this->assertSame( 0, $relaxed->links_loss );
+		$this->assertSame( 0, $relaxed->lists_loss );
+	}
+
+	public function test_relax_text_checks_for_lossy_returns_new_instance(): void {
+		$strict  = RegressionThresholds::defaults();
+		$relaxed = $strict->relax_text_checks_for_lossy();
+		$this->assertNotSame( $strict, $relaxed );
+		$this->assertSame( 0, $strict->text_loss_pct, 'l\'instance d\'origine reste inchangée' );
+	}
 }

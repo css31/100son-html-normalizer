@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P3 — ShareaholicShortcodeRule.
+ * Tests R3 — ShareaholicShortcodeRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -24,7 +24,7 @@ final class ShareaholicShortcodeRuleTest extends TestCase {
 	}
 
 	public function test_id_and_label(): void {
-		$this->assertSame( 'P3', $this->rule->id() );
+		$this->assertSame( 'R3', $this->rule->id() );
 		$this->assertNotEmpty( $this->rule->label() );
 	}
 
@@ -60,7 +60,7 @@ final class ShareaholicShortcodeRuleTest extends TestCase {
 	}
 
 	public function test_shortcode_in_paragraph_leaves_empty_p(): void {
-		// P3 supprime le shortcode mais laisse le <p> vide ; P1 le ramasse en pipeline complète.
+		// R3 supprime le shortcode mais laisse le <p> vide ; R1 le ramasse en pipeline complète.
 		$this->assertHtmlEquals( '<p></p>', $this->rule->apply( '<p>[shareaholic id="x"]</p>' ) );
 	}
 

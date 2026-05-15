@@ -13,7 +13,7 @@
  *   ┌──────────────────────────────────────────────────┐
  *   │ ScanBar       [ Scanner… ]   hint                │
  *   │ ApplyStepBar  [ Appliquer ce lot à K articles ]  │
- *   │               N/9 règles sélectionnées — P1, …   │
+ *   │               N/11 règles sélectionnées — R1, …   │
  *   │ FiltersBar    (search, cat, year, …, rules)      │
  *   │ TabsHeader                                       │
  *   │ StepResumeBanner (si lot non-finalisé en BDD)    │
@@ -170,12 +170,13 @@ export default function Normalize() {
 
 	const handleChangePerPage = useCallback(
 		( nextPerPage ) => {
-			// Borne [1, MAX_PER_PAGE=200] côté REST de toute façon, mais on
-			// défend ici aussi pour la cohérence UI. Reset à page 1 dans le
+			// Borne [1, MAX_PER_PAGE=1000] côté REST. On clamp ici aussi
+			// pour la cohérence UI et pour absorber l'option « Tous » qui
+			// passe `total` (≤ corpus) en valeur. Reset à page 1 dans le
 			// même dispatch — l'offset précédent n'a plus de sens.
 			const clamped = Math.max(
 				1,
-				Math.min( 200, Number( nextPerPage ) || 50 )
+				Math.min( 1000, Number( nextPerPage ) || 50 )
 			);
 			setNormalizeView( { perPage: clamped, page: 1 } );
 		},
@@ -186,6 +187,7 @@ export default function Normalize() {
 		isScanning,
 		progress: scanProgress,
 		error: scanError,
+		lastFinalize: scanLastFinalize,
 		startScan,
 		reset: dismissScanError,
 	} = useScanBatch( handleScanComplete );
@@ -277,6 +279,7 @@ export default function Normalize() {
 					error={ scanError }
 					disabled={ isRunning }
 					selectedPostCount={ selectedPostIds.size }
+					lastFinalize={ scanLastFinalize }
 					onScan={ () =>
 						startScan(
 							selectedPostIds.size > 0
@@ -285,6 +288,7 @@ export default function Normalize() {
 						)
 					}
 					onDismissError={ dismissScanError }
+					onDismissFinalize={ dismissScanError }
 				/>
 
 				<ApplyStepBar

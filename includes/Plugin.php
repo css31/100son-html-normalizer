@@ -235,11 +235,20 @@ final class Plugin {
 				self::make_step_runner(),
 				new StepsRepository(),
 			),
-			new DiagnosticsController( $batch_runner, $diag_repo, new BuilderClassifier() ),
+			new DiagnosticsController(
+				$batch_runner,
+				$diag_repo,
+				new BuilderClassifier(),
+				new \Cent_Son\Html_Normalizer\Core\Lifecycle\RuleAutoDisabler(
+					$settings,
+					$diag_repo,
+					new StepsRepository(),
+				),
+			),
 			new PostsController( $settings, $post_normalizer, $so_detector ),
 			new DiffController( $preset_registry, $metrics, new BuilderClassifier() ),
 			new SettingsController( $settings ),
-			new PresetsController( $settings, $preset_registry ),
+			new PresetsController( $settings, $preset_registry, new StepsRepository(), $diag_repo ),
 			new NotesController( $rich_notes ),
 		);
 	}

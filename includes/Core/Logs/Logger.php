@@ -62,7 +62,7 @@ final class Logger {
 	/**
 	 * Logue une sauvegarde de configuration des prereglages.
 	 *
-	 * @param string $message Description courte du changement (ex: "P3 desactive, P5 seuil 2->3").
+	 * @param string $message Description courte du changement (ex: "R3 desactive, R5 seuil 2->3").
 	 * @return void
 	 */
 	public function log_settings_change( string $message = '' ): void {

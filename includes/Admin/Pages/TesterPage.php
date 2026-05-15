@@ -3,7 +3,7 @@
  * Page admin "Tester un fragment".
  *
  * Textarea + bouton "Normaliser" + affichage avant/après. Utile pour valider
- * la configuration des préréglages sur du HTML réel sans toucher d'article.
+ * la configuration des règles sur du HTML réel sans toucher d'article.
  *
  * V0.1 minimale (POST handler classique). Sera complétée par la SPA + REST
  * en phase 11/15 du §11.
@@ -48,7 +48,7 @@ final class TesterPage {
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'HTML Normalizer — Tester un fragment', '100son-html-normalizer' ) . '</h1>';
-		echo '<p>' . esc_html__( 'Collez un fragment HTML pour voir le résultat avec votre configuration de préréglages. Limité à 50 Ko.', '100son-html-normalizer' ) . '</p>';
+		echo '<p>' . esc_html__( 'Collez un fragment HTML pour voir le résultat avec votre configuration de règles. Limité à 50 Ko.', '100son-html-normalizer' ) . '</p>';
 
 		if ( '' !== $error ) {
 			echo '<div class="notice notice-error"><p>' . esc_html( $error ) . '</p></div>';

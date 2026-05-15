@@ -270,15 +270,16 @@ export default function StepDetailDrawer( {
 						<dt>{ __( 'Articles', '100son-html-normalizer' ) }</dt>
 						<dd>
 							{ sprintf(
-								// translators: 1 = total, 2 = validés, 3 = refusés, 4 = erreurs.
+								// translators: 1 = total, 2 = validés, 3 = refusés, 4 = erreurs, 5 = en attente d'arbitrage.
 								__(
-									'%1$d au total · ✓ %2$d validés · ✗ %3$d refusés · ⚠ %4$d en erreur',
+									'%1$d au total · ✓ %2$d validés · ✗ %3$d refusés · ⚠ %4$d en erreur · ⏸ %5$d en attente',
 									'100son-html-normalizer'
 								),
 								Number( step.total_articles ) || 0,
 								Number( step.successful_articles ) || 0,
 								Number( step.refused_articles ) || 0,
-								Number( step.errored_articles ) || 0
+								Number( step.errored_articles ) || 0,
+								Number( step.pending_articles ) || 0
 							) }
 						</dd>
 

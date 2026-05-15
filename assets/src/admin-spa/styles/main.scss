@@ -484,7 +484,7 @@
 .htmln-rules-filter__popover {
 	/* Largeur calée sur celle du bouton-toggle (130 px) pour un effet
 	 * « la liste descend du bouton ». `white-space: nowrap` sur les
-	 * libellés des cases (cf. plus bas) garantit que `P2.1 (766)`
+	 * libellés des cases (cf. plus bas) garantit que `R10 (766)`
 	 * reste sur une ligne dans ces 130 px. */
 	min-width: 130px;
 	width: 130px;
@@ -611,7 +611,7 @@
 
 /* Chip rule_id dans la cellule « Règles applicables » du tableau Normaliser.
  * Le `title=` attribute déclenche le tooltip natif du navigateur (label
- * humain de la règle, ex. « Paragraphes vides » pour P1). On signale
+ * humain de la règle, ex. « Paragraphes vides » pour R1). On signale
  * visuellement la présence du tooltip par un curseur `help` et un soulign
  * pointillé discret au survol. */
 .htmln-rule-chip {
@@ -661,6 +661,16 @@
 	line-height: 1.6;
 	white-space: nowrap;
 	text-decoration: none;
+}
+
+/* Bouton « Voir le diff » dans la dernière colonne — même gabarit visuel
+ * compact que « Éditer » (cohérence inter-colonnes). `@wordpress/components`
+ * applique déjà la teinte secondaire, on aligne juste taille/padding. */
+.htmln-articles-table__diff-btn {
+	font-size: 11px;
+	padding: 2px 8px;
+	line-height: 1.6;
+	white-space: nowrap;
 }
 
 /* Cellule « Ouvrir sur » — flex row qui aligne les boutons Old / Prod
@@ -734,7 +744,7 @@
 }
 
 /* =============================================================================
- *  Onglet Règles — cards par préréglage
+ *  Onglet Règles — cards par règle
  * ========================================================================== */
 
 .htmln-rules__header {
@@ -774,31 +784,117 @@
 }
 
 .htmln-rules__list {
-	display: flex;
-	flex-direction: column;
+	/* Layout 3 colonnes en grand écran, dégradation responsive vers 2 puis
+	 * 1 colonne. `align-items: stretch` (défaut CSS Grid) garantit que
+	 * toutes les cards d'une même rangée prennent la hauteur de la plus
+	 * grande — alignement visuel des bordures inférieures. */
+	display: grid;
+	grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
 	gap: 16px;
+
+	@media ( max-width: 1400px ) {
+		grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+	}
+
+	@media ( max-width: 900px ) {
+		grid-template-columns: 1fr;
+	}
 }
 
 .htmln-rule {
 	background: var( --htmln-bg-paper );
 	border: 1px solid var( --htmln-border );
 	border-radius: var( --htmln-radius-lg );
-	padding: 20px 24px;
+	padding: 16px 18px;
 	transition: opacity 0.15s ease;
+	min-width: 0;
 
 	&--disabled {
 		opacity: 0.55;
 		background: var( --htmln-bg-subtle );
 	}
+
+	/* R7 (Listes ASCII) embarque le plus de paramètres (seuil + 5
+	 * marqueurs + textarea custom). On lui donne 2 colonnes du grid
+	 * parent ET on découpe son contenu en sous-grille interne :
+	 *
+	 *   ┌─────────────────────────┬─────────────────────────┐
+	 *   │ header (titre + actions)│ (continu sur 2 col)     │
+	 *   ├─────────────────────────┴─────────────────────────┤
+	 *   │ description (continu sur 2 col)                   │
+	 *   ├─────────────────────────┬─────────────────────────┤
+	 *   │ Paramètres              │ Avant                   │
+	 *   │                         ├─────────────────────────┤
+	 *   │                         │ Après                   │
+	 *   └─────────────────────────┴─────────────────────────┘
+	 *
+	 * En 1 col responsive (≤ 900 px), tout retombe en pile verticale.
+	 */
+	&[ data-rule-id="R7" ] {
+		grid-column: span 2;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		column-gap: 16px;
+		row-gap: 12px;
+
+		> .htmln-rule__header,
+		> .htmln-rule__description {
+			grid-column: 1 / -1;
+		}
+
+		/* Fieldset Paramètres : on garde le comportement natif de la
+		 * `<legend>` (sit sur le top border, texte au-dessus de la ligne).
+		 * Padding-left aligné sur celui d'example-col pour la cohérence
+		 * verticale entre colonnes. */
+		> .htmln-rule__params {
+			grid-column: 1 / 2;
+			align-self: start;
+			margin-bottom: 0;
+			padding-left: 14px;
+			padding-right: 14px;
+			min-inline-size: 0;
+
+			legend {
+				font-weight: 600;
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var( --htmln-text-muted );
+				padding: 0 6px;
+			}
+		}
+
+		/* L'exemple garde son flex column (Avant puis Après empilés),
+		 * il occupe simplement la 2ᵉ colonne de la grille interne. */
+		> .htmln-rule__example {
+			grid-column: 2 / 3;
+			align-self: start;
+		}
+
+		@media ( max-width: 900px ) {
+			grid-column: auto;
+			grid-template-columns: 1fr;
+
+			> .htmln-rule__header,
+			> .htmln-rule__description,
+			> .htmln-rule__params,
+			> .htmln-rule__example {
+				grid-column: auto;
+			}
+		}
+	}
 }
 
 .htmln-rule__header {
+	/* Titre + actions empilés verticalement (en colonne étroite ~340 px,
+	 * tenter les côte-à-côte serait illisible). Le bloc actions interne
+	 * est lui-même horizontal — case à cocher et toggle sur la même
+	 * ligne. */
 	display: flex;
+	flex-direction: column;
 	align-items: flex-start;
-	justify-content: space-between;
-	gap: var( --htmln-gap-lg );
+	gap: 10px;
 	margin-bottom: 12px;
-	flex-wrap: wrap;
 }
 
 .htmln-rule__title {
@@ -834,28 +930,108 @@
 }
 
 .htmln-rule__actions {
+	/* Case à cocher (« Dans le lot ») et toggle (« Activée ») sur la
+	 * même ligne — libellés compacts qui tiennent en flex row sans
+	 * passer à la ligne, même en card étroite. */
 	display: flex;
 	flex-direction: row;
-	flex-wrap: nowrap;
-	gap: var( --htmln-gap-lg );
+	flex-wrap: wrap;
+	gap: 16px;
 	align-items: center;
+	width: 100%;
 
-	/* `CheckboxControl` et `ToggleControl` ont leurs propres margins via
-	 * `@wordpress/components` — on les compacte ici. */
 	.components-base-control {
 		margin-bottom: 0;
 	}
 
-	/* Empêche les libellés multi-mots (« Sélectionnée pour le prochain
-	 * lot ») de wrapper sur 2 lignes : ils restent compacts à côté de leur
-	 * contrôle. Si la ligne titre + actions ne tient pas, le parent
-	 * `.htmln-rule__header` (flex-wrap: wrap) bascule le bloc actions
-	 * sous le titre — comportement responsive attendu. */
 	.components-base-control__label,
 	.components-checkbox-control__label,
 	.components-toggle-control .components-form-toggle + label,
 	.components-toggle-control label {
+		font-size: 13px;
 		white-space: nowrap;
+	}
+}
+
+.htmln-rule__threshold-row {
+	/* Input numérique compact (75 px max) avec le texte explicatif côté
+	 * droit, aligné sur le haut du contrôle — économise la hauteur
+	 * verticale dans une card 3-colonnes. */
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 12px;
+
+	.components-base-control {
+		flex: 0 0 auto;
+		margin-bottom: 0;
+	}
+
+	.components-text-control__input {
+		max-width: 75px;
+	}
+}
+
+.htmln-rule__threshold-help {
+	flex: 1 1 auto;
+	margin: 0;
+	padding-top: 22px; /* aligne le haut du texte avec le haut de l'input (offset label TextControl) */
+	font-size: 12px;
+	line-height: 1.4;
+	color: var( --htmln-text-muted );
+}
+
+/* Bandeau d'état d'application (R-card) — affiché entre le header
+ * et la description quand `completion_state` n'est pas `pending`. */
+.htmln-rule__completion {
+	margin: 0 0 12px;
+	padding: 8px 12px;
+	font-size: 12px;
+	line-height: 1.5;
+	border-radius: var( --htmln-radius );
+	border: 1px solid transparent;
+
+	&--complete {
+		background: rgb( 16 185 129 / 8% );
+		border-color: rgb( 16 185 129 / 30% );
+		color: rgb( 6 95 70 );
+	}
+
+	&--unused {
+		background: var( --htmln-bg-subtle );
+		border-color: var( --htmln-border );
+		color: var( --htmln-text-muted );
+	}
+}
+
+.htmln-rule__completion-icon {
+	display: inline-block;
+	font-weight: 700;
+	margin-right: 4px;
+}
+
+.htmln-rule__completion-override {
+	/* Bouton « Réactiver pour cette session » : style link discret. */
+	font-size: 11px !important;
+	text-decoration: underline;
+	margin-left: 6px !important;
+	padding: 0 !important;
+	height: auto !important;
+	min-height: 0 !important;
+}
+
+/* Card en état « verrouillée » : un peu plus discrète que la version
+ * --disabled (qui correspond au toggle off). */
+.htmln-rule--locked {
+	background: linear-gradient(
+		0deg,
+		rgb( 16 185 129 / 3% ),
+		rgb( 16 185 129 / 3% )
+	), var( --htmln-bg-paper );
+
+	.htmln-rule__code {
+		opacity: 0.75;
 	}
 }
 
@@ -903,25 +1079,38 @@
 }
 
 .htmln-rule__example {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 12px;
-
-	@media ( max-width: 900px ) {
-		grid-template-columns: 1fr;
-	}
+	/* En colonne étroite (3 colonnes), Avant/Après s'empilent toujours
+	 * verticalement (plutôt que 2 colonnes côte à côte) pour préserver la
+	 * lisibilité des fragments HTML. */
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 }
 
 .htmln-rule__example-col {
+	/* Reproduit le pattern fieldset/legend : le titre `h4` est positionné
+	 * absolument SUR le top border (centré verticalement dessus via
+	 * `translateY(-50%)`), avec un fond opaque qui masque la portion
+	 * de border située derrière le texte. Le contenu `<pre>` démarre
+	 * dans le padding normal du box. */
+	position: relative;
 	background: var( --htmln-bg-subtle );
 	border: 1px solid var( --htmln-border );
 	border-radius: var( --htmln-radius );
-	padding: 12px 14px;
+	padding: 14px 14px 12px;
 	min-width: 0;
 
 	h4 {
-		margin: 0 0 8px;
+		position: absolute;
+		top: 0;
+		left: 12px;
+		transform: translateY( -50% );
+		margin: 0;
+		padding: 0 6px;
+		background: var( --htmln-bg-paper );
 		font-size: 12px;
+		font-weight: 600;
+		line-height: 1;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: var( --htmln-text-muted );
@@ -936,6 +1125,13 @@
 		word-break: break-word;
 		color: var( --htmln-text );
 	}
+}
+
+/* Card en état désactivé : la `htmln-rule` passe en `bg-subtle`. Pour
+ * que le masque blanc du `h4` reste cohérent avec le fond visible
+ * derrière `example-col`, on bascule sur la même couleur. */
+.htmln-rule--disabled .htmln-rule__example-col h4 {
+	background: var( --htmln-bg-subtle );
 }
 
 /* =============================================================================
@@ -1352,7 +1548,7 @@
  * intrinsèque, la colonne du milieu empile la phrase summary (taux de
  * perte), la notice « Aucun changement » et les boutons « Code source /
  * Rendu HTML », et la 3e colonne liste les règles ayant matché sur cet
- * article (post-P10).
+ * article (post-R10).
  *
  * Pas de `align-items: flex-start` — on garde la valeur par défaut `stretch`
  * pour que la colonne aside s'étire à la pleine hauteur du tableau, ce qui
@@ -1493,7 +1689,7 @@
 	}
 
 	/* La colonne N° (1er <th scope="row">) reste compacte, monospace pour
-	 * que les `P1.1` / `P10.2` etc. s'alignent visuellement. */
+	 * que les `R1` / `R10` etc. s'alignent visuellement. */
 	th {
 		font-family: SFMono-Regular, Menlo, Consolas, monospace;
 		font-weight: 600;

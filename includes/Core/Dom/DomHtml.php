@@ -2,7 +2,7 @@
 /**
  * DomHtml — helper de parsing / sérialisation de fragments HTML via DOMDocument.
  *
- * Outillage partagé par les règles DOM-aware (P1, P2, P4, P6, P7, P8) pour :
+ * Outillage partagé par les règles DOM-aware (R1, R2, R4, R6, R7, R8) pour :
  *  - parser un fragment sans wrapper `<html><body>` parasite ;
  *  - préserver l'encodage UTF-8 ;
  *  - sérialiser sans réinjecter de DOCTYPE ni de balises racine.

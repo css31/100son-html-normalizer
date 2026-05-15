@@ -777,7 +777,7 @@ export default function DiffModal( {
 					     `applied_rules` (règles à occ > 0) et `localDisabledRules`
 					     (règles que l'utilisateur a décochées et veut pouvoir
 					     re-cocher). Trié par ordre d'affichage UI
-					     (P1.1, P1.2, P2.1, P2.2, P3…). */ }
+					     naturel (R1, R2, R3…, R11). */ }
 					{ visibleRules.length > 0 && (
 						<div className="htmln-diff-modal__metrics-rules">
 							<h3 className="htmln-diff-modal__metrics-rules-title">
@@ -818,7 +818,7 @@ export default function DiffModal( {
 														}
 														__nextHasNoMarginBottom
 														aria-label={ sprintf(
-															// translators: %s = libellé de règle (ex. P2.1).
+															// translators: %s = libellé de règle (ex. R9).
 															__(
 																'Activer ou désactiver la règle %s pour ce diff',
 																'100son-html-normalizer'

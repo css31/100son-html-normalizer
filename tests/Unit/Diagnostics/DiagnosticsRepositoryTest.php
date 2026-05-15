@@ -35,7 +35,7 @@ final class DiagnosticsRepositoryTest extends TestCase {
 			'id'                         => '7',
 			'post_id'                    => '1234',
 			'status'                     => 'to_improve',
-			'matching_rules'             => '[{"rule_id":"P1","occurrences":3},{"rule_id":"P5","occurrences":2}]',
+			'matching_rules'             => '[{"rule_id":"R1","occurrences":3},{"rule_id":"R5","occurrences":2}]',
 			'metrics'                    => '{"chars":1024,"words":150,"paragraphs":12}',
 			'is_stale'                   => '0',
 			'diagnosed_at'               => '2026-05-09 12:34:56',
@@ -47,7 +47,7 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$this->assertSame( 1234, $record->post_id );
 		$this->assertSame( 'to_improve', $record->status );
 		$this->assertCount( 2, $record->matching_rules );
-		$this->assertSame( 'P1', $record->matching_rules[0]['rule_id'] );
+		$this->assertSame( 'R1', $record->matching_rules[0]['rule_id'] );
 		$this->assertSame( 3, $record->matching_rules[0]['occurrences'] );
 		$this->assertSame( 1024, $record->metrics['chars'] );
 		$this->assertFalse( $record->is_stale );
@@ -92,7 +92,7 @@ final class DiagnosticsRepositoryTest extends TestCase {
 			id: null,
 			post_id: 42,
 			status: DiagnosticRecord::STATUS_TO_IMPROVE,
-			matching_rules: array( array( 'rule_id' => 'P1', 'occurrences' => 1 ) ),
+			matching_rules: array( array( 'rule_id' => 'R1', 'occurrences' => 1 ) ),
 			metrics: array( 'chars' => 999 ),
 			is_stale: false,
 			diagnosed_at: '2026-05-09 12:00:00',
@@ -260,25 +260,25 @@ final class DiagnosticsRepositoryTest extends TestCase {
 
 	public function test_list_paginated_with_rule_ids_emits_json_search_or(): void {
 		$this->wpdb->get_results_queue[] = array();
-		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array( 'P9', 'P7' ) ) );
+		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array( 'R9', 'R7' ) ) );
 		$last_sql = end( $this->wpdb->query_log );
 
-		// JSON_SEARCH précis (évite faux positifs P1/P10) et OR entre les règles.
+		// JSON_SEARCH précis (évite faux positifs R1/R10) et OR entre les règles.
 		$this->assertStringContainsString( 'JSON_SEARCH(d.matching_rules', $last_sql );
 		$this->assertStringContainsString( "'$[*].rule_id'", $last_sql );
 		$this->assertStringContainsString( ' OR ', $last_sql );
 		// Les valeurs sont injectées via prepare — on les retrouve quotées.
-		$this->assertStringContainsString( "'P9'", $last_sql );
-		$this->assertStringContainsString( "'P7'", $last_sql );
+		$this->assertStringContainsString( "'R9'", $last_sql );
+		$this->assertStringContainsString( "'R7'", $last_sql );
 	}
 
 	public function test_list_paginated_with_single_rule_id_no_or(): void {
 		$this->wpdb->get_results_queue[] = array();
-		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array( 'P1' ) ) );
+		$this->repo->list_paginated( null, 10, 0, array( 'rule_ids' => array( 'R1' ) ) );
 		$last_sql = end( $this->wpdb->query_log );
 
 		$this->assertStringContainsString( 'JSON_SEARCH(d.matching_rules', $last_sql );
-		$this->assertStringContainsString( "'P1'", $last_sql );
+		$this->assertStringContainsString( "'R1'", $last_sql );
 		// Une seule clause => pas de ` OR ` (mais l'enrobage `(…)` reste).
 		$this->assertStringNotContainsString( ' OR ', $last_sql );
 	}
@@ -297,11 +297,11 @@ final class DiagnosticsRepositoryTest extends TestCase {
 			null,
 			10,
 			0,
-			array( 'rule_ids' => array( 'P1', 42, 'P5' ) )
+			array( 'rule_ids' => array( 'R1', 42, 'R5' ) )
 		);
 		$last_sql = end( $this->wpdb->query_log );
-		$this->assertStringContainsString( "'P1'", $last_sql );
-		$this->assertStringContainsString( "'P5'", $last_sql );
+		$this->assertStringContainsString( "'R1'", $last_sql );
+		$this->assertStringContainsString( "'R5'", $last_sql );
 		$this->assertStringNotContainsString( '42', $last_sql );
 	}
 
@@ -318,31 +318,102 @@ final class DiagnosticsRepositoryTest extends TestCase {
 
 	public function test_count_by_applicable_rule_aggregates_articles_per_rule(): void {
 		$this->wpdb->get_results_queue[] = array(
-			// Article 1 : P1 + P6
-			array( 'matching_rules' => '[{"rule_id":"P1","occurrences":3},{"rule_id":"P6","occurrences":5}]' ),
-			// Article 2 : P1 seul
-			array( 'matching_rules' => '[{"rule_id":"P1","occurrences":1}]' ),
-			// Article 3 : P9
-			array( 'matching_rules' => '[{"rule_id":"P9","occurrences":2}]' ),
+			// Article 1 : R1 + R6
+			array( 'matching_rules' => '[{"rule_id":"R1","occurrences":3},{"rule_id":"R6","occurrences":5}]' ),
+			// Article 2 : R1 seul
+			array( 'matching_rules' => '[{"rule_id":"R1","occurrences":1}]' ),
+			// Article 3 : R9
+			array( 'matching_rules' => '[{"rule_id":"R9","occurrences":2}]' ),
 			// Bruit : JSON invalide → ignoré sans crash
 			array( 'matching_rules' => 'not-a-json' ),
 			// Bruit : array décodable mais entrée non-array → ignoré
-			array( 'matching_rules' => '[null,{"rule_id":"P6","occurrences":1}]' ),
+			array( 'matching_rules' => '[null,{"rule_id":"R6","occurrences":1}]' ),
 		);
 		$counts = $this->repo->count_by_applicable_rule();
-		$this->assertSame( 2, $counts['P1'] );
-		$this->assertSame( 2, $counts['P6'] );
-		$this->assertSame( 1, $counts['P9'] );
-		$this->assertSame( 0, $counts['P3'] );
-		$this->assertSame( 0, $counts['P8'] );
+		$this->assertSame( 2, $counts['R1'] );
+		$this->assertSame( 2, $counts['R6'] );
+		$this->assertSame( 1, $counts['R9'] );
+		$this->assertSame( 0, $counts['R3'] );
+		$this->assertSame( 0, $counts['R8'] );
 	}
 
 	public function test_count_by_applicable_rule_dedupes_per_article(): void {
 		// Même règle 2× dans le même JSON → article compté 1× seulement.
 		$this->wpdb->get_results_queue[] = array(
-			array( 'matching_rules' => '[{"rule_id":"P1","occurrences":1},{"rule_id":"P1","occurrences":2}]' ),
+			array( 'matching_rules' => '[{"rule_id":"R1","occurrences":1},{"rule_id":"R1","occurrences":2}]' ),
 		);
 		$counts = $this->repo->count_by_applicable_rule();
-		$this->assertSame( 1, $counts['P1'] );
+		$this->assertSame( 1, $counts['R1'] );
+	}
+
+	// =========================================================================
+	//  count_total / is_corpus_fully_scanned (auto-désactivation des règles)
+	// =========================================================================
+
+	public function test_count_total_returns_int(): void {
+		$this->wpdb->get_var_queue[] = '758';
+		$this->assertSame( 758, $this->repo->count_total() );
+	}
+
+	public function test_is_corpus_fully_scanned_false_when_table_empty(): void {
+		$this->wpdb->get_var_queue[] = '0';  // count_total
+		$settings                    = new \Cent_Son\Html_Normalizer\Settings\SettingsRepository();
+		$this->assertFalse( $this->repo->is_corpus_fully_scanned( $settings ) );
+	}
+
+	public function test_is_corpus_fully_scanned_true_when_diagnosed_matches_published(): void {
+		$this->wpdb->get_var_queue[] = '758';  // count_total
+		$this->wpdb->get_var_queue[] = '758';  // count(wp_posts publish)
+
+		$settings = $this->make_settings_with_f8( array( 'post' ) );
+		$this->assertTrue( $this->repo->is_corpus_fully_scanned( $settings ) );
+	}
+
+	public function test_is_corpus_fully_scanned_true_when_diagnosed_exceeds_published(): void {
+		// Drift normal : un article diagnostiqué puis dépublié → diagnostics
+		// > publish. On l'accepte (le sous-ensemble actuel est couvert).
+		$this->wpdb->get_var_queue[] = '760';
+		$this->wpdb->get_var_queue[] = '758';
+
+		$settings = $this->make_settings_with_f8( array( 'post' ) );
+		$this->assertTrue( $this->repo->is_corpus_fully_scanned( $settings ) );
+	}
+
+	public function test_is_corpus_fully_scanned_false_when_diagnosed_below_published(): void {
+		$this->wpdb->get_var_queue[] = '700';
+		$this->wpdb->get_var_queue[] = '758';
+
+		$settings = $this->make_settings_with_f8( array( 'post' ) );
+		$this->assertFalse( $this->repo->is_corpus_fully_scanned( $settings ) );
+	}
+
+	public function test_is_corpus_fully_scanned_false_when_f8_selection_empty(): void {
+		$this->wpdb->get_var_queue[] = '1';  // count_total
+		$settings                    = $this->make_settings_with_f8( array() );
+		$this->assertFalse( $this->repo->is_corpus_fully_scanned( $settings ) );
+	}
+
+	public function test_is_corpus_fully_scanned_emits_in_clause_with_post_types(): void {
+		$this->wpdb->get_var_queue[] = '758';
+		$this->wpdb->get_var_queue[] = '758';
+
+		$settings = $this->make_settings_with_f8( array( 'post', 'page' ) );
+		$this->repo->is_corpus_fully_scanned( $settings );
+		$last_sql = end( $this->wpdb->query_log );
+		$this->assertStringContainsString( "'post'", $last_sql );
+		$this->assertStringContainsString( "'page'", $last_sql );
+		$this->assertStringContainsString( "post_status = 'publish'", $last_sql );
+	}
+
+	/**
+	 * Crée un SettingsRepository concret avec une option F8 stockée
+	 * dans la fake options table. Évite d'avoir à mocker la classe.
+	 *
+	 * @param list<string> $post_types
+	 * @return \Cent_Son\Html_Normalizer\Settings\SettingsRepository
+	 */
+	private function make_settings_with_f8( array $post_types ): \Cent_Son\Html_Normalizer\Settings\SettingsRepository {
+		update_option( 'son100_htmln_settings', array( 'f8_post_types_selection' => $post_types ) );
+		return new \Cent_Son\Html_Normalizer\Settings\SettingsRepository();
 	}
 }

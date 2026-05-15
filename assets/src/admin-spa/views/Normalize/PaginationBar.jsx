@@ -8,7 +8,10 @@
  *
  * Trois zones, alignées sur la convention WP-list-table :
  *
- *  - **Gauche** : dropdown « Par page » (20 / 50 / 100 / 200 max).
+ *  - **Gauche** : dropdown « Par page » (20 / 50 / 100 / 200 / Tous (N))
+ *                — l'option « Tous » résout vers `total`, plafonné à 1000
+ *                côté REST (`DiagnosticsController::MAX_PER_PAGE`), pour
+ *                permettre la sélection bulk sur tout le corpus filtré.
  *  - **Centre** : compte total des articles (`N article(s)`).
  *  - **Droite** : Précédent | 1 2 3 … 14 15 16 | Suivant
  *                (rc4 : pagination numérotée cliquable, cf. `buildPageRange`).
@@ -26,17 +29,59 @@ import { __, sprintf } from '@wordpress/i18n';
 import { Button, SelectControl, Spinner } from '@wordpress/components';
 
 /**
- * Options du dropdown « Par page ». Plafonné à MAX_PER_PAGE = 200 côté
- * REST (cf. `DiagnosticsController::MAX_PER_PAGE`).
+ * Options numériques du dropdown « Par page ». Plafonné à MAX_PER_PAGE
+ * = 1000 côté REST (cf. `DiagnosticsController::MAX_PER_PAGE`).
+ * L'option « Tous » est ajoutée dynamiquement dans `buildPerPageOptions`
+ * car son libellé dépend du `total` courant.
  *
  * @type {Array<{value: string, label: string}>}
  */
-const PER_PAGE_OPTIONS = [
+const PER_PAGE_NUMERIC_OPTIONS = [
 	{ value: '20', label: '20' },
 	{ value: '50', label: '50' },
 	{ value: '100', label: '100' },
 	{ value: '200', label: '200' },
 ];
+
+/**
+ * Valeur sentinelle pour l'option « Tous » dans le SelectControl. Reçue
+ * dans `onChange`, on la résout vers `total` pour appeler
+ * `onChangePerPage`.
+ *
+ * @type {string}
+ */
+const ALL_VALUE = 'all';
+
+/**
+ * Construit la liste finale d'options selon `total` et `perPage` :
+ *  - on filtre les options numériques > total (montrer « 200 » alors qu'il
+ *    n'y a que 17 articles n'a pas de sens) ;
+ *  - on ajoute en queue l'option « Tous (N) » dès que `total > 0`.
+ *
+ * @param {number} total   Nombre total d'articles non paginé.
+ * @param {number} perPage Per-page courant — utilisé pour conserver
+ *                         l'option numérique sélectionnée même si elle
+ *                         serait normalement filtrée (cas rare : on
+ *                         change de filtre et le total baisse).
+ * @return {Array<{value: string, label: string}>} Options.
+ */
+function buildPerPageOptions( total, perPage ) {
+	const numeric = PER_PAGE_NUMERIC_OPTIONS.filter(
+		( opt ) =>
+			Number( opt.value ) <= total || Number( opt.value ) === perPage
+	);
+	if ( total > 0 ) {
+		numeric.push( {
+			value: ALL_VALUE,
+			label: sprintf(
+				// translators: %d = nombre total d'articles.
+				__( 'Tous (%d)', '100son-html-normalizer' ),
+				total
+			),
+		} );
+	}
+	return numeric;
+}
 
 /**
  * Sentinelle d'ellipsis dans la liste de pages — `Number.NaN` permettrait
@@ -125,6 +170,11 @@ export default function PaginationBar( {
 } ) {
 	const safeTotalPages = Math.max( 1, totalPages );
 	const pageItems = buildPageRange( page, safeTotalPages );
+	const perPageOptions = buildPerPageOptions( total, perPage );
+	// Si perPage ≥ total (>0), l'utilisateur voit déjà tout : le select
+	// affiche « Tous (N) » en lieu et place de la valeur numérique.
+	const perPageSelectedValue =
+		total > 0 && perPage >= total ? ALL_VALUE : String( perPage );
 
 	return (
 		<div className={ `htmln-pagination htmln-pagination--${ position }` }>
@@ -142,9 +192,15 @@ export default function PaginationBar( {
 				<SelectControl
 					label={ __( 'Par page', '100son-html-normalizer' ) }
 					hideLabelFromVision
-					value={ String( perPage ) }
-					options={ PER_PAGE_OPTIONS }
-					onChange={ ( raw ) => onChangePerPage( Number( raw ) ) }
+					value={ perPageSelectedValue }
+					options={ perPageOptions }
+					onChange={ ( raw ) => {
+						if ( ALL_VALUE === raw ) {
+							onChangePerPage( Math.max( 1, total ) );
+							return;
+						}
+						onChangePerPage( Number( raw ) );
+					} }
 					disabled={ isLoading }
 					__nextHasNoMarginBottom
 				/>

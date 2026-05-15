@@ -35,9 +35,9 @@ final class PublicApiTest extends TestCase {
 			}
 			public function get_preset_config( string $preset_id ): array {
 				return match ( $preset_id ) {
-					'P5' => [ 'enabled' => true, 'threshold' => 2 ],
-					'P6' => [ 'enabled' => true, 'keep_text_align' => true ],
-					'P7' => [
+					'R5' => [ 'enabled' => true, 'threshold' => 2 ],
+					'R6' => [ 'enabled' => true, 'keep_text_align' => true ],
+					'R7' => [
 						'enabled'        => true,
 						'threshold'      => 2,
 						'markers'        => [
@@ -46,7 +46,7 @@ final class PublicApiTest extends TestCase {
 						],
 						'custom_markers' => [],
 					],
-					'P8' => [ 'enabled' => true, 'mappings' => [ 'bold' => true, 'italic' => true ] ],
+					'R8' => [ 'enabled' => true, 'mappings' => [ 'bold' => true, 'italic' => true ] ],
 					default => [ 'enabled' => true ],
 				};
 			}
@@ -86,5 +86,56 @@ final class PublicApiTest extends TestCase {
 		// Garde-fou cahier section 13 : "toujours retourner string, jamais throw".
 		$result = $this->api->on_filter_normalize( '<<<not really html>>>', [] );
 		$this->assertIsString( $result );
+	}
+
+	public function test_filter_converts_h4_caption_to_figcaption(): void {
+		// R11 — pattern typique corpus MMM-2 (article 491).
+		$dirty  = '<p><a href="https://example.test/big.jpg"><img src="https://example.test/thumb.jpg" alt="x"></a></p>'
+			. '<h4>Ma légende détournée</h4>';
+		$result = $this->api->on_filter_normalize( $dirty, [ 'source' => 'test' ] );
+		$this->assertHtmlEquals(
+			'<figure><a href="https://example.test/big.jpg"><img src="https://example.test/thumb.jpg" alt="x"></a><figcaption>Ma légende détournée</figcaption></figure>',
+			$result
+		);
+	}
+
+	public function test_filter_converts_h4_mixed_image_caption_to_figure(): void {
+		// R12 — pattern intra-h4 (post 756).
+		$dirty  = '<h4><a href="https://example.test/big.jpg"><img src="https://example.test/thumb.jpg" alt="x"></a> Meuble Ikea.</h4>';
+		$result = $this->api->on_filter_normalize( $dirty, [ 'source' => 'test' ] );
+		$this->assertHtmlEquals(
+			'<figure><a href="https://example.test/big.jpg"><img src="https://example.test/thumb.jpg" alt="x"></a><figcaption>Meuble Ikea.</figcaption></figure>',
+			$result
+		);
+	}
+
+	public function test_filter_converts_h4_multi_image_to_figure(): void {
+		// R12 mode tolérant : 2 imgs partageant une figcaption unique.
+		$dirty  = '<h4><a href="a.jpg"><img src="a-t.jpg" alt="a"></a> <a href="b.jpg"><img src="b-t.jpg" alt="b"></a> Avant / après.</h4>';
+		$result = $this->api->on_filter_normalize( $dirty, [ 'source' => 'test' ] );
+		$this->assertHtmlEquals(
+			'<figure><a href="a.jpg"><img src="a-t.jpg" alt="a"></a><a href="b.jpg"><img src="b-t.jpg" alt="b"></a><figcaption>Avant / après.</figcaption></figure>',
+			$result
+		);
+	}
+
+	public function test_filter_promotes_h2_chapo_to_paragraph(): void {
+		// R13 — pattern typique chapô SiteOrigin (post 491).
+		$dirty  = '<h2>Il est rare de rénover sa maison en une unique session. La plupart du temps, ils s\'échelonnent par tranches sur plusieurs années.</h2><p>Suite.</p>';
+		$result = $this->api->on_filter_normalize( $dirty, [ 'source' => 'test' ] );
+		$this->assertHtmlEquals(
+			'<p class="chapo">Il est rare de rénover sa maison en une unique session. La plupart du temps, ils s\'échelonnent par tranches sur plusieurs années.</p><p>Suite.</p>',
+			$result
+		);
+	}
+
+	public function test_filter_marks_first_p_chapo(): void {
+		// R14 — chapô déjà en <p>, simplement marqué.
+		$dirty  = '<p>Basée sur la région toulousaine, Laetitia Moreau décline le verre en aménagement intérieur.</p><p>Suite.</p>';
+		$result = $this->api->on_filter_normalize( $dirty, [ 'source' => 'test' ] );
+		$this->assertHtmlEquals(
+			'<p class="chapo">Basée sur la région toulousaine, Laetitia Moreau décline le verre en aménagement intérieur.</p><p>Suite.</p>',
+			$result
+		);
 	}
 }

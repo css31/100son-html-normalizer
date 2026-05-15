@@ -1,6 +1,6 @@
 <?php
 /**
- * P7 — AsciiListRule.
+ * R7 — AsciiListRule.
  *
  * Detecte des listes ASCII et les convertit en <ul> / <ol>.
  *
@@ -32,7 +32,7 @@
  * SI ils n'ont aucun attribut semantique restant (apres nettoyage de
  * style/class/id qui sont supprimes lors de la copie).
  *
- * Cf. cahier section 3.1 F2.P7, section 4.4, section 14 hyp. 12.
+ * Cf. cahier section 3.1 F2.R7, section 4.4, section 14 hyp. 12.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -50,7 +50,7 @@ use DOMNode;
 use DOMText;
 
 /**
- * Preset P7 : conversion des listes ASCII.
+ * Preset R7 : conversion des listes ASCII.
  */
 final class AsciiListRule implements RuleInterface {
 
@@ -170,7 +170,7 @@ final class AsciiListRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P7';
+		return 'R7';
 	}
 
 	/**
@@ -342,16 +342,69 @@ final class AsciiListRule implements RuleInterface {
 	}
 
 	/**
+	 * Wrappers HTML structurels « transparents » : on descend dedans
+	 * pour appliquer le pass 2 sur leurs `<p>` enfants. Cas typique :
+	 * cascade `<div class="panel-layout">` → `<div class="panel-grid">`
+	 * → … → `<div class="textwidget">` des articles SiteOrigin, qui
+	 * contient le contenu réel. Sans descente, le pass 2 ne voyait
+	 * qu'un `<div>` comme enfant direct du wrapper racine et ratait
+	 * tous les `<p>` profonds.
+	 *
+	 * Sont **exclus** (structures où une séquence de `<p>` n'est pas
+	 * une liste plate à fusionner) : `<li>`, `<td>`, `<tr>`, `<th>`,
+	 * `<blockquote>`, `<figure>`, `<nav>`, `<aside>`, `<form>`,
+	 * `<fieldset>`.
+	 *
+	 * @var list<string>
+	 */
+	private const PASS2_TRANSPARENT_WRAPPERS = array( 'div', 'section', 'article', 'main', 'header', 'footer' );
+
+	/**
 	 * Pass 2 : groupe les sequences de <p> consecutifs marker-prefixed.
+	 *
+	 * Descente récursive dans les wrappers transparents (cf.
+	 * `PASS2_TRANSPARENT_WRAPPERS`) pour traiter les `<p>` même
+	 * profondément imbriqués (cas SiteOrigin panel-layout).
 	 *
 	 * @param DOMDocument $doc     Document parse.
 	 * @param DOMNode     $wrapper Wrapper racine.
 	 * @return void
 	 */
 	private function process_document_level( DOMDocument $doc, DOMNode $wrapper ): void {
-		// Snapshot des enfants directs du wrapper (ils peuvent inclure des <p> et autres).
+		$this->process_container_paragraphs( $doc, $wrapper );
+	}
+
+	/**
+	 * Récursif : sur chaque wrapper transparent rencontré, regroupe
+	 * les `<p>` enfants directs marker-prefixed. Descend ensuite (ou
+	 * d'abord) dans les sous-wrappers.
+	 *
+	 * @param DOMDocument $doc       Document.
+	 * @param DOMNode     $container Conteneur courant (wrapper racine ou descendant transparent).
+	 * @return void
+	 */
+	private function process_container_paragraphs( DOMDocument $doc, DOMNode $container ): void {
+		// (1) Snapshot des enfants élément (pour descendre dans les
+		// sous-wrappers avant de traiter le container courant). On
+		// descend D'ABORD pour que les transformations internes
+		// (fusions p → ul à un sous-niveau) s'appliquent avant que
+		// le container parent flush sa propre run de `<p>`.
+		$element_children = array();
+		foreach ( $container->childNodes as $child ) {
+			if ( $child instanceof DOMElement ) {
+				$element_children[] = $child;
+			}
+		}
+		foreach ( $element_children as $el ) {
+			if ( in_array( strtolower( $el->nodeName ), self::PASS2_TRANSPARENT_WRAPPERS, true ) ) {
+				$this->process_container_paragraphs( $doc, $el );
+			}
+		}
+
+		// (2) Snapshot des enfants directs (re-snapshot car la
+		// descente précédente peut les avoir modifiés).
 		$children = array();
-		foreach ( $wrapper->childNodes as $child ) {
+		foreach ( $container->childNodes as $child ) {
 			$children[] = $child;
 		}
 
@@ -359,17 +412,17 @@ final class AsciiListRule implements RuleInterface {
 		$run_tag     = null;
 		$next_anchor = null;
 
-		$flush = function () use ( &$run, &$run_tag, &$next_anchor, $doc, $wrapper ): void {
+		$flush = function () use ( &$run, &$run_tag, &$next_anchor, $doc, $container ): void {
 			if ( count( $run ) >= $this->threshold && null !== $run_tag ) {
 				/** @var list<DOMElement> $run_typed */
 				$run_typed = $run;
 				$list      = $this->build_list_from_paragraphs( $doc, $run_typed, $run_tag );
 				// Insere la liste avant le premier <p> du run.
 				$first = $run[0];
-				$wrapper->insertBefore( $list, $first );
+				$container->insertBefore( $list, $first );
 				// Supprime les <p> du run.
 				foreach ( $run as $node ) {
-					$wrapper->removeChild( $node );
+					$container->removeChild( $node );
 				}
 				unset( $run_typed );
 			}
@@ -687,7 +740,7 @@ final class AsciiListRule implements RuleInterface {
 	}
 
 	/**
-	 * Clone un noeud en appliquant les regles inline P7 :
+	 * Clone un noeud en appliquant les regles inline R7 :
 	 *  - Suppression de style/class/id sur tous les elements clones
 	 *  - Desenrobage des span/font/div inline sans attribut semantique restant
 	 *  - Preservation des balises semantiques avec leurs attributs semantiques

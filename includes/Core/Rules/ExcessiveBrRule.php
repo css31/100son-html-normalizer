@@ -1,11 +1,11 @@
 <?php
 /**
- * P5 — ExcessiveBrRule.
+ * R5 — ExcessiveBrRule.
  *
  * Collapse les <br> consecutifs (>= seuil, defaut 2) en </p><p>.
- * Le <p> vide eventuellement produit sera ramasse par P1 en fin de pipeline.
+ * Le <p> vide eventuellement produit sera ramasse par R1 en fin de pipeline.
  *
- * Cf. cahier section 3.1 F2.P5 et section 8 F2.P5.
+ * Cf. cahier section 3.1 F2.R5 et section 8 F2.R5.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -17,7 +17,7 @@ namespace Cent_Son\Html_Normalizer\Core\Rules;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Preset P5 : collapse des <br> excessifs.
+ * Preset R5 : collapse des <br> excessifs.
  */
 final class ExcessiveBrRule implements RuleInterface {
 
@@ -43,7 +43,7 @@ final class ExcessiveBrRule implements RuleInterface {
 	 * @return string
 	 */
 	public function id(): string {
-		return 'P5';
+		return 'R5';
 	}
 
 	/**

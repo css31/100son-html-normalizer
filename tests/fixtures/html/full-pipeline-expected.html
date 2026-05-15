@@ -3,29 +3,35 @@
   Test    : tests/Integration/HtmlNormalizerTest.php (pipeline complète)
   Auteur  : agent (option C — à valider par Cyrille avant écriture du code)
 
-  Sortie attendue après application complète de la pipeline P3 → P4 → P6 → P7 → P5 → P1 → P2
-  sur full-pipeline-input.html, en config par défaut (P6 keep_text_align=true).
+  Sortie attendue après application complète de la pipeline R3 → R4 → R8 → R13 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2
+  sur full-pipeline-input.html, en config par défaut (R6 keep_text_align=true).
 
-  Application bloc par bloc (cf. labels A à J de l'input) :
-    A → P7 détecte 8 <p> consécutifs préfixés `•` → <ul> 8 <li>. Le <br /> et contenu de chaque <p> sont conservés dans le <li>, marqueur retiré.
-    B → P3 retire `[shareaholic ...]`, le <p> devient vide, P1 le retire.
-    C → P4 retire le <span data-pin-do>, le <p> devient vide, P1 le retire.
-    D → P4 capture la forme B via signature `z-index: 8675309`, span supprimé, <p> devient vide, P1 le retire.
-    E → P6 keep_text_align=true : text-align préservé, color retiré.
-    K → P8 enrobe en <strong>/<em> selon mappings, retire chirurgicalement les déclarations sémantiques du style. P6 strippe ce qui reste.
-    F → P6 strip color, P7 détecte 3 fragments `- ` → <ul> 3 <li>, inline <span> préservé sans attribut.
-    G → P5 collapse 2 <br> en fin de <p> → `</p><p>` → <p> vide → P1 le retire. Reste le <p> texte original.
-    H → P2 retire <h2></h2> et <h4></h4>, garde <h3>.
-    I → P1 retire les 3 <p> vides.
-    J → P5 collapse 5 <br> → </p><p>, second <p> vide → P1 le retire.
+  Application bloc par bloc (cf. labels A à L de l'input) :
+    A → R7 détecte 8 <p> consécutifs préfixés `•` → <ul> 8 <li>. Le <br /> et contenu de chaque <p> sont conservés dans le <li>, marqueur retiré.
+    B → R3 retire `[shareaholic ...]`, le <p> devient vide, R1 le retire.
+    C → R4 retire le <span data-pin-do>, le <p> devient vide, R1 le retire.
+    D → R4 capture la forme B via signature `z-index: 8675309`, span supprimé, <p> devient vide, R1 le retire.
+    E → R6 keep_text_align=true : text-align préservé, color retiré.
+    K → R8 enrobe en <strong>/<em> selon mappings, retire chirurgicalement les déclarations sémantiques du style. R6 strippe ce qui reste.
+    F → R6 strip color, R7 détecte 3 fragments `- ` → <ul> 3 <li>, inline <span> préservé sans attribut.
+    G → R5 collapse 2 <br> en fin de <p> → `</p><p>` → <p> vide → R1 le retire. Reste le <p> texte original.
+    H → R2 retire <h2></h2> et <h4></h4>, garde <h3>.
+    I → R1 retire les 3 <p> vides.
+    J → R5 collapse 5 <br> → </p><p>, second <p> vide → R1 le retire.
+    L → R11 fusionne <p><a><img></a></p><h4>cap</h4> en <figure>…<figcaption>cap</figcaption></figure>.
+    M → R12 fusionne <h4><a><img></a> cap</h4> en <figure>…<figcaption>cap</figcaption></figure>.
+    N → R13 promeut <h2>phrase</h2> en <p class="chapo">phrase</p> (premier h2 du fragment).
 -->
+
+<!-- N -->
+<p class="chapo">Envie de plus de surface habitable ? Pas envie d'empiéter sur le jardin ?</p>
 
 <!-- A -->
 <ul><li>Meilleure performance thermique du marché. <br />Uw jusqu'à 0,8 W/(m².K)<br />NB : Le coefficient Uw mesure la performance de l'isolation de la fenêtre.</li><li>Bien moins chère que l'alu, le bois et le mixte.</li><li>Très bonne étanchéité.<br />3 joints au lieu de 2 habituellement.</li><li>Ouvrant caché, comme l'alu, et protégé contre l'effraction.</li><li>100% recyclable.</li><li>Très belles finitions au niveau des soudures d'angle. Pas d'ébavurage.</li><li>Vitrage de 28 mm d'épaisseur (4/20/4, isolation thermique renforcée, gaz argon).</li><li>Gain de surface vitrée jusqu'à +10%.</li></ul>
 
 <!-- B : supprimé (shareaholic + <p> vide) -->
 
-<!-- D : supprimé (P4 PinterestArtifacts capture via signature z-index, P1 ramasse le <p> vide) -->
+<!-- D : supprimé (R4 PinterestArtifacts capture via signature z-index, R1 ramasse le <p> vide) -->
 
 <!-- C : supprimé (data-pin-do span + <p> vide) -->
 
@@ -52,3 +58,9 @@
 
 <!-- J -->
 <p>Texte court avant.</p>
+
+<!-- L -->
+<figure><a href="https://example.test/big.jpg"><img class="size-medium wp-image-494" src="https://example.test/thumb.jpg" alt="facade" width="300" height="225"></a><figcaption>Façade après isolation par l'extérieur.</figcaption></figure>
+
+<!-- M -->
+<figure><a href="https://example.test/big2.jpg"><img class="size-medium wp-image-762" src="https://example.test/thumb2.jpg" alt="meuble" width="300" height="200"></a><figcaption>Meuble de salle de bains Ikea.</figcaption></figure>

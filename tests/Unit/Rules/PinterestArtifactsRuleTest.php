@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P4 — PinterestArtifactsRule.
+ * Tests R4 — PinterestArtifactsRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -24,7 +24,7 @@ final class PinterestArtifactsRuleTest extends TestCase {
 	}
 
 	public function test_id_and_label(): void {
-		$this->assertSame( 'P4', $this->rule->id() );
+		$this->assertSame( 'R4', $this->rule->id() );
 		$this->assertNotEmpty( $this->rule->label() );
 	}
 

@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Core\Rules\LossyRule;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
@@ -174,9 +175,18 @@ class StepRunner {
 
 		// 6. Régression — seuils relus à chaud (un changement entre 2 articles
 		// d'un même pas est pris en compte volontairement). Cf. §13 : appel
-		// SYSTÉMATIQUE, jamais shortcircuité.
+		// SYSTÉMATIQUE, jamais shortcircuité. Si le subset contient au
+		// moins une règle marquée `LossyRule` (R3, R4 — retraits volontaires
+		// de shortcodes/snippets), on relâche les seuils `text_loss_pct` et
+		// `words_loss_pct` : sinon chaque application d'une lossy rule sur
+		// un article tomberait en `regression_pending` faute de tolérance,
+		// rendant la cleanup inopérante. Les checks structurels (images,
+		// headings, links, lists, paragraphes) restent appliqués.
 		$thresholds = RegressionThresholds::from_settings( $this->settings );
-		$report     = $this->regression->analyze( $before, $after, $thresholds );
+		if ( $this->subset_contains_lossy_rule( $step->applied_rules ) ) {
+			$thresholds = $thresholds->relax_text_checks_for_lossy();
+		}
+		$report = $this->regression->analyze( $before, $after, $thresholds );
 
 		// 7a. Régression détectée → pas d'écriture, status pending.
 		if ( null !== $report ) {
@@ -441,6 +451,7 @@ class StepRunner {
 			$counts['success'],
 			$counts['refused'],
 			$counts['errored'],
+			$counts['pending'],
 		);
 
 		return $this->steps->find_by_uuid( $uuid );
@@ -487,6 +498,33 @@ class StepRunner {
 			return 'wp_update_post returned 0 for post ' . $post_id;
 		}
 		return null;
+	}
+
+	/**
+	 * Vrai ssi au moins une règle du sous-ensemble actif implémente
+	 * `LossyRule` (R3, R4 — retraits volontaires de contenu textuel).
+	 *
+	 * Le check passe par `PresetRegistry::get_enabled_rules()` puis filtre
+	 * sur les `rule_ids` du subset — on évite ainsi d'instancier les règles
+	 * deux fois et on respecte la même source de vérité que `applySubset`.
+	 *
+	 * @param list<string> $rule_ids IDs du subset appliqué (`StepRecord::applied_rules`).
+	 * @return bool
+	 */
+	private function subset_contains_lossy_rule( array $rule_ids ): bool {
+		if ( array() === $rule_ids ) {
+			return false;
+		}
+		$index = array_flip( $rule_ids );
+		foreach ( $this->registry->get_enabled_rules() as $rule ) {
+			if ( ! isset( $index[ $rule->id() ] ) ) {
+				continue;
+			}
+			if ( $rule instanceof LossyRule ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -565,24 +603,27 @@ class StepRunner {
 	/**
 	 * Compte les statuts terminaux d'un pas pour `finalize_step()`.
 	 *
-	 * Tout ce qui n'est pas `success` ou `refused` est compté `errored` :
-	 * `regression_pending` (la SPA n'a pas demandé de décision finale),
-	 * `error`, `dry_run` (pas de pas dry-run partiel attendu en V1.0),
-	 * statut inconnu, et articles affectés mais absents de
-	 * `per_article_results` (jamais traités).
+	 * Quatre buckets distincts (post-rc4 — séparation de `pending` qui était
+	 * fusionné dans `errored`) :
+	 *  - `success` : `success`
+	 *  - `refused` : `refused`
+	 *  - `pending` : `regression_pending` (admin n'a pas arbitré)
+	 *  - `errored` : `error`, `dry_run`, statut inconnu, et articles affectés
+	 *                mais absents de `per_article_results` (jamais traités).
 	 *
 	 * @param StepRecord $step Record à analyser.
-	 * @return array{success: int, refused: int, errored: int}
+	 * @return array{success: int, refused: int, errored: int, pending: int}
 	 */
 	private function count_terminal_statuses( StepRecord $step ): array {
 		$success = 0;
 		$refused = 0;
 		$errored = 0;
+		$pending = 0;
 		$seen    = array();
 
 		foreach ( $step->per_article_results as $post_id => $entry ) {
 			$seen[ (int) $post_id ] = true;
-			$status                  = (string) ( $entry['status'] ?? '' );
+			$status                 = (string) ( $entry['status'] ?? '' );
 			switch ( $status ) {
 				case ArticleResult::STATUS_SUCCESS:
 					++$success;
@@ -590,8 +631,11 @@ class StepRunner {
 				case ArticleResult::STATUS_REFUSED:
 					++$refused;
 					break;
+				case ArticleResult::STATUS_REGRESSION_PENDING:
+					++$pending;
+					break;
 				default:
-					// regression_pending, error, dry_run, statut inconnu.
+					// error, dry_run, statut inconnu.
 					++$errored;
 					break;
 			}
@@ -608,6 +652,7 @@ class StepRunner {
 			'success' => $success,
 			'refused' => $refused,
 			'errored' => $errored,
+			'pending' => $pending,
 		);
 	}
 }

@@ -72,6 +72,7 @@ final class StepRunnerTest extends TestCase {
 					successful_articles: 0,
 					refused_articles: 0,
 					errored_articles: 0,
+					pending_articles: 0,
 					per_article_results: array(),
 					user_id: $user_id,
 					started_at: '' !== $started_at ? $started_at : '2026-05-09 12:00:00',
@@ -104,6 +105,7 @@ final class StepRunnerTest extends TestCase {
 					successful_articles: $existing->successful_articles,
 					refused_articles: $existing->refused_articles,
 					errored_articles: $existing->errored_articles,
+					pending_articles: $existing->pending_articles,
 					per_article_results: $merged,
 					user_id: $existing->user_id,
 					started_at: $existing->started_at,
@@ -117,6 +119,7 @@ final class StepRunnerTest extends TestCase {
 				int $successful_articles,
 				int $refused_articles,
 				int $errored_articles,
+				int $pending_articles = 0,
 				?string $finished_at = null
 			): bool {
 				$existing = $this->records[ $uuid ] ?? null;
@@ -132,6 +135,7 @@ final class StepRunnerTest extends TestCase {
 					successful_articles: $successful_articles,
 					refused_articles: $refused_articles,
 					errored_articles: $errored_articles,
+					pending_articles: $pending_articles,
 					per_article_results: $existing->per_article_results,
 					user_id: $existing->user_id,
 					started_at: $existing->started_at,
@@ -192,6 +196,26 @@ final class StepRunnerTest extends TestCase {
 	}
 
 	/**
+	 * Crée une fake-rule marquée `LossyRule` (R3/R4-like). Sert aux tests
+	 * vérifiant que `StepRunner` relâche les seuils chars/words quand
+	 * le subset contient une lossy rule.
+	 *
+	 * @param string   $id        Identifiant rule.
+	 * @param callable $transform fn(string $html): string
+	 */
+	private function fake_lossy_rule( string $id, callable $transform ): RuleInterface {
+		return new class( $id, $transform ) implements RuleInterface, \Cent_Son\Html_Normalizer\Core\Rules\LossyRule {
+			public function __construct( private string $rule_id, private mixed $transform ) {}
+			public function id(): string { return $this->rule_id; }
+			public function label(): string { return $this->rule_id; }
+			public function apply( string $html, array $context = array() ): string {
+				return ( $this->transform )( $html );
+			}
+			public function countMatches( string $html, array $context = array() ): int { return 0; }
+		};
+	}
+
+	/**
 	 * Construit un StepRunner câblé avec les stubs fournis.
 	 *
 	 * @param StepsRepository       $steps       Steps stub.
@@ -233,7 +257,7 @@ final class StepRunnerTest extends TestCase {
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
 
-		$uuid = $runner->start_step( array( 100, 101 ), array( 'P1' ), 5 );
+		$uuid = $runner->start_step( array( 100, 101 ), array( 'R1' ), 5 );
 
 		$this->assertMatchesRegularExpression(
 			'/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
@@ -246,12 +270,12 @@ final class StepRunnerTest extends TestCase {
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
 
-		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'P1', 'P5' ), 7 );
+		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'R1', 'R5' ), 7 );
 		$record = $steps->find_by_uuid( $uuid );
 
 		$this->assertNotNull( $record );
 		$this->assertSame( $uuid, $record->step_uuid );
-		$this->assertSame( array( 'P1', 'P5' ), $record->applied_rules );
+		$this->assertSame( array( 'R1', 'R5' ), $record->applied_rules );
 		$this->assertSame( array( 100, 101, 102 ), $record->affected_post_ids );
 		$this->assertSame( 3, $record->total_articles );
 		$this->assertSame( 7, $record->user_id );
@@ -263,7 +287,7 @@ final class StepRunnerTest extends TestCase {
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
 
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), null );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), null );
 		$record = $steps->find_by_uuid( $uuid );
 
 		$this->assertNotNull( $record );
@@ -285,7 +309,7 @@ final class StepRunnerTest extends TestCase {
 		$runner = $this->make_runner( $failing, $this->diagnostics_stub(), array() );
 
 		$this->expectException( \RuntimeException::class );
-		$runner->start_step( array( 100 ), array( 'P1' ), null );
+		$runner->start_step( array( 100 ), array( 'R1' ), null );
 	}
 
 	// =========================================================================
@@ -295,14 +319,14 @@ final class StepRunnerTest extends TestCase {
 	public function test_process_article_happy_path_writes_post_content(): void {
 		$this->seed_post( 100, '<p>Hello</p>' );
 		$rule   = $this->fake_rule(
-			'P1',
+			'R1',
 			static fn( string $html ): string => str_replace( 'Hello', 'Bonjour', $html )
 		);
 		$steps  = $this->steps_stub();
 		$diags  = $this->diagnostics_stub();
 		$runner = $this->make_runner( $steps, $diags, array( $rule ) );
 
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$result = $runner->process_article( $uuid, 100 );
 
 		$this->assertSame( ArticleResult::STATUS_SUCCESS, $result->status );
@@ -321,10 +345,10 @@ final class StepRunnerTest extends TestCase {
 	public function test_process_article_creates_revision_before_write(): void {
 		// Garde-fou §13 : wp_save_post_revision SYSTÉMATIQUEMENT avant tout write.
 		$this->seed_post( 100, '<p>Hello</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h . ' ' );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h . ' ' );
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 
 		$this->assertArrayHasKey(
@@ -336,11 +360,11 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_process_article_recalculates_diagnostic_post_write(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$diags  = $this->diagnostics_stub();
 		$runner = $this->make_runner( $this->steps_stub(), $diags, array( $rule ) );
 
-		$uuid = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 
 		$this->assertCount( 1, $diags->upserted, 'Un upsert diagnostic attendu après écriture' );
@@ -350,11 +374,11 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_process_article_persists_success_in_per_article_results(): void {
 		$this->seed_post( 100, '<p>Hello</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 
 		$this->assertCount( 1, $steps->written_results );
@@ -369,12 +393,12 @@ final class StepRunnerTest extends TestCase {
 	public function test_process_article_returns_metrics_before_and_after(): void {
 		$this->seed_post( 100, '<p>Hello world</p>' );
 		$rule   = $this->fake_rule(
-			'P1',
+			'R1',
 			static fn( string $html ): string => $html . '<p>Extra</p>'
 		);
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$result = $runner->process_article( $uuid, 100 );
 
 		$this->assertSame( 1, $result->metrics_before->paragraphs );
@@ -388,12 +412,12 @@ final class StepRunnerTest extends TestCase {
 	public function test_dry_run_does_not_write_post_content(): void {
 		$this->seed_post( 100, '<p>Original</p>' );
 		$rule   = $this->fake_rule(
-			'P1',
+			'R1',
 			static fn( string $html ): string => str_replace( 'Original', 'Modified', $html )
 		);
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$result = $runner->process_article( $uuid, 100, dry_run: true );
 
 		$this->assertSame( ArticleResult::STATUS_DRY_RUN, $result->status );
@@ -411,10 +435,10 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_dry_run_does_not_create_revision(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100, dry_run: true );
 
 		$this->assertArrayNotHasKey(
@@ -426,11 +450,11 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_dry_run_does_not_recalculate_diagnostic(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$diags  = $this->diagnostics_stub();
 		$runner = $this->make_runner( $this->steps_stub(), $diags, array( $rule ) );
 
-		$uuid = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100, dry_run: true );
 
 		$this->assertCount( 0, $diags->upserted, 'Aucun upsert diagnostic attendu en dry_run' );
@@ -441,12 +465,12 @@ final class StepRunnerTest extends TestCase {
 		// que l'écriture aurait produit, pour permettre l'affichage d'un diff dans la SPA.
 		$this->seed_post( 100, '<p>One</p>' );
 		$rule   = $this->fake_rule(
-			'P1',
+			'R1',
 			static fn( string $html ): string => $html . '<p>Two</p><p>Three</p>'
 		);
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$result = $runner->process_article( $uuid, 100, dry_run: true );
 
 		$this->assertSame( 1, $result->metrics_before->paragraphs );
@@ -455,11 +479,11 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_dry_run_persists_dry_run_status_in_per_article_results(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
 
-		$uuid = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100, dry_run: true );
 
 		$this->assertCount( 1, $steps->written_results );
@@ -494,6 +518,79 @@ final class StepRunnerTest extends TestCase {
 		$this->assertArrayNotHasKey( 100, Son100_Htmln_Test_Posts_Registry::$updates );
 	}
 
+	public function test_lossy_rule_in_subset_relaxes_text_checks(): void {
+		// Sous seuils par défaut (text_loss_pct=0, words_loss_pct=0), retirer
+		// ~50 chars/6 mots déclencherait regression_pending. Avec une lossy
+		// rule dans le subset, les checks texte/mots sont relâchés → write
+		// passe en `success`.
+		$this->seed_post( 100, '<p>Texte avec [shareaholic id="abc-123"] dans le contenu utile</p>' );
+		$lossy  = $this->fake_lossy_rule(
+			'R3',
+			static fn( string $h ): string => preg_replace( '/\[shareaholic[^\]]*\]/', '', $h )
+		);
+		$runner = $this->make_runner(
+			$this->steps_stub(),
+			$this->diagnostics_stub(),
+			array( $lossy )
+		);
+
+		$uuid   = $runner->start_step( array( 100 ), array( 'R3' ), 1 );
+		$result = $runner->process_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_SUCCESS, $result->status );
+		$this->assertNull( $result->regression_report );
+		$this->assertStringNotContainsString( '[shareaholic', Son100_Htmln_Test_Posts_Registry::$posts[100]->post_content );
+	}
+
+	public function test_non_lossy_rule_keeps_strict_text_checks(): void {
+		// Symétrique : règle qui retire du texte mais qui n'est PAS LossyRule
+		// → comportement strict, on attend regression_pending.
+		$this->seed_post( 100, '<p>Texte que la règle non-lossy ampute lourdement</p>' );
+		$non_lossy = $this->fake_rule(
+			'R_STRICT',
+			static fn( string $h ): string => str_replace( 'ampute lourdement', '', $h )
+		);
+		$runner = $this->make_runner(
+			$this->steps_stub(),
+			$this->diagnostics_stub(),
+			array( $non_lossy )
+		);
+
+		$uuid   = $runner->start_step( array( 100 ), array( 'R_STRICT' ), 1 );
+		$result = $runner->process_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_REGRESSION_PENDING, $result->status );
+	}
+
+	public function test_lossy_rule_still_blocks_on_structural_regression(): void {
+		// Un lossy rule qui retire une <img> doit toujours déclencher
+		// regression_pending — les checks structurels restent stricts.
+		$this->seed_post( 100, '<p>Texte <img src="x.jpg" alt="">.</p>' );
+		$lossy_strips_img = $this->fake_lossy_rule(
+			'R_LOSSY_IMG',
+			static fn( string $h ): string => preg_replace( '/<img[^>]*>/', '', $h )
+		);
+		$runner = $this->make_runner(
+			$this->steps_stub(),
+			$this->diagnostics_stub(),
+			array( $lossy_strips_img )
+		);
+
+		$uuid   = $runner->start_step( array( 100 ), array( 'R_LOSSY_IMG' ), 1 );
+		$result = $runner->process_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_REGRESSION_PENDING, $result->status );
+		$this->assertNotNull( $result->regression_report );
+		// La failure remontée doit être structurelle (images), pas chars/words.
+		$failures = array_map(
+			static fn( $f ): string => $f->metric_key,
+			$result->regression_report->failures
+		);
+		$this->assertContains( 'images', $failures );
+		$this->assertNotContains( 'chars', $failures );
+		$this->assertNotContains( 'words', $failures );
+	}
+
 	public function test_regression_persists_pending_status_with_report(): void {
 		$this->seed_post( 100, '<p>Hello</p><p>World</p>' );
 		$destructive = $this->fake_rule( 'P_DESTROY', static fn(): string => '' );
@@ -522,7 +619,7 @@ final class StepRunnerTest extends TestCase {
 	public function test_unknown_post_returns_error_result(): void {
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array() );
 
-		$uuid   = $runner->start_step( array( 999 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 999 ), array( 'R1' ), 1 );
 		$result = $runner->process_article( $uuid, 999 );
 
 		$this->assertSame( ArticleResult::STATUS_ERROR, $result->status );
@@ -688,10 +785,10 @@ final class StepRunnerTest extends TestCase {
 	public function test_confirm_article_after_already_success_errors(): void {
 		// Si l'article est déjà success (pas regression_pending), confirm doit refuser.
 		$this->seed_post( 100, '<p>Hello</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 
 		$result = $runner->confirm_article( $uuid, 100 );
@@ -813,7 +910,7 @@ final class StepRunnerTest extends TestCase {
 	public function test_resume_progress_lists_all_pending_when_no_article_processed(): void {
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array() );
-		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'R1' ), 1 );
 
 		$progress = $runner->resume_progress( $uuid );
 
@@ -877,10 +974,10 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_resume_progress_treats_dry_run_as_processed(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100, dry_run: true );
 
 		$progress = $runner->resume_progress( $uuid );
@@ -893,12 +990,12 @@ final class StepRunnerTest extends TestCase {
 		$this->seed_post( 5, '<p>x</p>' );
 		$this->seed_post( 10, '<p>x</p>' );
 		$this->seed_post( 1, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$steps  = $this->steps_stub();
 		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
 
 		// Ordre volontairement non-trié pour vérifier que resume_progress respecte affected_post_ids.
-		$uuid = $runner->start_step( array( 10, 1, 5 ), array( 'P1' ), 1 );
+		$uuid = $runner->start_step( array( 10, 1, 5 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 5 ); // un seul traité
 
 		$progress = $runner->resume_progress( $uuid );
@@ -933,9 +1030,9 @@ final class StepRunnerTest extends TestCase {
 
 	public function test_finalize_counts_pending_as_errored(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
-		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100, 101, 102 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 		// 101 et 102 jamais traités.
 
@@ -947,15 +1044,18 @@ final class StepRunnerTest extends TestCase {
 		$this->assertSame( 2, $finalized->errored_articles, '101 + 102 jamais traités → errored' );
 	}
 
-	public function test_finalize_counts_regression_pending_as_errored(): void {
-		// Un article laissé en regression_pending au moment du finalize doit être compté errored.
+	public function test_finalize_counts_regression_pending_in_dedicated_bucket(): void {
+		// Post-rc4 : regression_pending a son propre bucket pending_articles
+		// (séparé d'errored). Auparavant les pending étaient comptés errored
+		// à tort, ce qui masquait le besoin d'arbitrage de l'admin.
 		$ctx       = $this->arrange_regression_pending( 100, $this->steps_stub(), $this->diagnostics_stub() );
 		$finalized = $ctx['runner']->finalize_step( $ctx['uuid'] );
 
 		$this->assertNotNull( $finalized );
 		$this->assertSame( 0, $finalized->successful_articles );
 		$this->assertSame( 0, $finalized->refused_articles );
-		$this->assertSame( 1, $finalized->errored_articles );
+		$this->assertSame( 0, $finalized->errored_articles, 'pending ≠ errored' );
+		$this->assertSame( 1, $finalized->pending_articles );
 	}
 
 	public function test_finalize_counts_refused_correctly(): void {
@@ -987,9 +1087,9 @@ final class StepRunnerTest extends TestCase {
 		// d'un pas live. Si on finalise un pas avec un article dry_run, on
 		// considère qu'il n'a pas vraiment été traité côté écriture.
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100, dry_run: true );
 
 		$finalized = $runner->finalize_step( $uuid );
@@ -1014,9 +1114,9 @@ final class StepRunnerTest extends TestCase {
 	public function test_finalize_is_idempotent_on_already_finalized(): void {
 		// Double-clic SPA : le 2e appel doit retourner le record existant sans rien recompter.
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 
 		$first  = $runner->finalize_step( $uuid );
@@ -1032,9 +1132,9 @@ final class StepRunnerTest extends TestCase {
 	public function test_finalize_after_resume_progress_no_pending(): void {
 		// Après un finalize, resume_progress reflète le pas finalisé : tous traités.
 		$this->seed_post( 100, '<p>x</p>' );
-		$rule   = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
-		$uuid   = $runner->start_step( array( 100 ), array( 'P1' ), 1 );
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
 		$runner->process_article( $uuid, 100 );
 		$runner->finalize_step( $uuid );
 

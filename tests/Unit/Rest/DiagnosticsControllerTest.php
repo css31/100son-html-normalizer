@@ -125,8 +125,10 @@ final class DiagnosticsControllerTest extends TestCase {
 			public function count_by_applicable_rule(): array {
 				// Aligné sur PresetRegistry::PRESETS — toutes clés présentes (UX stable).
 				return array(
-					'P3' => 0, 'P4' => 0, 'P8' => 0, 'P6' => 0,
-					'P7' => 0, 'P5' => 0, 'P9' => 0, 'P1' => 0, 'P2' => 0,
+					'R3'  => 0, 'R4'  => 0, 'R8'  => 0, 'R13' => 0,
+					'R14' => 0, 'R6'  => 0, 'R7'  => 0, 'R5'  => 0,
+					'R15' => 0, 'R16' => 0, 'R9'  => 0, 'R12' => 0,
+					'R11' => 0, 'R10' => 0, 'R1'  => 0, 'R2'  => 0,
 				);
 			}
 			/**
@@ -167,7 +169,7 @@ final class DiagnosticsControllerTest extends TestCase {
 			id: 1,
 			post_id: $post_id,
 			status: $status,
-			matching_rules: array( array( 'rule_id' => 'P1', 'occurrences' => 2 ) ),
+			matching_rules: array( array( 'rule_id' => 'R1', 'occurrences' => 2 ) ),
 			metrics: array(),
 			is_stale: false,
 			diagnosed_at: '2026-05-09 10:00:00',
@@ -197,10 +199,11 @@ final class DiagnosticsControllerTest extends TestCase {
 	//  register_routes
 	// =========================================================================
 
-	public function test_register_routes_creates_seven_endpoints(): void {
+	public function test_register_routes_creates_eight_endpoints(): void {
 		$this->make_controller()->register_routes();
-		// 6 endpoints initiaux + /diagnostics/facets (post-rc3).
-		$this->assertCount( 7, $GLOBALS['son100_htmln_test_rest_routes'] );
+		// 6 endpoints initiaux + /diagnostics/facets (post-rc3) +
+		// /diagnostics/finalize-scan (auto-désactivation des règles épuisées).
+		$this->assertCount( 8, $GLOBALS['son100_htmln_test_rest_routes'] );
 	}
 
 	public function test_register_routes_uses_htmln_v1_namespace(): void {
@@ -444,21 +447,21 @@ final class DiagnosticsControllerTest extends TestCase {
 		$repo       = $this->repo_stub( array(), array(), 0 );
 		$controller = $this->make_controller( null, $repo );
 		$response   = $controller->list_diagnostics(
-			$this->make_request( 'GET', array( 'rule_ids' => array( 'P1', 'P5' ) ) )
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'R1', 'R5' ) ) )
 		);
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( array( 'P1', 'P5' ), $repo->last_filters['rule_ids'] ?? null );
+		$this->assertSame( array( 'R1', 'R5' ), $repo->last_filters['rule_ids'] ?? null );
 	}
 
 	public function test_list_filters_out_unknown_rule_ids(): void {
 		$repo       = $this->repo_stub( array(), array(), 0 );
 		$controller = $this->make_controller( null, $repo );
 		// `INVALID` n'est pas dans PresetRegistry::PRESETS → ignoré ;
-		// `P9` reste → tableau non vide donc clé `rule_ids` présente.
+		// `R9` reste → tableau non vide donc clé `rule_ids` présente.
 		$controller->list_diagnostics(
-			$this->make_request( 'GET', array( 'rule_ids' => array( 'INVALID', 'P9' ) ) )
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'INVALID', 'R9' ) ) )
 		);
-		$this->assertSame( array( 'P9' ), $repo->last_filters['rule_ids'] ?? null );
+		$this->assertSame( array( 'R9' ), $repo->last_filters['rule_ids'] ?? null );
 	}
 
 	public function test_list_omits_rule_ids_filter_when_only_invalid_values(): void {
@@ -478,7 +481,7 @@ final class DiagnosticsControllerTest extends TestCase {
 		// Une string nue ne doit pas être interprétée comme un ID — l'API
 		// est volontairement strict sur le contrat « tableau ou rien ».
 		$controller->list_diagnostics(
-			$this->make_request( 'GET', array( 'rule_ids' => 'P1' ) )
+			$this->make_request( 'GET', array( 'rule_ids' => 'R1' ) )
 		);
 		$this->assertArrayNotHasKey( 'rule_ids', $repo->last_filters ?? array() );
 	}
@@ -487,9 +490,9 @@ final class DiagnosticsControllerTest extends TestCase {
 		$repo       = $this->repo_stub( array(), array(), 0 );
 		$controller = $this->make_controller( null, $repo );
 		$controller->list_diagnostics(
-			$this->make_request( 'GET', array( 'rule_ids' => array( 'P1', 'P1', 'P5' ) ) )
+			$this->make_request( 'GET', array( 'rule_ids' => array( 'R1', 'R1', 'R5' ) ) )
 		);
-		$this->assertSame( array( 'P1', 'P5' ), $repo->last_filters['rule_ids'] ?? null );
+		$this->assertSame( array( 'R1', 'R5' ), $repo->last_filters['rule_ids'] ?? null );
 	}
 
 	public function test_facets_includes_applicable_rules_key(): void {
@@ -500,7 +503,7 @@ final class DiagnosticsControllerTest extends TestCase {
 		$this->assertArrayHasKey( 'applicable_rules', $data );
 		$this->assertIsArray( $data['applicable_rules'] );
 		// Toutes les clés PresetRegistry::PRESETS présentes pour UX stable.
-		foreach ( array( 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9' ) as $rid ) {
+		foreach ( array( 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16' ) as $rid ) {
 			$this->assertArrayHasKey( $rid, $data['applicable_rules'] );
 		}
 	}

@@ -14,6 +14,7 @@ namespace Cent_Son\Html_Normalizer\Diagnostics;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
  * Repository CRUD sur `{$wpdb->prefix}son100_htmln_diagnostics`.
@@ -237,6 +238,50 @@ class DiagnosticsRepository {
 			}
 		}
 		return $years;
+	}
+
+	/**
+	 * Nombre total de rows dans la table de diagnostics (stale incluses).
+	 * Sert au calcul de couverture corpus dans `is_corpus_fully_scanned`.
+	 *
+	 * @return int
+	 */
+	public function count_total(): int {
+		return (int) $this->wpdb->get_var( "SELECT COUNT(*) FROM `{$this->table}`" );
+	}
+
+	/**
+	 * Indique si tous les articles éligibles (`post_status='publish'` × les
+	 * post_types F8 sélectionnés) ont au moins une entrée en table
+	 * diagnostics — autrement dit, si le scan couvre l'intégralité du
+	 * corpus actuel.
+	 *
+	 * Critère : `count(diagnostics) >= count(wp_posts éligibles)`. Le `>=`
+	 * (non `===`) tolère le drift naturel d'une dépublication post-scan
+	 * (article diagnostiqué, puis dépublié → la diag persiste, l'article
+	 * n'est plus dans publish) — auquel cas la couverture du sous-ensemble
+	 * actuel reste exhaustive. Retourne `false` si la table est vide ou si
+	 * la sélection F8 est vide (cas pathologique).
+	 *
+	 * @param SettingsRepository $settings Source des post_types F8 actifs.
+	 * @return bool
+	 */
+	public function is_corpus_fully_scanned( SettingsRepository $settings ): bool {
+		$diagnosed = $this->count_total();
+		if ( 0 === $diagnosed ) {
+			return false;
+		}
+		$post_types = $settings->get_f8_post_types_selection();
+		if ( array() === $post_types ) {
+			return false;
+		}
+		$placeholders = implode( ',', array_fill( 0, count( $post_types ), '%s' ) );
+		$sql          = $this->wpdb->prepare(
+			"SELECT COUNT(*) FROM `{$this->wpdb->posts}` WHERE post_status = 'publish' AND post_type IN ({$placeholders})",
+			$post_types
+		);
+		$published    = (int) $this->wpdb->get_var( $sql );
+		return $diagnosed >= $published;
 	}
 
 	/**
@@ -580,10 +625,10 @@ class DiagnosticsRepository {
 		}
 
 		// rule_ids : filtre OR sur le JSON `matching_rules`.
-		// Format stocké : `[{"rule_id":"P1","occurrences":12}, …]`.
+		// Format stocké : `[{"rule_id":"R1","occurrences":12}, …]`.
 		// `JSON_SEARCH(... 'one', %s, NULL, '$[*].rule_id')` retourne le
 		// chemin trouvé (ex. `"$[0].rule_id"`) ou NULL — précis et sans
-		// faux positifs (`P1` ne matche pas `P10`). Disponible MySQL 5.7+
+		// faux positifs (`R1` ne matche pas `R10`). Disponible MySQL 5.7+
 		// que WordPress 6.8 exige déjà.
 		//
 		// Sémantique : OR (au moins une des règles cochées s'applique à

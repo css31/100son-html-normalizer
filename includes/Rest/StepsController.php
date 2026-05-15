@@ -418,6 +418,7 @@ final class StepsController extends BaseController {
 			'successful_articles' => $record->successful_articles,
 			'refused_articles'    => $record->refused_articles,
 			'errored_articles'    => $record->errored_articles,
+			'pending_articles'    => $record->pending_articles,
 			'per_article_results' => $record->per_article_results,
 			'user_id'             => $record->user_id,
 			'started_at'          => $record->started_at,

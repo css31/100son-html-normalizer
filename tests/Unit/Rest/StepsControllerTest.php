@@ -137,12 +137,13 @@ final class StepsControllerTest extends TestCase {
 		return new StepRecord(
 			id: 1,
 			step_uuid: $uuid,
-			applied_rules: array( 'P1' ),
+			applied_rules: array( 'R1' ),
 			affected_post_ids: array( 100, 101 ),
 			total_articles: 2,
 			successful_articles: $finished ? 2 : 0,
 			refused_articles: 0,
 			errored_articles: 0,
+			pending_articles: 0,
 			per_article_results: array(),
 			user_id: 5,
 			started_at: '2026-05-09 10:00:00',
@@ -290,7 +291,7 @@ final class StepsControllerTest extends TestCase {
 		$response = $this->make_controller( $runner )->run_step(
 			$this->make_request( 'POST', array(
 				'post_ids' => array( 100, 101, 102 ),
-				'rule_ids' => array( 'P1' ),
+				'rule_ids' => array( 'R1' ),
 			) )
 		);
 
@@ -304,7 +305,7 @@ final class StepsControllerTest extends TestCase {
 		$response = $this->make_controller()->run_step(
 			$this->make_request( 'POST', array(
 				'post_ids' => array(),
-				'rule_ids' => array( 'P1' ),
+				'rule_ids' => array( 'R1' ),
 			) )
 		);
 		$this->assertSame( 400, $response->get_status() );
@@ -329,7 +330,7 @@ final class StepsControllerTest extends TestCase {
 		$response = $this->make_controller( $runner )->run_step(
 			$this->make_request( 'POST', array(
 				'post_ids' => array( 100 ),
-				'rule_ids' => array( 'P1' ),
+				'rule_ids' => array( 'R1' ),
 			) )
 		);
 		$this->assertSame( 500, $response->get_status() );

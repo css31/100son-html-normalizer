@@ -281,6 +281,20 @@ export default function StepsTable( {
 									>
 										⚠ { step.errored_articles ?? 0 }
 									</span>
+									{ ( step.pending_articles ?? 0 ) > 0 && (
+										<>
+											{ ' · ' }
+											<span
+												className="htmln-counter htmln-counter--pending"
+												title={ __(
+													'En attente d’arbitrage (régression non confirmée)',
+													'100son-html-normalizer'
+												) }
+											>
+												⏸ { step.pending_articles }
+											</span>
+										</>
+									) }
 									{ confirmedRegressions > 0 && (
 										<>
 											{ ' · ' }

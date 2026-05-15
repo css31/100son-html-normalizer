@@ -8,7 +8,7 @@
  *   - Catégorie WP              : dropdown des taxonomies `category`
  *   - Année / Mois              : 2 dropdowns sur `post_date`
  *   - Constructeur              : 4 valeurs (SO / Gut / Autres / Out)
- *   - Règles applicables (rc4)  : Dropdown multi-checkbox sur les 9 préréglages,
+ *   - Règles applicables (rc4)  : Dropdown multi-checkbox sur les 11 règles,
  *                                 sémantique OR (au moins une match)
  *
  * État local minimaliste : la barre est contrôlée par le parent via
@@ -51,12 +51,12 @@ import {
  * @property {number}   [year]     Année (>0).
  * @property {number}   [month]    Mois 1-12 (combiné avec year).
  * @property {string}   [builder]  siteorigin / gutenberg / other / out.
- * @property {string[]} [rule_ids] IDs internes (`P1`..`P9`) filtre OR sur règles applicables.
+ * @property {string[]} [rule_ids] IDs internes (`R1`..`R9`) filtre OR sur règles applicables.
  */
 
 /**
- * Liste triée des IDs internes des 9 préréglages, dans l'ordre d'affichage
- * UI (P1, P2.1, P2.2, P3, P4, P5, P6, P7, P8). Pré-calculé hors composant
+ * Liste triée des IDs internes de tous les règles, dans l'ordre
+ * d'affichage UI naturel (R1, R2, …, R11). Pré-calculé hors composant
  * pour éviter de retrier à chaque render.
  *
  * @type {string[]}
@@ -386,14 +386,14 @@ export default function FiltersBar( { value, onChange, facets, isLoading } ) {
 /**
  * RulesFilterDropdown — dropdown multi-sélection des règles applicables.
  *
- * Affiche un bouton « Règles : … ▾ » qui ouvre un popover de 9 cases à
- * cocher (P1..P8, libellés UI via `getRuleLabel`). Chaque case porte un
+ * Affiche un bouton « Règles : … ▾ » qui ouvre un popover de cases à
+ * cocher (R1..R12, libellés UI via `getRuleLabel`). Chaque case porte un
  * compteur `(N)` issu de la facette `applicable_rules`. Filtre OR côté
  * serveur (au moins une règle cochée match l'article).
  *
  * Le label du bouton s'adapte :
  *  - 0 sélectionnée : « Règles : Toutes »
- *  - 1 sélectionnée : « Règles : P2.1 »
+ *  - 1 sélectionnée : « Règles : R9 »
  *  - N≥2 sélectionnées : « Règles : N sélectionnées »
  *
  * @param {Object}                                 props
@@ -468,7 +468,7 @@ function RulesFilterDropdown( {
 									ruleCounts[ ruleId ] ?? 0
 								);
 								const label = sprintf(
-									/* translators: 1 = label affiché (ex. P2.1), 2 = nombre d'articles concernés. */
+									/* translators: 1 = label affiché (ex. R9), 2 = nombre d'articles concernés. */
 									'%1$s (%2$d)',
 									getRuleLabel( ruleId ),
 									count

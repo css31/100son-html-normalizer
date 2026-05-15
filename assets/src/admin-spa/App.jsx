@@ -2,7 +2,7 @@
  * App — composant racine de la SPA V1.0.
  *
  * Router hash minimaliste. Ordre d'affichage des onglets dans la barre :
- *  - `#/rules`              → vue Rules (configuration des 8 préréglages).
+ *  - `#/rules`              → vue Rules (configuration des 11 règles).
  *  - `#/normalize` (défaut) → vue Normalize (F13/F14/F14.3/F15).
  *  - `#/history`            → vue History (F16).
  *  - `#/notes`              → vue Notes (post-rc1, éditeur Gutenberg restreint).

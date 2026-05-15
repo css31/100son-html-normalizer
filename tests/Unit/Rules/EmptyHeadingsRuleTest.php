@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P2 — EmptyHeadingsRule.
+ * Tests R2 — EmptyHeadingsRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -24,7 +24,7 @@ final class EmptyHeadingsRuleTest extends TestCase {
 	}
 
 	public function test_id_and_label(): void {
-		$this->assertSame( 'P2', $this->rule->id() );
+		$this->assertSame( 'R2', $this->rule->id() );
 		$this->assertNotEmpty( $this->rule->label() );
 	}
 
@@ -72,7 +72,7 @@ final class EmptyHeadingsRuleTest extends TestCase {
 
 	public function test_paragraphs_are_not_touched(): void {
 		$html = '<p></p><h2>OK</h2><p>texte</p>';
-		// P1 fera le ménage des <p> vides ; P2 ne touche pas aux <p>.
+		// R1 fera le ménage des <p> vides ; R2 ne touche pas aux <p>.
 		$this->assertHtmlEquals( $html, $this->rule->apply( $html ) );
 	}
 

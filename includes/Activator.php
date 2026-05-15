@@ -31,8 +31,15 @@ final class Activator {
 	 *            KEY) dans `son100_htmln_diagnostics` pour filtrage SPA.
 	 *            dbDelta est idempotent : ajoute la colonne sur instances
 	 *            existantes, NULL initial puis re-rempli au prochain scan.
+	 *  - 2.2.0 : post-rc4 — ajout colonne `pending_articles` (INT UNSIGNED
+	 *            NOT NULL DEFAULT 0) dans `son100_htmln_steps`. Sépare le
+	 *            bucket `regression_pending` du `errored_articles` qui
+	 *            l'absorbait à tort. Le hook `maybe_run_db_upgrade` du
+	 *            Plugin déclenche un re-run de `create_tables` (dbDelta
+	 *            idempotent) sur les installs upgradées sans réactivation
+	 *            manuelle.
 	 */
-	public const DB_VERSION = '2.1.0';
+	public const DB_VERSION = '2.2.0';
 
 	/**
 	 * Exécuté à l'activation du plugin.
@@ -96,6 +103,7 @@ final class Activator {
 			successful_articles INT UNSIGNED NOT NULL DEFAULT 0,
 			refused_articles INT UNSIGNED NOT NULL DEFAULT 0,
 			errored_articles INT UNSIGNED NOT NULL DEFAULT 0,
+			pending_articles INT UNSIGNED NOT NULL DEFAULT 0,
 			per_article_results LONGTEXT NULL,
 			user_id BIGINT UNSIGNED NULL,
 			started_at DATETIME NOT NULL,
@@ -129,18 +137,18 @@ final class Activator {
 	}
 
 	/**
-	 * Initialise / complète la configuration des préréglages.
+	 * Initialise / complète la configuration des règles.
 	 *
-	 * Tous les préréglages sont activés par défaut, avec leurs paramètres au
+	 * Tous les règles sont activés par défaut, avec leurs paramètres au
 	 * défaut documenté en §3.1 et §14.
 	 *
 	 * Comportement de **propagation** (post-rc4) : au lieu d'un seed
 	 * strictement initial (early-return si l'option existe), on fait un
-	 * **merge** à chaque activation/réactivation — les préréglages
+	 * **merge** à chaque activation/réactivation — les règles
 	 * existants sont préservés à l'identique (clés `enabled` et
-	 * paramètres conservés), les nouveaux préréglages absents sont ajoutés
+	 * paramètres conservés), les nouvelles règles absents sont ajoutés
 	 * avec leur config par défaut. Cela permet de propager les nouvelles
-	 * règles ajoutées dans une version (P10 post-rc4, futures Pxx) à un
+	 * règles ajoutées dans une version (R10 post-rc4, futures Pxx) à un
 	 * site déjà activé sans écraser les choix de l'utilisateur — il
 	 * suffit d'une réactivation du plugin.
 	 *
@@ -148,19 +156,19 @@ final class Activator {
 	 */
 	private static function seed_presets(): void {
 		$defaults = array(
-			'P1' => array( 'enabled' => true ),
-			'P2' => array( 'enabled' => true ),
-			'P3' => array( 'enabled' => true ),
-			'P4' => array( 'enabled' => true ),
-			'P5' => array(
+			'R1' => array( 'enabled' => true ),
+			'R2' => array( 'enabled' => true ),
+			'R3' => array( 'enabled' => true ),
+			'R4' => array( 'enabled' => true ),
+			'R5' => array(
 				'enabled'   => true,
 				'threshold' => 2,
 			),
-			'P6' => array(
+			'R6' => array(
 				'enabled'         => true,
 				'keep_text_align' => true,
 			),
-			'P7' => array(
+			'R7' => array(
 				'enabled'        => true,
 				'threshold'      => 2,
 				'markers'        => array(
@@ -172,15 +180,21 @@ final class Activator {
 				),
 				'custom_markers' => array(),
 			),
-			'P8' => array(
+			'R8' => array(
 				'enabled'  => true,
 				'mappings' => array(
 					'bold'   => true,
 					'italic' => true,
 				),
 			),
-			'P9'  => array( 'enabled' => true ),
-			'P10' => array( 'enabled' => true ),
+			'R9'  => array( 'enabled' => true ),
+			'R10' => array( 'enabled' => true ),
+			'R11' => array( 'enabled' => true ),
+			'R12' => array( 'enabled' => true ),
+			'R13' => array( 'enabled' => true ),
+			'R14' => array( 'enabled' => true ),
+			'R15' => array( 'enabled' => true ),
+			'R16' => array( 'enabled' => true ),
 		);
 
 		$existing = get_option( 'son100_htmln_presets', false );

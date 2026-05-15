@@ -81,7 +81,7 @@ Ouvre `https://ma-maison-mag-2.local/wp-admin/admin.php?page=100son-html-normali
 | # | Action | Attendu |
 |---|---|---|
 | B1 | Hard reload `Ctrl+Shift+R` | Page charge, 5 onglets visibles, aucune erreur rouge en console |
-| B2 | Clic onglet **Règles** | Liste des 8 préréglages affichée |
+| B2 | Clic onglet **Règles** | Liste des 8 règles affichée |
 | B3 | Clic onglet **Normaliser** | Tableau articles + onglets internes (to_improve / normal / stale) |
 | B4 | Clic onglet **Historique** | Tableau des pas (peut être vide si jamais joué) |
 | B5 | Clic onglet **Notes** | Cadre éditeur avec barre haute + paragraphe vide |
@@ -142,18 +142,18 @@ wp-sandbox option get son100_htmln_notes_rich | head -c 200
 
 | # | Action | Attendu |
 |---|---|---|
-| D1 | Toggle off P1 (EmptyParagraphs) | Card grisée |
+| D1 | Toggle off R1 (EmptyParagraphs) | Card grisée |
 | D2 | Reload | État OFF persisté |
-| D3 | Toggle on P1 | Card normale |
-| D4 | Modifier param `keep_text_align` de P6 (RemoveInlineStyles) → save | Persistance |
-| D5 | Modifier seuil P5 (ExcessiveBr) à `3` → save | Persistance |
-| D6 | Vérifier ordre du pipeline en bas | P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2 |
+| D3 | Toggle on R1 | Card normale |
+| D4 | Modifier param `keep_text_align` de R6 (RemoveInlineStyles) → save | Persistance |
+| D5 | Modifier seuil R5 (ExcessiveBr) à `3` → save | Persistance |
+| D6 | Vérifier ordre du pipeline en bas | R3 → R4 → R8 → R6 → R7 → R5 → R1 → R2 |
 
 - [ ] D1 — Toggle off
 - [ ] D2 — Persistance OFF
 - [ ] D3 — Toggle on
-- [ ] D4 — Param P6 persistant
-- [ ] D5 — Param P5 persistant
+- [ ] D4 — Param R6 persistant
+- [ ] D5 — Param R5 persistant
 - [ ] D6 — Ordre pipeline correct
 
 ---
@@ -264,7 +264,7 @@ echo "APRÈS : " . $clean . PHP_EOL;
 '
 ```
 
-**Attendu** : les `<p>` vides ont disparu, reste `<p>contenu</p>`. P1 a fait son travail via le filtre public.
+**Attendu** : les `<p>` vides ont disparu, reste `<p>contenu</p>`. R1 a fait son travail via le filtre public.
 
 - [ ] H1 — Filtre retourne du HTML normalisé
 - [ ] H2 — Pas de `null` / `false` / exception

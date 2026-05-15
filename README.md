@@ -1,6 +1,6 @@
 # 100son HTML Normalizer
 
-> Moteur de **normalisation HTML configurable** pour WordPress — 8 préréglages prêts à l'emploi, application par **lot** avec garde-fou de régression, historique tracé, et API publique consommable par d'autres extensions.
+> Moteur de **normalisation HTML configurable** pour WordPress — 8 règles prêts à l'emploi, application par **lot** avec garde-fou de régression, historique tracé, et API publique consommable par d'autres extensions.
 
 [![Version](https://img.shields.io/badge/version-1.0.0--rc1-orange.svg)](CHANGELOG.md)
 [![PHP](https://img.shields.io/badge/PHP-8.3+-blue.svg)](#pile-technique)
@@ -29,22 +29,29 @@ qu'on réécrit habituellement à coups de `preg_replace` éparpillés. Il a ét
 
 ## Ce que fait l'extension
 
-### Les 9 préréglages
+### Les 16 règles
 
 | Code | Nom | Action |
 |:---:|---|---|
-| **P1** | `EmptyParagraphs` | Supprime les `<p>` vides (et `<p>&nbsp;</p>`, `<p><br></p>`…) |
-| **P2** | `EmptyHeadings` | Supprime les `<hN>` vides ou ne contenant que des espaces |
-| **P3** | `ShareaholicShortcode` | Supprime les shortcodes `[shareaholic …]` orphelins |
-| **P4** | `PinterestArtifacts` | Nettoie les artefacts Pinterest (formes A + B) résiduels |
-| **P5** | `ExcessiveBr` | Réduit les rafales `<br><br><br>…` à un seul `<br>` (paramétrable) |
-| **P6** | `RemoveInlineStyles` | Supprime tout `style="…"` en ligne (option `keep_text_align` pour préserver les alignements) |
-| **P7** | `AsciiList` | Convertit les listes ASCII (`* item`, `- item`) en vraies `<ul><li>` |
-| **P8** | `RecoverSemanticStyles` | Récupère le sens : `<span style="font-weight:bold">` → `<strong>`, etc., **avant** que P6 ne tape |
-| **P9** | `UnwrapHeadingImage` | Désencapsule les `<hN>` autour d'images (`<h2><img></h2>` → `<img>`). Préserve les wrappers internes (`<a>`, `<figure>`). Symétrique de P2. |
+| **R1** | `EmptyParagraphs` | Supprime les `<p>` vides (et `<p>&nbsp;</p>`, `<p><br></p>`…) |
+| **R2** | `EmptyHeadings` | Supprime les `<hN>` vides ou ne contenant que des espaces |
+| **R3** | `ShareaholicShortcode` | Supprime les shortcodes `[shareaholic …]` orphelins |
+| **R4** | `PinterestArtifacts` | Nettoie les artefacts Pinterest (formes A + B) résiduels |
+| **R5** | `ExcessiveBr` | Réduit les rafales `<br><br><br>…` à un seul `<br>` (paramétrable) |
+| **R6** | `RemoveInlineStyles` | Supprime tout `style="…"` en ligne (option `keep_text_align` pour préserver les alignements) |
+| **R7** | `AsciiList` | Convertit les listes ASCII (`* item`, `- item`) en vraies `<ul><li>` |
+| **R8** | `RecoverSemanticStyles` | Récupère le sens : `<span style="font-weight:bold">` → `<strong>`, etc., **avant** que R6 ne tape |
+| **R9** | `UnwrapHeadingImage` | Désencapsule les `<hN>` autour d'images (`<h2><img></h2>` → `<img>`). Préserve les wrappers internes (`<a>`, `<figure>`). Symétrique de R2. |
+| **R10** | `UnwrapParagraphImage` | Désencapsule les `<p>` autour d'images (`<p><img></p>` → `<img>`). Cousine de R9 appliquée aux `<p>`. |
+| **R11** | `HeadingCaptionToFigcaption` | Disposition contextuelle des `<h4>` (convention MMM : jamais un vrai sous-titre, toujours un détournement). 3 cas : (1) `<p><img></p><h4>légende</h4>` → `<figure>`+`<figcaption>` ; (2) h4 orphelin juste après chapô-lead seul → `<p class="chapo">` crédit (gras strippé) ; (3) h4 orphelin ailleurs → `<p><strong>` gras. |
+| **R12** | `HeadingMixedToFigure` | Variante inline de R11 : `<h4>img + texte</h4>` (image et légende dans le **même** h4) → `<figure>img<figcaption>texte</figcaption></figure>`. Mode tolérant multi-images (forme HTML5 normative pour groupe d'images partageant une caption commune). |
+| **R13** | `H2ChapoToParagraph` | Promotion : le **premier** `<h2>` phrase-chapô du fragment (≥ 5 mots + ponctuation) → `<p class="chapo">`. Seul le premier h2 du document est candidat ; les h2 ultérieurs (vrais sous-titres de section) restent intacts. |
+| **R14** | `FirstParagraphChapo` | Complément de R13 : ajoute `class="chapo"` au **premier `<p>` phrase** du fragment, si c'est le premier élément significatif. Étend aux paragraphes de crédits adjacents (max 3) — « LA RÉDACTION », « PHOTOS Untel »… Descend dans les wrappers transparents (`<div>`, `<section>`). |
+| **R15** | `MergeAdjacentInlineTags` | Fusionne deux éléments inline adjacents (même tag + mêmes attributs) : `<em>foo</em><em>bar</em>` → `<em>foobar</em>`, `<span style="X">A</span><span style="X">B</span>` → `<span style="X">AB</span>`. Whitelist de 29 inlines (em, strong, span, font…). Exclut `<p>`, `<div>`, headings, `<a>`, `<li>`, void. |
+| **R16** | `StripHeadingPrefix` | Retire les préfixes typographiques en tête des `<h1>`-`<h6>` : numéros (« 1. », « 23) », « 5° »), puces (`•` `‣` `►` `▸` `*`), tirets (`-` `–` `—`). Walk DOM (le préfixe peut être emballé dans un `<strong>` ou `<span>`). Convention : un heading porte un titre, pas une marque de liste. |
 
-**Pipeline canonique :** P3 → P4 → P8 → P6 → P7 → P5 → P9 → P1 → P2.
-L'ordre est figé pour préserver le sens : on récupère la sémantique avant de purger les styles, on enlève le shortcode avant qu'il génère des paragraphes vides, etc. Chaque préréglage est **activable / désactivable indépendamment** depuis l'admin.
+**Pipeline canonique :** R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R15 → R16 → R9 → R12 → R11 → R10 → R1 → R2.
+L'ordre est figé pour préserver le sens : on récupère la sémantique avant de purger les styles, on enlève le shortcode avant qu'il génère des paragraphes vides, etc. Chaque règle est **activable / désactivable indépendamment** depuis l'admin.
 
 ### Workflow par lots (V1.0)
 
@@ -138,7 +145,7 @@ Menu top-level **HTML Normalizer**, qui héberge cinq sous-pages en cohabitation
 
 | Page | Phase | Rôle |
 |---|:---:|---|
-| **Préréglages** | V0.1 | Activer/désactiver chaque préréglage et régler ses paramètres. |
+| **Règles** | V0.1 | Activer/désactiver chaque règle et régler ses paramètres. |
 | **Tester un fragment** | V0.1 | Coller un bout de HTML, voir le résultat normalisé en source + rendu. |
 | **Normaliser** | V0.1 | Liste paginée des articles (V0.1, normalisation immédiate sans pas). |
 | **Journal** | V0.1 | 500 dernières entrées (FIFO) : normalisations, aperçus, changements de configuration. |
@@ -254,7 +261,7 @@ Les dossiers `vendor/` et `assets/build/` ne sont pas versionnés (convention PH
 │   ├── Admin/                      Menu + 4 pages V0.1 + SpaPage V1.0 + Assets enqueue
 │   ├── Api/                        PublicApi (filtre htmln/normalize)
 │   ├── Cli/                        StepsCommand + DiagnoseCommand + CliServiceProvider
-│   ├── Core/                       HtmlNormalizer, Pipeline, Rules P1..P8, Logs, Posts, Registry
+│   ├── Core/                       HtmlNormalizer, Pipeline, Rules R1..R8, Logs, Posts, Registry
 │   ├── Diagnostics/                DiagnosticEngine, BatchRunner, Invalidator (hook save_post), Repository
 │   ├── Metrics/                    MetricsCalculator + MetricsSnapshot (7 métriques γ)
 │   ├── Regression/                 RegressionDetector + DTOs Failure/Report/Thresholds
@@ -334,7 +341,7 @@ wp i18n make-pot . languages/100son-html-normalizer.pot \
 
 ### ✅ Livré
 
-**V0.1** — moteur PHP + UI admin V0.1 (4 pages : Préréglages, Tester, Normaliser, Journal).
+**V0.1** — moteur PHP + UI admin V0.1 (4 pages : Règles, Tester, Normaliser, Journal).
 
 **V1.0 (en cours d'intégration)** — couche diagnostic + lots + SPA :
 - Diagnostic structurel (Phase 3) : `DiagnosticEngine`, `DiagnosticBatchRunner`, hook `save_post → is_stale`

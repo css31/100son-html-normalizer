@@ -37,14 +37,14 @@ final class PostNormalizerTest extends TestCase {
 			public function is_preset_enabled( string $preset_id ): bool { return true; }
 			public function get_preset_config( string $preset_id ): array {
 				return match ( $preset_id ) {
-					'P5' => [ 'enabled' => true, 'threshold' => 2 ],
-					'P6' => [ 'enabled' => true, 'keep_text_align' => true ],
-					'P7' => [
+					'R5' => [ 'enabled' => true, 'threshold' => 2 ],
+					'R6' => [ 'enabled' => true, 'keep_text_align' => true ],
+					'R7' => [
 						'enabled' => true, 'threshold' => 2,
 						'markers' => [ 'dash' => true, 'emdash' => true, 'asterix' => true, 'bullet' => true, 'numeric' => true ],
 						'custom_markers' => [],
 					],
-					'P8' => [ 'enabled' => true, 'mappings' => [ 'bold' => true, 'italic' => true ] ],
+					'R8' => [ 'enabled' => true, 'mappings' => [ 'bold' => true, 'italic' => true ] ],
 					default => [ 'enabled' => true ],
 				};
 			}

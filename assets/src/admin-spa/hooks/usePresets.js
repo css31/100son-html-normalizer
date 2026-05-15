@@ -1,5 +1,5 @@
 /**
- * Hook React — récupère et persiste la config des 8 préréglages
+ * Hook React — récupère et persiste la config des 11 règles
  * (onglet Règles SPA).
  *
  * Cycle de vie :
@@ -8,10 +8,10 @@
  *  2. Sur `save(id, payload)` : POST `/presets/<id>` → met à jour
  *     l'entrée correspondante dans `presets` avec la version
  *     normalisée renvoyée par le serveur (utile si l'admin tape
- *     `99` sur le threshold de P5 alors que le max est 20 → le
+ *     `99` sur le threshold de R5 alors que le max est 20 → le
  *     serveur retombe à 2 par défaut et la SPA reflète ça).
  *
- * État local plutôt que store global : la config des préréglages
+ * État local plutôt que store global : la config des règles
  * n'intéresse que la vue Règles et le récap dans Normaliser. Le
  * récap utilise une vue dérivée (les `enabled`) qu'on calcule côté
  * Normalize via un simple `useMemo`. Pas besoin d'indirection store.
@@ -22,7 +22,7 @@ import * as api from '../api';
 
 /**
  * @typedef {Object} PresetEntry
- * @property {string}  id          Identifiant `P1`..`P8`.
+ * @property {string}  id          Identifiant `R1`..`R8`.
  * @property {string}  label       Libellé localisé.
  * @property {string}  description Description HTML (rendu via dangerouslySetInnerHTML — contenu serveur de confiance).
  * @property {boolean} has_options Vrai si la règle a des paramètres configurables.
@@ -37,7 +37,7 @@ import * as api from '../api';
  * @property {boolean}                                               isLoading Vrai durant le fetch initial.
  * @property {boolean}                                               isSaving  Vrai pendant qu'un POST est en vol.
  * @property {?string}                                               error     Message d'erreur ou null.
- * @property {(id: string, payload: Object) => Promise<PresetEntry>} save      POST partiel sur un préréglage, retourne la version normalisée.
+ * @property {(id: string, payload: Object) => Promise<PresetEntry>} save      POST partiel sur une règle, retourne la version normalisée.
  * @property {() => void}                                            refetch   Relance manuelle de GET /presets.
  */
 

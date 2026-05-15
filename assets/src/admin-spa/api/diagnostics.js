@@ -70,6 +70,15 @@ export const runBatch = ( body = {} ) => post( '/diagnostics/run', body );
 export const runChunk = ( body ) => post( '/diagnostics/run/chunk', body );
 
 /**
+ * `POST /diagnostics/finalize-scan` — appelé après la dernière boucle de
+ * chunks. Si le scan couvre 100 % du corpus, désactive automatiquement
+ * les règles `complete` (épuisées) et retourne leurs IDs.
+ *
+ * @return {Promise<{auto_disabled_rules: string[], fully_scanned: boolean}>} Liste des IDs auto-désactivés + flag de couverture.
+ */
+export const finalizeScan = () => post( '/diagnostics/finalize-scan', {} );
+
+/**
  * `GET /diagnostics/stats` — compteurs onglets F13.
  *
  * @return {Promise<{normal: number, to_improve: number, stale: number, total: number}>} Compteurs des 4 catégories.

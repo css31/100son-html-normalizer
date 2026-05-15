@@ -1,14 +1,14 @@
 <!--
   Fixture : ascii-list-input.html
-  Test    : tests/Unit/Rules/AsciiListRuleTest.php (préréglage P7 isolé)
+  Test    : tests/Unit/Rules/AsciiListRuleTest.php (règle R7 isolé)
   Auteur  : agent (option C — à valider par Cyrille avant écriture du code)
 
-  Configuration testée : préréglages activés par défaut
+  Configuration testée : règles activés par défaut
     - marqueurs `- `, `– ` (cadratin), `* `, `• `, numéros `N. `
     - pas de marqueurs custom
     - seuil = 2
 
-  Cas couverts (cf. cahier §3.1 F2.P7, §4.4, §14 hyp. 12) :
+  Cas couverts (cf. cahier §3.1 F2.R7, §4.4, §14 hyp. 12) :
     1. `<p>` mixte (texte + bullets `•` séparées par `<br />`) — extrait post 6150
     2. Bullets `•` hors-`<p>` (chaque item dans `<p>` distinct) — extrait post 2500
     3. Tirets `- ` traversant `<span>` inline — extrait post 6690 (avec attribut style à dropper)
@@ -16,7 +16,7 @@
     5. Astérisque `* ` intra-`<p>` (synthétique)
     6. Numéros `N.` hors-`<p>` (synthétique)
     7. Sous-seuil : 1 seul tiret isolé (seuil défaut 2) — ne doit PAS être converti
-    8. `<p>` mixte sans détection (1 seul bullet en milieu, sous seuil) — pas d'action P7
+    8. `<p>` mixte sans détection (1 seul bullet en milieu, sous seuil) — pas d'action R7
 -->
 
 <!-- 1. <p> mixte avec bullets `•` (post 6150) — split + conversion -->
@@ -47,5 +47,5 @@
 <!-- 7. Sous-seuil (1 tiret isolé, seuil = 2) — ne doit PAS être converti -->
 <p>- Tiret isolé qui doit rester en paragraphe.</p>
 
-<!-- 8. <p> mixte sans détection (1 bullet seul au milieu, sous seuil) — P7 inactif -->
+<!-- 8. <p> mixte sans détection (1 bullet seul au milieu, sous seuil) — R7 inactif -->
 <p>Texte d'introduction normal sans liste.<br />• Une seule bullet isolée ici.<br />Conclusion sur une autre ligne.</p>

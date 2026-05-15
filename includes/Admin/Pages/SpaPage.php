@@ -9,7 +9,7 @@
  * Settings γ) sont implémentées côté React en Phases 6.3 à 6.7.
  *
  * Coexistence V1.0 : cette page est ajoutée au menu en parallèle des
- * pages V0.1 PHP classiques (Préréglages, Tester, Normaliser, Journal).
+ * pages V0.1 PHP classiques (Règles, Tester, Normaliser, Journal).
  * La migration complète de l'UI vers la SPA est différée V1.1.
  *
  * @package Cent_Son\Html_Normalizer

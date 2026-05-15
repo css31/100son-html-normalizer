@@ -1,6 +1,6 @@
 <?php
 /**
- * P1 — EmptyParagraphsRule.
+ * R1 — EmptyParagraphsRule.
  *
  * Supprime les `<p>` vides ou contenant uniquement du blanc / `&nbsp;`.
  *
@@ -11,7 +11,7 @@
  * et provoque un bloc fantome (visible comme une ligne vide invalide
  * dans l'editeur).
  *
- * Cf. cahier §3.1 F2.P1 et §8 F2.P1.
+ * Cf. cahier §3.1 F2.R1 et §8 F2.R1.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -29,7 +29,7 @@ use DOMNode;
 use DOMText;
 
 /**
- * Préréglage P1 : suppression des paragraphes vides.
+ * Règle R1 : suppression des paragraphes vides.
  */
 final class EmptyParagraphsRule implements RuleInterface {
 
@@ -37,7 +37,7 @@ final class EmptyParagraphsRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P1';
+		return 'R1';
 	}
 
 	/**

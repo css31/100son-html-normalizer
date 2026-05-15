@@ -1,6 +1,6 @@
 <?php
 /**
- * RuleInterface — contrat commun à toutes les règles (préréglages + custom).
+ * RuleInterface — contrat commun à toutes les règles (règles + custom).
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 interface RuleInterface {
 
 	/**
-	 * Identifiant stable de la règle (ex. "P1", "P7", ou un UUID utilisateur).
+	 * Identifiant stable de la règle (ex. "R1", "R7", ou un UUID utilisateur).
 	 *
 	 * @return string
 	 */
@@ -55,7 +55,7 @@ interface RuleInterface {
 	 *  - retour ≥ 0 ;
 	 *  - ne lève jamais — en cas de parse error, retourner 0 ;
 	 *  - sémantique « ce que apply() supprimerait/transformerait », pas
-	 *    « occurrences brutes du pattern ». Ex. P5 ne compte pas chaque
+	 *    « occurrences brutes du pattern ». Ex. R5 ne compte pas chaque
 	 *    `<br>` mais chaque séquence ≥ N qui serait fusionnée.
 	 *  - idempotence implicite : `countMatches(apply($html)) == 0` doit
 	 *    être vrai pour les règles déterministes (cf. tests Phase 1).

@@ -1,15 +1,15 @@
 /**
  * Rules — vue racine de l'onglet « Règles » (post-rc1).
  *
- * Liste les 8 préréglages P1-P8 avec, pour chacun :
+ * Liste les 16 règles R1-R16 avec, pour chacun :
  *  - une **case « Sélectionnée pour le prochain pas »** (store mémoire,
  *    partagée avec la vue Normaliser) ;
  *  - un **toggle « Activée par défaut »** (BDD, persisté via REST) ;
  *  - la **description** rendue depuis PresetRegistry (HTML serveur de
  *    confiance, `dangerouslySetInnerHTML` autorisé) ;
- *  - les **paramètres modifiables** spécifiques à la règle (P5 seuil,
- *    P6 keep_text_align, P7 seuil + 5 marqueurs + custom_markers,
- *    P8 mappings bold/italic) ;
+ *  - les **paramètres modifiables** spécifiques à la règle (R5 seuil,
+ *    R6 keep_text_align, R7 seuil + 5 marqueurs + custom_markers,
+ *    R8 mappings bold/italic) ;
  *  - un **encart Avant / Après** sur un fragment HTML factice statique
  *    qui illustre l'effet de la règle.
  *
@@ -46,41 +46,69 @@ import {
  * @type {Object<string, {before: string, after: string}>}
  */
 const RULE_EXAMPLES = {
-	P1: {
+	R1: {
 		before: '<p>Texte utile</p>\n<p>&nbsp;</p>\n<p>Suite</p>',
 		after: '<p>Texte utile</p>\n<p>Suite</p>',
 	},
-	P2: {
+	R2: {
 		before: '<h2>Vraie section</h2>\n<h3>&nbsp;</h3>\n<p>Contenu</p>',
 		after: '<h2>Vraie section</h2>\n<p>Contenu</p>',
 	},
-	P3: {
+	R3: {
 		before: '<p>Article</p>\n[shareaholic id="123-abc"]\n<p>Suite</p>',
 		after: '<p>Article</p>\n<p>Suite</p>',
 	},
-	P4: {
+	R4: {
 		before: '<span data-pin-do="buttonBookmark" data-pin-config="above">Pin it</span>\n<p>Article</p>',
 		after: '<p>Article</p>',
 	},
-	P5: {
+	R5: {
 		before: '<p>Ligne 1<br><br><br><br>Ligne 2</p>',
 		after: '<p>Ligne 1</p>\n<p>Ligne 2</p>',
 	},
-	P6: {
+	R6: {
 		before: '<p style="color:red; text-align:center; font-size:16px;">Texte centré rouge</p>',
 		after: '<p style="text-align:center;">Texte centré rouge</p>',
 	},
-	P7: {
+	R7: {
 		before: '<p>- Premier item<br>- Deuxième item<br>- Troisième item</p>',
 		after: '<ul>\n  <li>Premier item</li>\n  <li>Deuxième item</li>\n  <li>Troisième item</li>\n</ul>',
 	},
-	P8: {
+	R8: {
 		before: '<span style="font-weight:bold; color:red;">Important</span> et <span style="font-style:italic;">accent</span>',
 		after: '<strong style="color:red;">Important</strong> et <em>accent</em>',
 	},
-	P9: {
+	R9: {
 		before: '<h2><img src="/photo.jpg" alt="Photo de Une"></h2>\n<h2>Vrai titre</h2>',
 		after: '<img src="/photo.jpg" alt="Photo de Une">\n<h2>Vrai titre</h2>',
+	},
+	R10: {
+		before: '<p><img src="/photo.jpg" alt="Photo"></p>\n<p>Texte normal.</p>',
+		after: '<img src="/photo.jpg" alt="Photo">\n<p>Texte normal.</p>',
+	},
+	R11: {
+		before: '<!-- Cas 1 : h4 après image-p → figure -->\n<p><a href="big.jpg"><img src="thumb.jpg" alt=""></a></p>\n<h4>Légende.</h4>\n\n<!-- Cas 2 : h4 orphelin juste après chapô → crédit -->\n<p class="chapo">Chapô seul.</p>\n<h4>Cyrille Martin</h4>\n\n<!-- Cas 3 : h4 orphelin ailleurs → p gras -->\n<p>Corps.</p>\n<h4>Sous-titre détourné</h4>',
+		after: '<!-- Cas 1 -->\n<figure>\n  <a href="big.jpg"><img src="thumb.jpg" alt=""></a>\n  <figcaption>Légende.</figcaption>\n</figure>\n\n<!-- Cas 2 -->\n<p class="chapo">Chapô seul.</p>\n<p class="chapo">Cyrille Martin</p>\n\n<!-- Cas 3 -->\n<p>Corps.</p>\n<p><strong>Sous-titre détourné</strong></p>',
+	},
+	R12: {
+		before: '<h4><a href="big.jpg"><img src="thumb.jpg" alt=""></a> Texte de légende.</h4>',
+		after: '<figure>\n  <a href="big.jpg"><img src="thumb.jpg" alt=""></a>\n  <figcaption>Texte de légende.</figcaption>\n</figure>',
+	},
+	R13: {
+		before: "<h2>Première phrase du chapô. Deuxième phrase qui complète.</h2>\n<p>Texte de l'article.</p>",
+		after: '<p class="chapo">Première phrase du chapô. Deuxième phrase qui complète.</p>\n<p>Texte de l\'article.</p>',
+	},
+	R14: {
+		before: "<p>Une famille s'est lancée dans la rénovation écologique de sa maison.</p>\n<p>LA RÉDACTION</p>\n<p>PHOTOS Cyrille Martin</p>\n<p>Premier paragraphe du corps.</p>",
+		after: '<p class="chapo">Une famille s\'est lancée dans la rénovation écologique de sa maison.</p>\n<p class="chapo">LA RÉDACTION</p>\n<p class="chapo">PHOTOS Cyrille Martin</p>\n<p>Premier paragraphe du corps.</p>',
+	},
+	R15: {
+		before: '<p><em>Première moitié</em> <em>deuxième moitié</em> du texte.</p>\n<p><span style="font-size:14pt">A</span><span style="font-size:14pt">B</span></p>',
+		after: '<p><em>Première moitié deuxième moitié</em> du texte.</p>\n<p><span style="font-size:14pt">AB</span></p>',
+	},
+	R16: {
+		before: '<h2>1. Pourquoi bioclimatique ?</h2>\n<h2>• Spécialiste de la terrasse</h2>\n<h3>— Sous-titre</h3>',
+		after: '<h2>Pourquoi bioclimatique ?</h2>\n<h2>Spécialiste de la terrasse</h2>\n<h3>Sous-titre</h3>',
 	},
 };
 
@@ -141,7 +169,7 @@ export default function Rules() {
 				<h2>{ __( 'Règles', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'Les 9 préréglages du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain lot et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Préréglages » (V0.1).',
+						'Les 16 règles du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » ne s’applique qu’au prochain lot et redevient cochée par défaut au rechargement de la page. Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Règles » (V0.1).',
 						'100son-html-normalizer'
 					) }
 				</p>
@@ -191,9 +219,9 @@ export default function Rules() {
 			</div>
 
 			<div className="htmln-rules__list">
-				{ /* Tri d'affichage : pas l'ordre du pipeline (P3 → P4 → … → P2)
-				 *   mais l'ordre lisible humain où les règles d'une même
-				 *   famille sont contiguës (P1, P2.1, P2.2, P3, …). Cf.
+				{ /* Tri d'affichage : pas l'ordre du pipeline
+				 *   (`R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2`)
+				 *   mais l'ordre naturel R1..R14. Cf.
 				 *   `utils/ruleLabels.RULE_DISPLAY_ORDER`. */ }
 				{ [ ...( presets ?? [] ) ]
 					.sort( ( a, b ) =>
@@ -242,11 +270,41 @@ function RuleCard( {
 	onSaveParams,
 } ) {
 	const example = RULE_EXAMPLES[ preset.id ] ?? null;
+
+	// État de complétion (cf. PresetsController::preset_to_array) :
+	//  - 'pending'  : il reste des articles à traiter pour cette règle
+	//  - 'complete' : règle appliquée à tout le corpus (verrouillée)
+	//  - 'unused'   : aucun article ne nécessite cette règle, et elle
+	//                 n'a jamais été appliquée
+	const completionState = preset.completion_state ?? 'pending';
+
+	// Override per-session : permet de re-tourner une règle « complete »
+	// pour retester après modification de la règle. État UNIQUEMENT
+	// frontend, perdu au reload.
+	const [ overrideLock, setOverrideLock ] = useState( false );
+
+	// Quand la règle a été auto-désactivée à la fin d'un scan, on
+	// considère que le verrou « complete » est déjà résolu côté
+	// serveur (la règle est `enabled=false`). Le toggle reste directement
+	// modifiable pour permettre une réactivation manuelle sans passer
+	// par l'override de session.
+	const isAutoDisabled =
+		'complete' === completionState &&
+		preset.auto_disabled_at &&
+		! preset.enabled;
+	const isLocked =
+		'complete' === completionState && ! overrideLock && ! isAutoDisabled;
+	const lockClass = isLocked ? ' htmln-rule--locked' : '';
+	const unusedClass =
+		'unused' === completionState ? ' htmln-rule--unused' : '';
+
 	return (
 		<article
 			className={ `htmln-rule${
 				preset.enabled ? '' : ' htmln-rule--disabled'
-			}` }
+			}${ lockClass }${ unusedClass }` }
+			data-rule-id={ preset.id }
+			data-completion-state={ completionState }
 		>
 			<header className="htmln-rule__header">
 				<div className="htmln-rule__title">
@@ -263,26 +321,29 @@ function RuleCard( {
 				</div>
 				<div className="htmln-rule__actions">
 					<CheckboxControl
-						label={ __(
-							'Sélectionnée pour le prochain lot',
-							'100son-html-normalizer'
-						) }
-						checked={ isSelected }
+						label={ __( 'Dans le lot', '100son-html-normalizer' ) }
+						checked={ isSelected && ! isLocked }
 						onChange={ onToggleSelected }
+						disabled={ isLocked }
 						__nextHasNoMarginBottom
 					/>
 					<ToggleControl
-						label={ __(
-							'Activée par défaut',
-							'100son-html-normalizer'
-						) }
+						label={ __( 'Activée', '100son-html-normalizer' ) }
 						checked={ preset.enabled }
 						onChange={ onToggleEnabled }
-						disabled={ isSaving }
+						disabled={ isSaving || isLocked }
 						__nextHasNoMarginBottom
 					/>
 				</div>
 			</header>
+
+			<RuleCompletionBanner
+				state={ completionState }
+				lastAppliedAt={ preset.last_applied_at }
+				autoDisabledAt={ preset.auto_disabled_at }
+				overrideActive={ overrideLock }
+				onToggleOverride={ () => setOverrideLock( ( v ) => ! v ) }
+			/>
 
 			<div
 				className="htmln-rule__description"
@@ -306,6 +367,106 @@ function RuleCard( {
 }
 
 /**
+ * Bandeau d'état d'application affiché entre le header et la description
+ * de chaque card. Trois variantes selon `completion_state` :
+ *
+ *  - **complete** : règle appliquée à tout le corpus. Badge vert ✓ +
+ *    date de dernière application + bouton « Réactiver pour ce corpus »
+ *    qui débloque les contrôles uniquement pour la session courante
+ *    (état frontend, perdu au reload).
+ *  - **unused** : règle jamais utile sur ce corpus. Badge gris discret,
+ *    pas de verrou.
+ *  - **pending** : règle a encore du travail. N affiche pas de bandeau
+ *    (card normale).
+ *
+ * @param {Object}     props
+ * @param {string}     props.state            État (`pending`, `complete`, `unused`).
+ * @param {?string}    props.lastAppliedAt    Datetime MySQL ou null.
+ * @param {?string}    props.autoDisabledAt   Datetime MySQL si la règle a été auto-désactivée à la fin d'un scan complet — modifie le libellé du bandeau `complete`.
+ * @param {boolean}    props.overrideActive   L'override est-il actif (vrai = verrou levé).
+ * @param {() => void} props.onToggleOverride Bascule l'override.
+ * @return {JSX.Element|null} Bandeau ou null si rien à afficher.
+ */
+function RuleCompletionBanner( {
+	state,
+	lastAppliedAt,
+	autoDisabledAt = null,
+	overrideActive,
+	onToggleOverride,
+} ) {
+	if ( 'pending' === state ) {
+		return null;
+	}
+
+	if ( 'unused' === state ) {
+		return (
+			<p className="htmln-rule__completion htmln-rule__completion--unused">
+				<span
+					className="htmln-rule__completion-icon"
+					aria-hidden="true"
+				>
+					{ '○' }
+				</span>{ ' ' }
+				{ __(
+					'Aucun article ne nécessite cette règle.',
+					'100son-html-normalizer'
+				) }
+			</p>
+		);
+	}
+
+	// 'complete'
+	const formattedDate = lastAppliedAt
+		? new Date( lastAppliedAt.replace( ' ', 'T' ) + 'Z' ).toLocaleString(
+				'fr-FR',
+				{
+					dateStyle: 'long',
+					timeStyle: 'short',
+				}
+		  )
+		: '';
+
+	const completionMessage = autoDisabledAt
+		? sprintf(
+				// translators: %s = date de la dernière application.
+				__(
+					'Appliquée à tout le corpus le %s. Désactivée automatiquement.',
+					'100son-html-normalizer'
+				),
+				formattedDate
+		  )
+		: sprintf(
+				// translators: %s = date de la dernière application.
+				__(
+					'Appliquée à tout le corpus le %s.',
+					'100son-html-normalizer'
+				),
+				formattedDate
+		  );
+
+	return (
+		<p className="htmln-rule__completion htmln-rule__completion--complete">
+			<span className="htmln-rule__completion-icon" aria-hidden="true">
+				{ '✓' }
+			</span>{ ' ' }
+			{ completionMessage }{ ' ' }
+			<Button
+				variant="link"
+				onClick={ onToggleOverride }
+				className="htmln-rule__completion-override"
+			>
+				{ overrideActive
+					? __( 'Re-verrouiller', '100son-html-normalizer' )
+					: __(
+							'Réactiver pour cette session',
+							'100son-html-normalizer'
+					  ) }
+			</Button>
+		</p>
+	);
+}
+
+/**
  * Champs de paramètres spécifiques à chaque règle. Switch sur
  * `preset.id` — chaque cas connaît son schéma local.
  *
@@ -317,33 +478,33 @@ function RuleCard( {
  */
 function RuleParams( { preset, isSaving, onSaveParams } ) {
 	switch ( preset.id ) {
-		case 'P5':
+		case 'R5':
 			return (
-				<P5Params
+				<R5Params
 					params={ preset.params }
 					isSaving={ isSaving }
 					onSaveParams={ onSaveParams }
 				/>
 			);
-		case 'P6':
+		case 'R6':
 			return (
-				<P6Params
+				<R6Params
 					params={ preset.params }
 					isSaving={ isSaving }
 					onSaveParams={ onSaveParams }
 				/>
 			);
-		case 'P7':
+		case 'R7':
 			return (
-				<P7Params
+				<R7Params
 					params={ preset.params }
 					isSaving={ isSaving }
 					onSaveParams={ onSaveParams }
 				/>
 			);
-		case 'P8':
+		case 'R8':
 			return (
-				<P8Params
+				<R8Params
 					params={ preset.params }
 					isSaving={ isSaving }
 					onSaveParams={ onSaveParams }
@@ -355,7 +516,7 @@ function RuleParams( { preset, isSaving, onSaveParams } ) {
 }
 
 /**
- * P5 — un seul paramètre : `threshold` (int 2..20).
+ * R5 — un seul paramètre : `threshold` (int 2..20).
  *
  * @param {Object}              props
  * @param {{threshold: number}} props.params
@@ -363,7 +524,7 @@ function RuleParams( { preset, isSaving, onSaveParams } ) {
  * @param {(p: Object) => void} props.onSaveParams
  * @return {JSX.Element} Bloc.
  */
-function P5Params( { params, isSaving, onSaveParams } ) {
+function R5Params( { params, isSaving, onSaveParams } ) {
 	const [ value, setValue ] = useState( String( params.threshold ?? 2 ) );
 	const isValid = /^\d+$/.test( value.trim() );
 	const parsed = isValid ? parseInt( value, 10 ) : null;
@@ -371,22 +532,26 @@ function P5Params( { params, isSaving, onSaveParams } ) {
 	return (
 		<fieldset className="htmln-rule__params">
 			<legend>{ __( 'Paramètres', '100son-html-normalizer' ) }</legend>
-			<TextControl
-				label={ __( 'Seuil (≥ 2)', '100son-html-normalizer' ) }
-				value={ value }
-				type="number"
-				min={ 2 }
-				max={ 20 }
-				step={ 1 }
-				onChange={ setValue }
-				disabled={ isSaving }
-				help={ __(
-					'Nombre minimal de <br> consécutifs pour déclencher la coupure en <p>. Défaut : 2.',
-					'100son-html-normalizer'
-				) }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-			/>
+			<div className="htmln-rule__threshold-row">
+				<TextControl
+					label={ __( 'Seuil (≥ 2)', '100son-html-normalizer' ) }
+					value={ value }
+					type="number"
+					min={ 2 }
+					max={ 20 }
+					step={ 1 }
+					onChange={ setValue }
+					disabled={ isSaving }
+					__next40pxDefaultSize
+					__nextHasNoMarginBottom
+				/>
+				<p className="htmln-rule__threshold-help">
+					{ __(
+						'Nombre minimal de <br> consécutifs pour déclencher la coupure en <p>. Défaut : 2.',
+						'100son-html-normalizer'
+					) }
+				</p>
+			</div>
 			<Button
 				variant="secondary"
 				onClick={ () => onSaveParams( { threshold: parsed } ) }
@@ -394,14 +559,14 @@ function P5Params( { params, isSaving, onSaveParams } ) {
 					isSaving || ! inRange || parsed === params.threshold
 				}
 			>
-				{ __( 'Enregistrer le seuil', '100son-html-normalizer' ) }
+				{ __( 'Enregistrer', '100son-html-normalizer' ) }
 			</Button>
 		</fieldset>
 	);
 }
 
 /**
- * P6 — un seul paramètre booléen : `keep_text_align`.
+ * R6 — un seul paramètre booléen : `keep_text_align`.
  *
  * @param {Object}                     props
  * @param {{keep_text_align: boolean}} props.params
@@ -409,7 +574,7 @@ function P5Params( { params, isSaving, onSaveParams } ) {
  * @param {(p: Object) => void}        props.onSaveParams
  * @return {JSX.Element} Bloc.
  */
-function P6Params( { params, isSaving, onSaveParams } ) {
+function R6Params( { params, isSaving, onSaveParams } ) {
 	return (
 		<fieldset className="htmln-rule__params">
 			<legend>{ __( 'Paramètres', '100son-html-normalizer' ) }</legend>
@@ -430,7 +595,7 @@ function P6Params( { params, isSaving, onSaveParams } ) {
 }
 
 /**
- * P7 — seuil + 5 marqueurs + custom_markers (textarea).
+ * R7 — seuil + 5 marqueurs + custom_markers (textarea).
  *
  * @param {Object}                                                         props
  * @param {{threshold: number, markers: Object, custom_markers: string[]}} props.params
@@ -438,7 +603,7 @@ function P6Params( { params, isSaving, onSaveParams } ) {
  * @param {(p: Object) => void}                                            props.onSaveParams
  * @return {JSX.Element} Bloc.
  */
-function P7Params( { params, isSaving, onSaveParams } ) {
+function R7Params( { params, isSaving, onSaveParams } ) {
 	const [ threshold, setThreshold ] = useState(
 		String( params.threshold ?? 2 )
 	);
@@ -462,18 +627,26 @@ function P7Params( { params, isSaving, onSaveParams } ) {
 		<fieldset className="htmln-rule__params">
 			<legend>{ __( 'Paramètres', '100son-html-normalizer' ) }</legend>
 
-			<TextControl
-				label={ __( 'Seuil (≥ 2)', '100son-html-normalizer' ) }
-				value={ threshold }
-				type="number"
-				min={ 2 }
-				max={ 20 }
-				step={ 1 }
-				onChange={ setThreshold }
-				disabled={ isSaving }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
-			/>
+			<div className="htmln-rule__threshold-row">
+				<TextControl
+					label={ __( 'Seuil (≥ 2)', '100son-html-normalizer' ) }
+					value={ threshold }
+					type="number"
+					min={ 2 }
+					max={ 20 }
+					step={ 1 }
+					onChange={ setThreshold }
+					disabled={ isSaving }
+					__next40pxDefaultSize
+					__nextHasNoMarginBottom
+				/>
+				<p className="htmln-rule__threshold-help">
+					{ __(
+						'Nombre minimal de marqueurs consécutifs pour déclencher la conversion en liste. Défaut : 2.',
+						'100son-html-normalizer'
+					) }
+				</p>
+			</div>
 			<Button
 				variant="secondary"
 				onClick={ () =>
@@ -487,7 +660,7 @@ function P7Params( { params, isSaving, onSaveParams } ) {
 					parseInt( threshold, 10 ) === params.threshold
 				}
 			>
-				{ __( 'Enregistrer le seuil', '100son-html-normalizer' ) }
+				{ __( 'Enregistrer', '100son-html-normalizer' ) }
 			</Button>
 
 			<p className="htmln-rule__params-label">
@@ -548,7 +721,7 @@ function P7Params( { params, isSaving, onSaveParams } ) {
 }
 
 /**
- * P8 — 2 toggles : `mappings.bold`, `mappings.italic`.
+ * R8 — 2 toggles : `mappings.bold`, `mappings.italic`.
  *
  * @param {Object}                                       props
  * @param {{mappings: {bold: boolean, italic: boolean}}} props.params
@@ -556,7 +729,7 @@ function P7Params( { params, isSaving, onSaveParams } ) {
  * @param {(p: Object) => void}                          props.onSaveParams
  * @return {JSX.Element} Bloc.
  */
-function P8Params( { params, isSaving, onSaveParams } ) {
+function R8Params( { params, isSaving, onSaveParams } ) {
 	const mappings = params.mappings ?? { bold: true, italic: true };
 	return (
 		<fieldset className="htmln-rule__params">

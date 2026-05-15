@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P1 — EmptyParagraphsRule.
+ * Tests R1 — EmptyParagraphsRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -24,7 +24,7 @@ final class EmptyParagraphsRuleTest extends TestCase {
 	}
 
 	public function test_id_and_label(): void {
-		$this->assertSame( 'P1', $this->rule->id() );
+		$this->assertSame( 'R1', $this->rule->id() );
 		$this->assertNotEmpty( $this->rule->label() );
 	}
 
@@ -58,7 +58,7 @@ final class EmptyParagraphsRuleTest extends TestCase {
 	}
 
 	public function test_paragraph_with_br_only_is_preserved(): void {
-		// Un <br> est un élément structurel — on ne supprime pas, ce sera P5
+		// Un <br> est un élément structurel — on ne supprime pas, ce sera R5
 		// (ExcessiveBr) qui s'occupera du <br> isolé/résiduel selon son seuil.
 		$html = '<p><br/></p>';
 		$this->assertHtmlEquals( $html, $this->rule->apply( $html ) );

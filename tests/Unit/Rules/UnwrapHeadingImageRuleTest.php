@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests UnwrapHeadingImageRule (P9).
+ * Tests UnwrapHeadingImageRule (R9).
  *
  * Couvre :
  *  - Cas canonique : `<h2><img></h2>` → `<img>`
@@ -35,7 +35,7 @@ final class UnwrapHeadingImageRuleTest extends TestCase {
 	// =========================================================================
 
 	public function test_id_is_P9(): void {
-		$this->assertSame( 'P9', $this->rule->id() );
+		$this->assertSame( 'R9', $this->rule->id() );
 	}
 
 	public function test_label_is_non_empty(): void {
@@ -128,7 +128,7 @@ final class UnwrapHeadingImageRuleTest extends TestCase {
 	}
 
 	public function test_preserves_heading_without_image(): void {
-		// Vide ou plein de texte, pas notre problème (c'est P2).
+		// Vide ou plein de texte, pas notre problème (c'est R2).
 		$input  = '<h2>Titre normal</h2>';
 		$this->assertSame( $input, $this->rule->apply( $input ) );
 

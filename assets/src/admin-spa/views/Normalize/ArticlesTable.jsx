@@ -54,7 +54,7 @@ function sumViolations( matchingRules ) {
  * (cf. `RULE_TOOLTIPS` dans `utils/ruleLabels`) — le tooltip natif du
  * navigateur s'affiche au survol.
  *
- * Tri par ordre d'affichage UI (P1, P2.1, P2.2, P3…), pas par ordre
+ * Tri par ordre d'affichage UI (R1, R2, R3, …, R11), pas par ordre
  * d'exécution du pipeline.
  *
  * @param {Array<{rule_id?: string}>} matchingRules Règles applicables.
@@ -456,7 +456,9 @@ export default function ArticlesTable( {
 							</td>
 							<td>
 								<Button
-									variant="link"
+									variant="secondary"
+									size="small"
+									className="htmln-articles-table__diff-btn"
 									onClick={ () => onViewDiff( item.post_id ) }
 									disabled={ disabled }
 								>

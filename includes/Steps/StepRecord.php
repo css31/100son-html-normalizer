@@ -37,6 +37,7 @@ final class StepRecord {
 	 * @param int                                                                                            $successful_articles Articles validés.
 	 * @param int                                                                                            $refused_articles    Articles refusés (régression rejetée par admin).
 	 * @param int                                                                                            $errored_articles    Articles en erreur technique.
+	 * @param int                                                                                            $pending_articles    Articles en `regression_pending` à la finalisation (admin n'a pas arbitré).
 	 * @param array<int, array{status: string, regression?: array<string, mixed>, error?: string}>           $per_article_results Détail par article.
 	 * @param int|null                                                                                       $user_id             Auteur du pas (null en CLI).
 	 * @param string                                                                                         $started_at          Datetime MySQL au lancement.
@@ -51,6 +52,7 @@ final class StepRecord {
 		public readonly int $successful_articles,
 		public readonly int $refused_articles,
 		public readonly int $errored_articles,
+		public readonly int $pending_articles,
 		public readonly array $per_article_results,
 		public readonly ?int $user_id,
 		public readonly string $started_at,
@@ -80,6 +82,7 @@ final class StepRecord {
 			successful_articles: (int) ( $row['successful_articles'] ?? 0 ),
 			refused_articles: (int) ( $row['refused_articles'] ?? 0 ),
 			errored_articles: (int) ( $row['errored_articles'] ?? 0 ),
+			pending_articles: (int) ( $row['pending_articles'] ?? 0 ),
 			per_article_results: self::decode_per_article_results( (string) ( $row['per_article_results'] ?? '' ) ),
 			user_id: isset( $row['user_id'] ) && '' !== $row['user_id'] && null !== $row['user_id']
 				? (int) $row['user_id']
@@ -105,6 +108,7 @@ final class StepRecord {
 			'successful_articles' => $this->successful_articles,
 			'refused_articles'    => $this->refused_articles,
 			'errored_articles'    => $this->errored_articles,
+			'pending_articles'    => $this->pending_articles,
 			'per_article_results' => self::encode_json( $this->per_article_results ),
 			'user_id'             => $this->user_id,
 			'started_at'          => $this->started_at,

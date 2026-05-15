@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P5 — ExcessiveBrRule.
+ * Tests R5 — ExcessiveBrRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -19,7 +19,7 @@ final class ExcessiveBrRuleTest extends TestCase {
 
 	public function test_id_and_label(): void {
 		$rule = new ExcessiveBrRule();
-		$this->assertSame( 'P5', $rule->id() );
+		$this->assertSame( 'R5', $rule->id() );
 		$this->assertNotEmpty( $rule->label() );
 	}
 
@@ -81,7 +81,7 @@ final class ExcessiveBrRuleTest extends TestCase {
 	public function test_trailing_br_collapse_creates_empty_paragraph(): void {
 		$rule = new ExcessiveBrRule( 2 );
 		// Cas du post 374 : `<p>texte.<br /><br /></p>` → `<p>texte.</p><p></p>`.
-		// P1 ramassera le <p></p> en pipeline complète.
+		// R1 ramassera le <p></p> en pipeline complète.
 		$this->assertHtmlEquals(
 			'<p>texte.</p><p></p>',
 			$rule->apply( '<p>texte.<br /><br /></p>' )

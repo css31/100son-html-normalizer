@@ -1,11 +1,11 @@
 <?php
 /**
- * P2 — EmptyHeadingsRule.
+ * R2 — EmptyHeadingsRule.
  *
  * Supprime les titres `<h1>` à `<h6>` vides ou ne contenant que du blanc.
- * Symétrique de P1 mais sur les headings.
+ * Symétrique de R1 mais sur les headings.
  *
- * Cf. cahier §3.1 F2.P2 et §8 F2.P2.
+ * Cf. cahier §3.1 F2.R2 et §8 F2.R2.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -20,7 +20,7 @@ use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use DOMElement;
 
 /**
- * Préréglage P2 : suppression des titres vides.
+ * Règle R2 : suppression des titres vides.
  */
 final class EmptyHeadingsRule implements RuleInterface {
 
@@ -35,7 +35,7 @@ final class EmptyHeadingsRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P2';
+		return 'R2';
 	}
 
 	/**

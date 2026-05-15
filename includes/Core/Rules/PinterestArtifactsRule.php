@@ -1,14 +1,14 @@
 <?php
 /**
- * P4 — PinterestArtifactsRule.
+ * R4 — PinterestArtifactsRule.
  *
  * Supprime tous les vestiges Pinterest dans le HTML :
  *  - Forme A : `<span data-pin-do>`, `<span data-pin-id>`, tout `<span data-pin-*>`
  *  - Forme B : `<span style="…z-index: 8675309…">…</span>` (signature canonique
  *    du bouton « Save » Pinterest, vérifiée 0 faux positif sur le corpus MMM —
- *    cf. PLUGIN_CONTEXT.md §6.7 et cahier §3.1 F2.P4 / §8 F2.P4).
+ *    cf. PLUGIN_CONTEXT.md §6.7 et cahier §3.1 F2.R4 / §8 F2.R4).
  *
- * Le `<p>` parent éventuellement vidé sera ramassé par P1 en fin de pipeline.
+ * Le `<p>` parent éventuellement vidé sera ramassé par R1 en fin de pipeline.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -23,9 +23,14 @@ use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use DOMElement;
 
 /**
- * Préréglage P4 : suppression des artefacts Pinterest (formes A et B).
+ * Règle R4 : suppression des artefacts Pinterest (formes A et B).
+ *
+ * Marquée `LossyRule` : retire physiquement le bouton « Save » et les
+ * snippets `data-pin-*` du HTML, ce qui réduit `chars` et `words`. Sans
+ * le marker, tout article touché par R4 passerait en `regression_pending`
+ * sous le seuil `text_loss_pct = 0` (default).
  */
-final class PinterestArtifactsRule implements RuleInterface {
+final class PinterestArtifactsRule implements RuleInterface, LossyRule {
 
 	/**
 	 * Signature canonique du bouton Pinterest dans l'attribut style.
@@ -41,7 +46,7 @@ final class PinterestArtifactsRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P4';
+		return 'R4';
 	}
 
 	/**

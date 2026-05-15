@@ -1,6 +1,6 @@
 <?php
 /**
- * SettingsRepository — accès lecture/écriture aux options globales et configs préréglages.
+ * SettingsRepository — accès lecture/écriture aux options globales et configs règles.
  *
  * Encapsule l'API options de WordPress pour offrir une surface typée et un
  * point unique de validation/normalisation.
@@ -15,7 +15,7 @@ namespace Cent_Son\Html_Normalizer\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Repository des réglages plugin et de la config des préréglages.
+ * Repository des réglages plugin et de la config des règles.
  *
  * Volontairement non-final pour permettre l'extension/stub en tests
  * d'intégration (HtmlNormalizerTest, PublicApiTest…). Ne pas la rendre
@@ -96,9 +96,9 @@ class SettingsRepository {
 	}
 
 	/**
-	 * Récupère la configuration brute d'un préréglage.
+	 * Récupère la configuration brute d'une règle.
 	 *
-	 * @param string $preset_id Identifiant (P1..P8).
+	 * @param string $preset_id Identifiant (R1..R12).
 	 * @return array<string, mixed>
 	 */
 	public function get_preset_config( string $preset_id ): array {
@@ -108,7 +108,7 @@ class SettingsRepository {
 	}
 
 	/**
-	 * Met à jour la configuration d'un préréglage.
+	 * Met à jour la configuration d'une règle.
 	 *
 	 * @param string               $preset_id Identifiant.
 	 * @param array<string, mixed> $config    Nouvelle configuration.
@@ -121,7 +121,7 @@ class SettingsRepository {
 	}
 
 	/**
-	 * Indique si un préréglage est activé.
+	 * Indique si une règle est activé.
 	 *
 	 * @param string $preset_id Identifiant.
 	 * @return bool
@@ -132,7 +132,7 @@ class SettingsRepository {
 	}
 
 	/**
-	 * Récupère la config de tous les préréglages.
+	 * Récupère la config de tous les règles.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */

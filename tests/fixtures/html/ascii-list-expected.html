@@ -1,14 +1,14 @@
 <!--
   Fixture : ascii-list-expected.html
-  Test    : tests/Unit/Rules/AsciiListRuleTest.php (préréglage P7 isolé)
+  Test    : tests/Unit/Rules/AsciiListRuleTest.php (règle R7 isolé)
   Auteur  : agent (option C — à valider par Cyrille avant écriture du code)
 
-  Sortie attendue après application de P7 SEUL (pas P6, pas P5, pas P1 etc.)
+  Sortie attendue après application de R7 SEUL (pas R6, pas R5, pas R1 etc.)
   sur ascii-list-input.html, en config par défaut (marqueurs `- – * • N.`, seuil 2).
 
   Format : HTML brut (pas de blocs Gutenberg, cf. cahier §3.2 ligne 82).
 
-  Règles appliquées (cf. cahier §3.1 F2.P7, §14 hyp. 12) :
+  Règles appliquées (cf. cahier §3.1 F2.R7, §14 hyp. 12) :
     - Pour chaque <p>, compter les fragments séparés par <br /> qui commencent par un marqueur.
     - Si nb < seuil → <p> inchangé.
     - Si nb >= seuil → split sur <br />, fragments non-bullet en <p> séparés, fragments bullets consécutifs regroupés en <ul>/<ol>.

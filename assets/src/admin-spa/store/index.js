@@ -33,7 +33,7 @@ export const STORE_NAME = 'htmln/spa';
  * État initial — toutes les valeurs `null` signalent « pas encore chargé »
  * et permettent aux vues d'afficher un skeleton/loader avant le premier fetch.
  *
- * `selectedRules` est éphémère : initialisé à la liste complète P1..P8 au
+ * `selectedRules` est éphémère : initialisé à la liste complète R1..R16 au
  * boot, modifié par l'onglet Règles, perdu au reload (cf. décision post-rc1).
  *
  * `normalizeView` est également éphémère (perdu au reload) mais survit au
@@ -56,25 +56,31 @@ export const STORE_NAME = 'htmln/spa';
  */
 
 /**
- * Liste canonique des 10 ids de préréglages, dans l'ordre du pipeline.
+ * Liste canonique des 10 ids de règles, dans l'ordre du pipeline.
  *
- * Note : l'ORDRE ici est l'ordre d'EXÉCUTION (P3 → P4 → … → P2), pas
+ * Note : l'ORDRE ici est l'ordre d'EXÉCUTION (R3 → R4 → … → R2), pas
  * l'ordre d'affichage UI. Pour l'affichage trié (Règles tab, recap),
  * utiliser `compareRuleIdsByDisplayOrder` de `utils/ruleLabels`.
  *
  * @type {string[]}
  */
 export const ALL_RULE_IDS = [
-	'P1',
-	'P2',
-	'P3',
-	'P4',
-	'P5',
-	'P6',
-	'P7',
-	'P8',
-	'P9',
-	'P10',
+	'R1',
+	'R2',
+	'R3',
+	'R4',
+	'R5',
+	'R6',
+	'R7',
+	'R8',
+	'R9',
+	'R10',
+	'R11',
+	'R12',
+	'R13',
+	'R14',
+	'R15',
+	'R16',
 ];
 
 /**
@@ -149,14 +155,14 @@ const actions = {
 	 * Bascule l'état d'un id dans la sélection. Ajoute s'il est absent,
 	 * retire s'il est présent.
 	 *
-	 * @param {string} ruleId Identifiant P1..P8.
+	 * @param {string} ruleId Identifiant R1..R12.
 	 */
 	toggleSelectedRule( ruleId ) {
 		return { type: 'TOGGLE_SELECTED_RULE', ruleId };
 	},
 
 	/**
-	 * Coche les 8 règles canoniques.
+	 * Coche les 11 règles canoniques.
 	 */
 	selectAllRules() {
 		return { type: 'SET_SELECTED_RULES', ruleIds: [ ...ALL_RULE_IDS ] };
@@ -373,7 +379,7 @@ const selectors = {
 	getRegressionThresholds: ( state ) => state.regressionThresholds,
 
 	/**
-	 * Sélection éphémère de règles pour le prochain pas (P1..P8 par
+	 * Sélection éphémère de règles pour le prochain pas (R1..R12 par
 	 * défaut). Partagée entre l'onglet Règles et la vue Normaliser.
 	 *
 	 * @param {HtmlnSpaState} state État du store.

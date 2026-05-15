@@ -1,6 +1,6 @@
 <?php
 /**
- * P10 — UnwrapParagraphImageRule.
+ * R10 — UnwrapParagraphImageRule.
  *
  * Désencapsule les `<p>` qui ne contiennent qu'une image (sans texte) —
  * cas typique du HTML migré depuis Word, Classic Editor ou SiteOrigin
@@ -18,14 +18,14 @@
  * de l'image (s'il existe) bloque le matching — un paragraphe légitime
  * avec image et texte n'est pas désencapsulé.
  *
- * Symétrique de P1 (paragraphes vides) qui **préserve volontairement**
+ * Symétrique de R1 (paragraphes vides) qui **préserve volontairement**
  * ces paragraphes (présence d'élément structurel = pas "vide") — c'est
- * P10 qui les nettoie. Et symétrique cousine de P9 (`UnwrapHeadingImageRule`)
+ * R10 qui les nettoie. Et symétrique cousine de R9 (`UnwrapHeadingImageRule`)
  * qui fait la même chose sur les `<h1>`-`<h6>`.
  *
- * Pipeline : placé juste après P9 — cohérence sémantique (deux règles de
+ * Pipeline : placé juste après R9 — cohérence sémantique (deux règles de
  * désencapsulation d'images) et même invariant (s'exécute avant le cleanup
- * final P1/P2).
+ * final R1/R2).
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -41,7 +41,7 @@ use DOMElement;
 use DOMNode;
 
 /**
- * Préréglage P10 : désencapsulation des paragraphes autour d'images.
+ * Règle R10 : désencapsulation des paragraphes autour d'images.
  */
 final class UnwrapParagraphImageRule implements RuleInterface {
 
@@ -49,7 +49,7 @@ final class UnwrapParagraphImageRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P10';
+		return 'R10';
 	}
 
 	/**
@@ -74,7 +74,7 @@ final class UnwrapParagraphImageRule implements RuleInterface {
 		}
 
 		// Collecter avant modification — modifier la live NodeList pendant
-		// itération est risqué (cf. P1/P2/P9 pour le même pattern).
+		// itération est risqué (cf. R1/R2/R9 pour le même pattern).
 		$paragraphs = array();
 		foreach ( $doc->getElementsByTagName( 'p' ) as $p ) {
 			$paragraphs[] = $p;
@@ -118,7 +118,7 @@ final class UnwrapParagraphImageRule implements RuleInterface {
 	/**
 	 * Indique si un paragraphe est un wrapper « pseudo-vide » d'image.
 	 *
-	 * Critères cumulatifs (alignés sur P9) :
+	 * Critères cumulatifs (alignés sur R9) :
 	 *  1. contient au moins un descendant `<img>` (à n'importe quel niveau,
 	 *     pour gérer `<p><a><img></a></p>` et `<p><figure><img></figure></p>`) ;
 	 *  2. son `textContent` (après normalisation NBSP→espace et trim) est vide

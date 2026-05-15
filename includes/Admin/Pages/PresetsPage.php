@@ -1,6 +1,6 @@
 <?php
 /**
- * Page admin "Préréglages" — cocher/décocher et configurer les préréglages.
+ * Page admin "Règles" — cocher/décocher et configurer les règles.
  *
  * V0.1 minimale : formulaire PHP classique avec POST handler. Sera remplacée
  * par la SPA React en phase 15 du §11.
@@ -19,7 +19,7 @@ use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 
 /**
- * Vue Préréglages.
+ * Vue Règles.
  */
 final class PresetsPage {
 
@@ -49,8 +49,8 @@ final class PresetsPage {
 		$saved = $this->maybe_handle_save();
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'HTML Normalizer — Préréglages', '100son-html-normalizer' ) . '</h1>';
-		echo '<p>' . esc_html__( "Activez les règles de nettoyage à appliquer dans la pipeline. L'ordre d'exécution est : P3 → P4 → P8 → P6 → P7 → P5 → P1 → P2.", '100son-html-normalizer' ) . '</p>';
+		echo '<h1>' . esc_html__( 'HTML Normalizer — Règles', '100son-html-normalizer' ) . '</h1>';
+		echo '<p>' . esc_html__( "Activez les règles de nettoyage à appliquer dans la pipeline. L'ordre d'exécution est : R3 → R4 → R8 → R6 → R7 → R5 → R1 → R2.", '100son-html-normalizer' ) . '</p>';
 
 		if ( $saved ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Configuration enregistrée.', '100son-html-normalizer' ) . '</p></div>';
@@ -90,25 +90,25 @@ final class PresetsPage {
 			$config['enabled']   = ! empty( $post_data[ $preset_id ]['enabled'] );
 
 			switch ( $preset_id ) {
-				case 'P5':
-					$threshold        = isset( $post_data['P5']['threshold'] ) ? (int) $post_data['P5']['threshold'] : 2;
+				case 'R5':
+					$threshold        = isset( $post_data['R5']['threshold'] ) ? (int) $post_data['R5']['threshold'] : 2;
 					$config['threshold'] = max( 2, $threshold );
 					break;
-				case 'P6':
-					$config['keep_text_align'] = ! empty( $post_data['P6']['keep_text_align'] );
+				case 'R6':
+					$config['keep_text_align'] = ! empty( $post_data['R6']['keep_text_align'] );
 					break;
-				case 'P7':
-					$threshold = isset( $post_data['P7']['threshold'] ) ? (int) $post_data['P7']['threshold'] : 2;
+				case 'R7':
+					$threshold = isset( $post_data['R7']['threshold'] ) ? (int) $post_data['R7']['threshold'] : 2;
 					$config['threshold'] = max( 2, $threshold );
 					$config['markers']   = array(
-						'dash'    => ! empty( $post_data['P7']['markers']['dash'] ),
-						'emdash'  => ! empty( $post_data['P7']['markers']['emdash'] ),
-						'asterix' => ! empty( $post_data['P7']['markers']['asterix'] ),
-						'bullet'  => ! empty( $post_data['P7']['markers']['bullet'] ),
-						'numeric' => ! empty( $post_data['P7']['markers']['numeric'] ),
+						'dash'    => ! empty( $post_data['R7']['markers']['dash'] ),
+						'emdash'  => ! empty( $post_data['R7']['markers']['emdash'] ),
+						'asterix' => ! empty( $post_data['R7']['markers']['asterix'] ),
+						'bullet'  => ! empty( $post_data['R7']['markers']['bullet'] ),
+						'numeric' => ! empty( $post_data['R7']['markers']['numeric'] ),
 					);
-					$raw_custom               = isset( $post_data['P7']['custom_markers'] )
-						? sanitize_textarea_field( (string) $post_data['P7']['custom_markers'] )
+					$raw_custom               = isset( $post_data['R7']['custom_markers'] )
+						? sanitize_textarea_field( (string) $post_data['R7']['custom_markers'] )
 						: '';
 					$config['custom_markers'] = array_values(
 						array_filter(
@@ -117,10 +117,10 @@ final class PresetsPage {
 						)
 					);
 					break;
-				case 'P8':
+				case 'R8':
 					$config['mappings'] = array(
-						'bold'   => ! empty( $post_data['P8']['mappings']['bold'] ),
-						'italic' => ! empty( $post_data['P8']['mappings']['italic'] ),
+						'bold'   => ! empty( $post_data['R8']['mappings']['bold'] ),
+						'italic' => ! empty( $post_data['R8']['mappings']['italic'] ),
 					);
 					break;
 			}
@@ -138,7 +138,7 @@ final class PresetsPage {
 	}
 
 	/**
-	 * Construit un résumé textuel du diff entre deux configurations de préréglages.
+	 * Construit un résumé textuel du diff entre deux configurations de règles.
 	 *
 	 * @param array<string, array<string, mixed>> $before Avant.
 	 * @param array<string, array<string, mixed>> $after  Après.
@@ -168,7 +168,7 @@ final class PresetsPage {
 	}
 
 	/**
-	 * Render du formulaire des préréglages.
+	 * Render du formulaire des règles.
 	 *
 	 * @return void
 	 */
@@ -271,7 +271,7 @@ final class PresetsPage {
 	}
 
 	/**
-	 * Render des sous-paramètres d'un préréglage.
+	 * Render des sous-paramètres d'une règle.
 	 *
 	 * @param string               $preset_id Identifiant.
 	 * @param array<string, mixed> $config    Configuration courante.
@@ -279,25 +279,25 @@ final class PresetsPage {
 	 */
 	private function render_preset_options( string $preset_id, array $config ): void {
 		switch ( $preset_id ) {
-			case 'P5':
+			case 'R5':
 				$threshold = isset( $config['threshold'] ) ? (int) $config['threshold'] : 2;
 				printf(
-					'<label>%s <input type="number" name="preset[P5][threshold]" value="%d" min="2" max="20" style="width:60px;"></label>',
+					'<label>%s <input type="number" name="preset[R5][threshold]" value="%d" min="2" max="20" style="width:60px;"></label>',
 					esc_html__( 'Seuil (≥ 2) :', '100son-html-normalizer' ),
 					(int) $threshold
 				);
 				break;
 
-			case 'P6':
+			case 'R6':
 				$keep = ! isset( $config['keep_text_align'] ) || (bool) $config['keep_text_align'];
 				printf(
-					'<label><input type="checkbox" name="preset[P6][keep_text_align]" value="1" %s> %s</label>',
+					'<label><input type="checkbox" name="preset[R6][keep_text_align]" value="1" %s> %s</label>',
 					checked( $keep, true, false ),
 					esc_html__( 'Conserver text-align (sinon strip total)', '100son-html-normalizer' )
 				);
 				break;
 
-			case 'P7':
+			case 'R7':
 				$threshold = isset( $config['threshold'] ) ? (int) $config['threshold'] : 2;
 				$markers   = isset( $config['markers'] ) && is_array( $config['markers'] ) ? $config['markers'] : array();
 				$custom    = isset( $config['custom_markers'] ) && is_array( $config['custom_markers'] )
@@ -305,7 +305,7 @@ final class PresetsPage {
 					: '';
 
 				printf(
-					'<p><label>%s <input type="number" name="preset[P7][threshold]" value="%d" min="2" max="20" style="width:60px;"></label></p>',
+					'<p><label>%s <input type="number" name="preset[R7][threshold]" value="%d" min="2" max="20" style="width:60px;"></label></p>',
 					esc_html__( 'Seuil (≥ 2) :', '100son-html-normalizer' ),
 					(int) $threshold
 				);
@@ -322,7 +322,7 @@ final class PresetsPage {
 				foreach ( $marker_labels as $key => $label ) {
 					$checked = ! empty( $markers[ $key ] );
 					printf(
-						'<li><label><input type="checkbox" name="preset[P7][markers][%s]" value="1" %s> %s</label></li>',
+						'<li><label><input type="checkbox" name="preset[R7][markers][%s]" value="1" %s> %s</label></li>',
 						esc_attr( $key ),
 						checked( $checked, true, false ),
 						esc_html( $label )
@@ -331,25 +331,25 @@ final class PresetsPage {
 				echo '</ul>';
 
 				printf(
-					'<p><label>%s<br><textarea name="preset[P7][custom_markers]" rows="3" cols="40">%s</textarea><br><span class="description">%s</span></label></p>',
+					'<p><label>%s<br><textarea name="preset[R7][custom_markers]" rows="3" cols="40">%s</textarea><br><span class="description">%s</span></label></p>',
 					esc_html__( 'Marqueurs custom (1 par ligne) :', '100son-html-normalizer' ),
 					esc_textarea( $custom ),
 					esc_html__( 'Ex. ▸  ou  ► — un par ligne. Toujours produit <ul>.', '100son-html-normalizer' )
 				);
 				break;
 
-			case 'P8':
+			case 'R8':
 				$mappings = isset( $config['mappings'] ) && is_array( $config['mappings'] ) ? $config['mappings'] : array();
 				$bold     = ! isset( $mappings['bold'] ) || (bool) $mappings['bold'];
 				$italic   = ! isset( $mappings['italic'] ) || (bool) $mappings['italic'];
 				echo '<p>' . esc_html__( 'Mappings sémantiques activés :', '100son-html-normalizer' ) . '</p>';
 				printf(
-					'<p><label><input type="checkbox" name="preset[P8][mappings][bold]" value="1" %s> %s</label></p>',
+					'<p><label><input type="checkbox" name="preset[R8][mappings][bold]" value="1" %s> %s</label></p>',
 					checked( $bold, true, false ),
 					esc_html__( 'font-weight: bold (ou ≥ 700) → <strong>', '100son-html-normalizer' )
 				);
 				printf(
-					'<p><label><input type="checkbox" name="preset[P8][mappings][italic]" value="1" %s> %s</label></p>',
+					'<p><label><input type="checkbox" name="preset[R8][mappings][italic]" value="1" %s> %s</label></p>',
 					checked( $italic, true, false ),
 					esc_html__( 'font-style: italic → <em>', '100son-html-normalizer' )
 				);

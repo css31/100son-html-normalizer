@@ -47,11 +47,11 @@ final class PipelineTest extends TestCase {
 
 		// Ordre canonique simule (sous-ensemble suffit pour ces tests).
 		$this->all_rules = array(
-			$make_rule( 'P3' ),
-			$make_rule( 'P4' ),
-			$make_rule( 'P8' ),
-			$make_rule( 'P5' ),
-			$make_rule( 'P1' ),
+			$make_rule( 'R3' ),
+			$make_rule( 'R4' ),
+			$make_rule( 'R8' ),
+			$make_rule( 'R5' ),
+			$make_rule( 'R1' ),
 		);
 	}
 
@@ -61,25 +61,25 @@ final class PipelineTest extends TestCase {
 	}
 
 	public function test_apply_subset_unknown_rule_ids_is_noop(): void {
-		$out = $this->pipeline->applySubset( $this->all_rules, array( 'P99', 'PXY' ), 'INPUT' );
+		$out = $this->pipeline->applySubset( $this->all_rules, array( 'R99', 'RXY' ), 'INPUT' );
 		$this->assertSame( 'INPUT', $out );
 	}
 
 	public function test_apply_subset_filters_to_requested_only(): void {
-		$out = $this->pipeline->applySubset( $this->all_rules, array( 'P5' ), 'X' );
-		$this->assertSame( 'X|P5', $out );
+		$out = $this->pipeline->applySubset( $this->all_rules, array( 'R5' ), 'X' );
+		$this->assertSame( 'X|R5', $out );
 	}
 
 	public function test_apply_subset_respects_order_of_all_rules(): void {
-		// Demande dans le desordre P1, P5, P3 : doit s'executer dans l'ordre
-		// canonique fourni par $all_rules : P3, P5, P1.
-		$out = $this->pipeline->applySubset( $this->all_rules, array( 'P1', 'P5', 'P3' ), 'X' );
-		$this->assertSame( 'X|P3|P5|P1', $out );
+		// Demande dans le desordre R1, R5, R3 : doit s'executer dans l'ordre
+		// canonique fourni par $all_rules : R3, R5, R1.
+		$out = $this->pipeline->applySubset( $this->all_rules, array( 'R1', 'R5', 'R3' ), 'X' );
+		$this->assertSame( 'X|R3|R5|R1', $out );
 	}
 
 	public function test_apply_subset_ignores_unknown_among_known(): void {
-		$out = $this->pipeline->applySubset( $this->all_rules, array( 'P5', 'P99', 'P1' ), 'X' );
-		$this->assertSame( 'X|P5|P1', $out );
+		$out = $this->pipeline->applySubset( $this->all_rules, array( 'R5', 'R99', 'R1' ), 'X' );
+		$this->assertSame( 'X|R5|R1', $out );
 	}
 
 	public function test_apply_subset_collects_warnings_from_throwing_rule(): void {
@@ -96,9 +96,9 @@ final class PipelineTest extends TestCase {
 		};
 		$rules    = array_merge( $this->all_rules, array( $throwing_rule ) );
 		$warnings = array();
-		$out      = $this->pipeline->applySubset( $rules, array( 'P5', 'P_BOOM' ), 'X', array(), $warnings );
-		// La regle qui throw n'arrete pas la pipeline, P5 doit avoir taggue.
-		$this->assertSame( 'X|P5', $out );
+		$out      = $this->pipeline->applySubset( $rules, array( 'R5', 'P_BOOM' ), 'X', array(), $warnings );
+		// La regle qui throw n'arrete pas la pipeline, R5 doit avoir taggue.
+		$this->assertSame( 'X|R5', $out );
 		$this->assertNotEmpty( $warnings );
 		$this->assertStringContainsString( 'P_BOOM', $warnings[0] );
 		$this->assertStringContainsString( 'kaboom', $warnings[0] );

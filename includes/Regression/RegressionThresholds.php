@@ -100,6 +100,33 @@ final class RegressionThresholds {
 	}
 
 	/**
+	 * Retourne une copie avec les seuils `text_loss_pct` et `words_loss_pct`
+	 * portés à 100 — i.e. désactive de fait les vérifications de perte
+	 * texte/mots. Les seuils structurels (paragraphes, headings, images,
+	 * links, lists) sont conservés tels quels.
+	 *
+	 * Usage : appelé par `StepRunner::process_article` quand le sous-ensemble
+	 * de règles à appliquer contient au moins une `LossyRule` (R3, R4) —
+	 * ces règles sont délibérément destructives en texte (retraits de
+	 * shortcodes / snippets), il ne faut pas qu'elles déclenchent une
+	 * fausse régression. Les checks structurels restent en place pour
+	 * détecter les erreurs réelles (image perdue, h2 disparu, etc.).
+	 *
+	 * @return self
+	 */
+	public function relax_text_checks_for_lossy(): self {
+		return new self(
+			text_loss_pct: 100,
+			words_loss_pct: 100,
+			paragraphs_loss_pct: $this->paragraphs_loss_pct,
+			headings_loss: $this->headings_loss,
+			images_loss: $this->images_loss,
+			links_loss: $this->links_loss,
+			lists_loss: $this->lists_loss,
+		);
+	}
+
+	/**
 	 * Représentation tableau (clé → entier).
 	 *
 	 * @return array{

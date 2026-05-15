@@ -121,12 +121,12 @@ final class DiffControllerTest extends TestCase {
 	public function test_compute_diff_returns_before_after_and_metrics(): void {
 		$this->seed_post( 100, '<p>Original</p>' );
 		$rule = $this->fake_rule(
-			'P1',
+			'R1',
 			static fn( string $html ): string => str_replace( 'Original', 'Modifié', $html )
 		);
 
 		$response = $this->make_controller( array( $rule ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( 200, $response->get_status() );
@@ -140,10 +140,10 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_marks_unchanged_when_html_identical(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertTrue( $response->get_data()['unchanged'] );
@@ -152,10 +152,10 @@ final class DiffControllerTest extends TestCase {
 	public function test_compute_diff_does_not_create_revision_or_write(): void {
 		// Garde-fou §13 : le diff est preview-only, pas d'effet sur post_content.
 		$this->seed_post( 100, '<p>Original</p>' );
-		$rule = $this->fake_rule( 'P1', static fn(): string => '<p>Tout effacé</p>' );
+		$rule = $this->fake_rule( 'R1', static fn(): string => '<p>Tout effacé</p>' );
 
 		$this->make_controller( array( $rule ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame(
@@ -178,7 +178,7 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_404_for_unknown_post(): void {
 		$response = $this->make_controller()->compute_diff(
-			$this->make_request( array( 'id' => 999, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 999, 'rule_ids' => array( 'R1' ) ) )
 		);
 		$this->assertSame( 404, $response->get_status() );
 		$this->assertSame( 'post_not_found', $response->get_data()['code'] );
@@ -200,10 +200,10 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_exposes_post_date(): void {
 		$this->seed_post( 100, '<p>x</p>', '2024-03-12 14:30:00' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( '2024-03-12 14:30:00', $response->get_data()['post_date'] );
@@ -216,10 +216,10 @@ final class DiffControllerTest extends TestCase {
 			'2024-01-01 00:00:00',
 			array( 'Animaux', 'Maison' )
 		);
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( array( 'Animaux', 'Maison' ), $response->get_data()['categories'] );
@@ -227,10 +227,10 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_exposes_empty_categories_when_none(): void {
 		$this->seed_post( 100, '<p>x</p>' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( array(), $response->get_data()['categories'] );
@@ -239,10 +239,10 @@ final class DiffControllerTest extends TestCase {
 	public function test_compute_diff_exposes_builder_type(): void {
 		// Contenu Gutenberg → classifier doit retourner `gutenberg`.
 		$this->seed_post( 100, '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( 'gutenberg', $response->get_data()['builder_type'] );
@@ -256,10 +256,10 @@ final class DiffControllerTest extends TestCase {
 		Son100_Htmln_Test_Posts_Registry::$meta[100]['panels_data'] = array(
 			'widgets' => array( array( 'panels_info' => array() ) ),
 		);
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$body = $response->get_data();
@@ -270,10 +270,10 @@ final class DiffControllerTest extends TestCase {
 	public function test_compute_diff_no_fossil_flag_on_pure_gutenberg(): void {
 		// Article Gutenberg sans aucun vestige SO en meta — flag false.
 		$this->seed_post( 100, '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertFalse( $response->get_data()['has_fossil_panels_data'] );
@@ -286,10 +286,10 @@ final class DiffControllerTest extends TestCase {
 		Son100_Htmln_Test_Posts_Registry::$meta[100]['panels_data'] = array(
 			'widgets' => array( array( 'panels_info' => array() ) ),
 		);
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$body = $response->get_data();
@@ -304,10 +304,10 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_normalizes_double_spaces_between_attributes(): void {
 		$this->seed_post( 100, '<div id="x"  class="y">contenu</div>' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$body = $response->get_data();
@@ -319,10 +319,10 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_normalizes_trailing_space_before_close_bracket(): void {
 		$this->seed_post( 100, '<div class="y" >contenu</div>' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$body = $response->get_data();
@@ -339,10 +339,10 @@ final class DiffControllerTest extends TestCase {
 		// tort la notice « Aucun changement » manquante. Avec normalisation
 		// des deux cotes : `unchanged === true`.
 		$this->seed_post( 100, '<div id="x"  class="y" >contenu</div>' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$body = $response->get_data();
@@ -357,10 +357,10 @@ final class DiffControllerTest extends TestCase {
 		// silencieusement, etc.).
 		$clean = '<p class="x">contenu <strong>fort</strong> et liens</p>';
 		$this->seed_post( 100, $clean );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( $clean, $response->get_data()['html_before'] );
@@ -373,16 +373,16 @@ final class DiffControllerTest extends TestCase {
 
 	public function test_compute_diff_applied_rules_lists_rules_with_matches(): void {
 		$this->seed_post( 100, '<p>Texte</p>' );
-		// Trois règles candidates : P1 a 3 occurrences, P2 a 1, P3 a 0
-		// (donc P3 doit être exclu de `applied_rules`).
-		$p1 = $this->fake_rule( 'P1', static fn( string $h ): string => $h, 3 );
-		$p2 = $this->fake_rule( 'P2', static fn( string $h ): string => $h, 1 );
-		$p3 = $this->fake_rule( 'P3', static fn( string $h ): string => $h, 0 );
+		// Trois règles candidates : R1 a 3 occurrences, R2 a 1, R3 a 0
+		// (donc R3 doit être exclu de `applied_rules`).
+		$p1 = $this->fake_rule( 'R1', static fn( string $h ): string => $h, 3 );
+		$p2 = $this->fake_rule( 'R2', static fn( string $h ): string => $h, 1 );
+		$p3 = $this->fake_rule( 'R3', static fn( string $h ): string => $h, 0 );
 
 		$response = $this->make_controller( array( $p1, $p2, $p3 ) )->compute_diff(
 			$this->make_request( array(
 				'id'       => 100,
-				'rule_ids' => array( 'P1', 'P2', 'P3' ),
+				'rule_ids' => array( 'R1', 'R2', 'R3' ),
 			) )
 		);
 
@@ -394,36 +394,36 @@ final class DiffControllerTest extends TestCase {
 		foreach ( $body['applied_rules'] as $entry ) {
 			$by_id[ $entry['rule_id'] ] = $entry['occurrences'];
 		}
-		$this->assertSame( 3, $by_id['P1'] );
-		$this->assertSame( 1, $by_id['P2'] );
-		$this->assertArrayNotHasKey( 'P3', $by_id );
+		$this->assertSame( 3, $by_id['R1'] );
+		$this->assertSame( 1, $by_id['R2'] );
+		$this->assertArrayNotHasKey( 'R3', $by_id );
 	}
 
 	public function test_compute_diff_applied_rules_empty_when_no_match(): void {
 		$this->seed_post( 100, '<p>Texte</p>' );
-		$noop = $this->fake_rule( 'P1', static fn( string $h ): string => $h, 0 );
+		$noop = $this->fake_rule( 'R1', static fn( string $h ): string => $h, 0 );
 
 		$response = $this->make_controller( array( $noop ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$this->assertSame( array(), $response->get_data()['applied_rules'] );
 	}
 
 	public function test_compute_diff_applied_rules_excludes_rules_not_in_subset(): void {
-		// Une règle (P9) **active dans le registre** mais NON demandée dans
+		// Une règle (R9) **active dans le registre** mais NON demandée dans
 		// `rule_ids` ne doit pas apparaître dans `applied_rules`, même si
 		// son countMatches serait positif.
 		$this->seed_post( 100, '<p>Texte</p>' );
-		$p1 = $this->fake_rule( 'P1', static fn( string $h ): string => $h, 2 );
-		$p9 = $this->fake_rule( 'P9', static fn( string $h ): string => $h, 5 );
+		$p1 = $this->fake_rule( 'R1', static fn( string $h ): string => $h, 2 );
+		$p9 = $this->fake_rule( 'R9', static fn( string $h ): string => $h, 5 );
 
 		$response = $this->make_controller( array( $p1, $p9 ) )->compute_diff(
-			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P1' ) ) )
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'R1' ) ) )
 		);
 
 		$body = $response->get_data();
 		$this->assertCount( 1, $body['applied_rules'] );
-		$this->assertSame( 'P1', $body['applied_rules'][0]['rule_id'] );
+		$this->assertSame( 'R1', $body['applied_rules'][0]['rule_id'] );
 	}
 }

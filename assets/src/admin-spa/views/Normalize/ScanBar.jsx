@@ -16,14 +16,16 @@ import { __, sprintf } from '@wordpress/i18n';
 import { Button, Notice } from '@wordpress/components';
 
 /**
- * @param {Object}                              props
- * @param {boolean}                             props.isScanning        Scan en cours.
- * @param {?{processed: number, total: number}} props.progress          Avancement.
- * @param {?string}                             props.error             Message d'erreur du dernier scan (ou null).
- * @param {boolean}                             props.disabled          Bloque le bouton (ex. pas en cours).
- * @param {number}                              props.selectedPostCount Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
- * @param {() => void}                          props.onScan            Déclenche le scan.
- * @param {() => void}                          props.onDismissError    Reset l'erreur affichée.
+ * @param {Object}                                                   props
+ * @param {boolean}                                                  props.isScanning        Scan en cours.
+ * @param {?{processed: number, total: number}}                      props.progress          Avancement.
+ * @param {?string}                                                  props.error             Message d'erreur du dernier scan (ou null).
+ * @param {boolean}                                                  props.disabled          Bloque le bouton (ex. pas en cours).
+ * @param {number}                                                   props.selectedPostCount Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
+ * @param {?{auto_disabled_rules: string[], fully_scanned: boolean}} props.lastFinalize      Résultat du dernier `POST /diagnostics/finalize-scan`. Si une ou plusieurs règles ont été auto-désactivées (état `complete`), on affiche une notice succincte.
+ * @param {() => void}                                               props.onScan            Déclenche le scan.
+ * @param {() => void}                                               props.onDismissError    Reset l'erreur affichée.
+ * @param {() => void}                                               props.onDismissFinalize Reset la notice d'auto-désactivation.
  * @return {JSX.Element} Barre.
  */
 export default function ScanBar( {
@@ -32,8 +34,10 @@ export default function ScanBar( {
 	error,
 	disabled,
 	selectedPostCount = 0,
+	lastFinalize = null,
 	onScan,
 	onDismissError,
+	onDismissFinalize,
 } ) {
 	const processed = progress?.processed ?? 0;
 	const total = progress?.total ?? 0;
@@ -122,6 +126,27 @@ export default function ScanBar( {
 					) }
 				</Notice>
 			) }
+
+			{ ! isScanning &&
+				lastFinalize &&
+				Array.isArray( lastFinalize.auto_disabled_rules ) &&
+				lastFinalize.auto_disabled_rules.length > 0 && (
+					<Notice
+						status="success"
+						onRemove={ onDismissFinalize }
+						isDismissible
+					>
+						{ sprintf(
+							// translators: 1 = nombre de règles, 2 = liste des IDs séparés par des virgules.
+							__(
+								'%1$d règle(s) sans occurrence détectée ont été désactivées : %2$s. Onglet Règles › toggle « Activée par défaut » pour réactiver si besoin.',
+								'100son-html-normalizer'
+							),
+							lastFinalize.auto_disabled_rules.length,
+							lastFinalize.auto_disabled_rules.join( ', ' )
+						) }
+					</Notice>
+				) }
 		</div>
 	);
 }

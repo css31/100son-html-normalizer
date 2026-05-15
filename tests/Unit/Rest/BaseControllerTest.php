@@ -168,20 +168,20 @@ final class BaseControllerTest extends TestCase {
 
 	public function test_sanitize_string_list_strips_tags_and_trims(): void {
 		$this->assertSame(
-			array( 'P1', 'P5' ),
-			$this->controller->call_sanitize_string_list( array( '  <b>P1</b>', 'P5' ) )
+			array( 'R1', 'R5' ),
+			$this->controller->call_sanitize_string_list( array( '  <b>R1</b>', 'R5' ) )
 		);
 	}
 
 	public function test_sanitize_string_list_filters_empty_after_sanitize(): void {
 		$this->assertSame(
-			array( 'P1' ),
-			$this->controller->call_sanitize_string_list( array( '', '   ', 'P1', null ) )
+			array( 'R1' ),
+			$this->controller->call_sanitize_string_list( array( '', '   ', 'R1', null ) )
 		);
 	}
 
 	public function test_sanitize_string_list_returns_empty_for_non_array(): void {
 		$this->assertSame( array(), $this->controller->call_sanitize_string_list( null ) );
-		$this->assertSame( array(), $this->controller->call_sanitize_string_list( 'P1' ) );
+		$this->assertSame( array(), $this->controller->call_sanitize_string_list( 'R1' ) );
 	}
 }

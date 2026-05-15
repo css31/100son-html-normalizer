@@ -73,8 +73,8 @@ final class DiagnosticEngineTest extends TestCase {
 	public function test_clean_post_returns_normal_status(): void {
 		// 2 règles qui ne matchent rien : status normal.
 		$registry = $this->registry_with( array(
-			$this->fake_rule( 'P1', 0 ),
-			$this->fake_rule( 'P5', 0 ),
+			$this->fake_rule( 'R1', 0 ),
+			$this->fake_rule( 'R5', 0 ),
 		) );
 		$engine   = new DiagnosticEngine( $registry, new MetricsCalculator() );
 		$record   = $engine->diagnose( $this->post( 42, '<p>Texte propre</p>' ) );
@@ -86,18 +86,18 @@ final class DiagnosticEngineTest extends TestCase {
 
 	public function test_post_with_matches_returns_to_improve_status(): void {
 		$registry = $this->registry_with( array(
-			$this->fake_rule( 'P1', 3 ),
-			$this->fake_rule( 'P5', 0 ),
-			$this->fake_rule( 'P7', 2 ),
+			$this->fake_rule( 'R1', 3 ),
+			$this->fake_rule( 'R5', 0 ),
+			$this->fake_rule( 'R7', 2 ),
 		) );
 		$engine   = new DiagnosticEngine( $registry, new MetricsCalculator() );
 		$record   = $engine->diagnose( $this->post( 42, '<p>x</p>' ) );
 
 		$this->assertSame( DiagnosticRecord::STATUS_TO_IMPROVE, $record->status );
-		$this->assertCount( 2, $record->matching_rules, 'P5 (count=0) ne doit pas etre liste' );
-		$this->assertSame( 'P1', $record->matching_rules[0]['rule_id'] );
+		$this->assertCount( 2, $record->matching_rules, 'R5 (count=0) ne doit pas etre liste' );
+		$this->assertSame( 'R1', $record->matching_rules[0]['rule_id'] );
 		$this->assertSame( 3, $record->matching_rules[0]['occurrences'] );
-		$this->assertSame( 'P7', $record->matching_rules[1]['rule_id'] );
+		$this->assertSame( 'R7', $record->matching_rules[1]['rule_id'] );
 		$this->assertSame( 2, $record->matching_rules[1]['occurrences'] );
 	}
 
@@ -147,14 +147,14 @@ final class DiagnosticEngineTest extends TestCase {
 
 	public function test_diagnose_record_id_is_null_pre_persist(): void {
 		// Le record sortant n'a pas d'id (pas encore persisté).
-		$registry = $this->registry_with( array( $this->fake_rule( 'P1', 1 ) ) );
+		$registry = $this->registry_with( array( $this->fake_rule( 'R1', 1 ) ) );
 		$engine   = new DiagnosticEngine( $registry, new MetricsCalculator() );
 		$record   = $engine->diagnose( $this->post( 1, '<p>x</p>' ) );
 		$this->assertNull( $record->id );
 	}
 
 	public function test_diagnose_with_empty_html_does_not_crash(): void {
-		$registry = $this->registry_with( array( $this->fake_rule( 'P1', 0 ) ) );
+		$registry = $this->registry_with( array( $this->fake_rule( 'R1', 0 ) ) );
 		$engine   = new DiagnosticEngine( $registry, new MetricsCalculator() );
 		$record   = $engine->diagnose( $this->post( 1, '' ) );
 		$this->assertSame( DiagnosticRecord::STATUS_NORMAL, $record->status );

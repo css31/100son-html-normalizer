@@ -3,24 +3,36 @@
   Test    : tests/Integration/HtmlNormalizerTest.php (pipeline complète)
   Auteur  : agent + Cyrille (option C — à valider par Cyrille avant écriture du code)
 
-  Configuration testée : tous préréglages activés par défaut
-    P3, P4, P6 (keep_text_align=true), P7 (marqueurs défaut, seuil 2), P5, P1, P2
+  Configuration testée : tous règles activés par défaut
+    R3, R4, R8, R6 (keep_text_align=true), R7 (marqueurs défaut, seuil 2), R5, R9, R11, R10, R1, R2
 
-  Pipeline (cf. cahier §4.4) : P3 → P4 → P6 → P7 → P5 → P1 → P2
+  Pipeline (cf. cahier §4.4) : R3 → R4 → R8 → R6 → R7 → R5 → R9 → R11 → R10 → R1 → R2
 
   Cas couverts :
-    A. P7 hors-<p> bullets `•` (post 2500)            — chaque item dans son propre <p>
-    B. P3 Shareaholic shortcode (post 2500)            — `[shareaholic …]`
-    C. P4 Pinterest officiel `data-pin-do` (synth.)    — vrai bouton Pinterest
-    D. P6 + cas Pinterest "Enregistrer" forme B (2500) — span sans data-pin-*, capturé seulement par P6
-    E. P6 keep_text_align=true (synth.)                — text-align préservé, color retiré
-    F. P7 + P6 imbriqué — tirets dans <span style> (post 6690)
-    K. P8 RecoverSemanticStyles                       — bold → <strong>, italic → <em>, combinés, chirurgical avec text-align
-    G. P5 ExcessiveBr (synth.)                         — 4 <br> consécutifs
-    H. P2 EmptyHeadings (synth.)                       — <h2></h2>
-    I. P1 EmptyParagraphs                              — <p>&nbsp;</p>, <p></p>
-    J. Interaction P5 → P1 (synth.)                    — 5 <br> en fin de <p> → P5 splitte → P1 ramasse
+    A. R7 hors-<p> bullets `•` (post 2500)            — chaque item dans son propre <p>
+    B. R3 Shareaholic shortcode (post 2500)            — `[shareaholic …]`
+    C. R4 Pinterest officiel `data-pin-do` (synth.)    — vrai bouton Pinterest
+    D. R6 + cas Pinterest "Enregistrer" forme B (2500) — span sans data-pin-*, capturé seulement par R6
+    E. R6 keep_text_align=true (synth.)                — text-align préservé, color retiré
+    F. R7 + R6 imbriqué — tirets dans <span style> (post 6690)
+    K. R8 RecoverSemanticStyles                       — bold → <strong>, italic → <em>, combinés, chirurgical avec text-align
+    G. R5 ExcessiveBr (synth.)                         — 4 <br> consécutifs
+    H. R2 EmptyHeadings (synth.)                       — <h2></h2>
+    I. R1 EmptyParagraphs                              — <p>&nbsp;</p>, <p></p>
+    J. Interaction R5 → R1 (synth.)                    — 5 <br> en fin de <p> → R5 splitte → R1 ramasse
+    L. R11 h4 légende d'image (post 491)               — <p><a><img></a></p><h4>cap</h4> → <figure>…<figcaption>cap</figcaption></figure>
+    M. R12 h4 mixte image+légende (post 756)           — <h4><a><img></a> cap</h4> → <figure>…<figcaption>cap</figcaption></figure>
+    N. R13 chapô h2 phrase (post 374)                  — premier <h2> du fragment, ≥5 mots + ponctuation → <p class="chapo">
+
+  Note ordre : la section N est placée en tête car R13 ne traite QUE
+  le premier <h2> du fragment dans l'ordre du document. Si la section
+  H (<h2></h2> vide) venait avant N, R13 verrait l'empty h2, déciderait
+  qu'il n'y a pas de chapô, et N resterait un <h2> au lieu de devenir
+  <p class="chapo">.
 -->
+
+<!-- N. R13 chapô h2 phrase (post 374) — placé en tête pour être le 1er h2 que R13 voit -->
+<h2>Envie de plus de surface habitable ? Pas envie d'empiéter sur le jardin ?</h2>
 
 <!-- A. Bullets `•` hors-<p> (post 2500) -->
 <p>• Meilleure performance thermique du marché. <br />Uw jusqu'à 0,8 W/(m².K)<br />NB : Le coefficient Uw mesure la performance de l'isolation de la fenêtre.</p>
@@ -32,45 +44,52 @@
 <p>• Vitrage de 28 mm d'épaisseur (4/20/4, isolation thermique renforcée, gaz argon).</p>
 <p>• Gain de surface vitrée jusqu'à +10%.</p>
 
-<!-- B. P3 Shareaholic shortcode (post 2500) -->
+<!-- B. R3 Shareaholic shortcode (post 2500) -->
 <p>[shareaholic app="share_buttons" id="25022196"]</p>
 
 <!--
   D. Pinterest "Enregistrer" forme B — span sans data-pin-* (post 2500).
   Variantes observées dans le corpus (toutes équivalentes côté pipeline V1) : opacity 0.85/1, avec/sans top/left.
-  Toutes deviennent `<p><span>Enregistrer</span></p>` après P6 (P4 ne les capture pas).
-  Si P4 est élargi en V2 (cf. PLUGIN_CONTEXT.md §6.7), enrichir cette fixture.
+  Toutes deviennent `<p><span>Enregistrer</span></p>` après R6 (R4 ne les capture pas).
+  Si R4 est élargi en V2 (cf. PLUGIN_CONTEXT.md §6.7), enrichir cette fixture.
 -->
 <p><span style="border-radius: 2px; text-indent: 20px; width: auto; padding: 0px 4px 0px 0px; text-align: center; font: bold 11px/20px 'Helvetica Neue',Helvetica,sans-serif; color: #ffffff; background: #bd081c no-repeat scroll 3px 50% / 14px 14px; position: absolute; opacity: 0.85; z-index: 8675309; display: none; cursor: pointer; top: 168px; left: 328px;">Enregistrer</span></p>
 
-<!-- C. P4 Pinterest officiel — vrai bouton avec data-pin-do (synthétique) -->
+<!-- C. R4 Pinterest officiel — vrai bouton avec data-pin-do (synthétique) -->
 <p><span data-pin-do="buttonPin" data-pin-config="above" data-pin-color="red">Pin it</span></p>
 
-<!-- E. P6 keep_text_align (synthétique) — text-align doit rester, color doit partir -->
+<!-- E. R6 keep_text_align (synthétique) — text-align doit rester, color doit partir -->
 <p style="text-align: center; color: red;">Texte centré rouge.</p>
 
-<!-- K. P8 RecoverSemanticStyles (synthétique) -->
+<!-- K. R8 RecoverSemanticStyles (synthétique) -->
 <p style="font-weight: bold;">Texte gras seul.</p>
 <p style="font-style: italic;">Texte italique seul.</p>
 <p style="font-weight: 700;">Valeur numérique 700, équivalent bold.</p>
 <p style="text-align: center; font-weight: bold;">Centré et gras combinés.</p>
 <p><span style="font-weight: bold; font-style: italic;">Inline gras italique combiné.</span></p>
 
-<!-- F. P7 + P6 imbriqué — tirets dans <span style> (post 6690) -->
+<!-- F. R7 + R6 imbriqué — tirets dans <span style> (post 6690) -->
 <p><span style="color: #000000;">- offre des <strong>performances inégalables</strong>.</span><br /><span style="color: #000000;">- combine des procédés techniques.</span><br /><span style="color: #000000;">- permet de réaliser les travaux.</span></p>
 
-<!-- G. P5 ExcessiveBr (post 374) — 2 <br> en fin de <p> avec seuil défaut 2 → collapse en </p><p>, P1 ramasse le <p> vide -->
+<!-- G. R5 ExcessiveBr (post 374) — 2 <br> en fin de <p> avec seuil défaut 2 → collapse en </p><p>, R1 ramasse le <p> vide -->
 <p>Puis la charpente traditionnelle avec poutre faîtière et solives qui garantira une hauteur sous plafond de 1,80 m au plus bas et de 3 m au plus haut.<br /><br /></p>
 
-<!-- H. P2 EmptyHeadings (synthétique) -->
+<!-- H. R2 EmptyHeadings (synthétique) -->
 <h2></h2>
 <h3>Vrai titre conservé.</h3>
 <h4></h4>
 
-<!-- I. P1 EmptyParagraphs (synthétique + post 2500) -->
+<!-- I. R1 EmptyParagraphs (synthétique + post 2500) -->
 <p>&nbsp;</p>
 <p></p>
 <p> </p>
 
-<!-- J. Interaction P5 → P1 — 5 <br> en fin de <p> : P5 collapse, le <p> résultant peut être vide -->
+<!-- J. Interaction R5 → R1 — 5 <br> en fin de <p> : R5 collapse, le <p> résultant peut être vide -->
 <p>Texte court avant.<br /><br /><br /><br /><br /></p>
+
+<!-- L. R11 h4 légende d'image (post 491) — <p> avec image lightbox suivi d'un <h4> détourné en légende -->
+<p><a href="https://example.test/big.jpg"><img class="size-medium wp-image-494" src="https://example.test/thumb.jpg" alt="facade" width="300" height="225"></a></p>
+<h4>Façade après isolation par l'extérieur.</h4>
+
+<!-- M. R12 h4 mixte image+légende (post 756) — variante inline de L -->
+<h4><a href="https://example.test/big2.jpg"><img class="size-medium wp-image-762" src="https://example.test/thumb2.jpg" alt="meuble" width="300" height="200"></a> Meuble de salle de bains Ikea.</h4>

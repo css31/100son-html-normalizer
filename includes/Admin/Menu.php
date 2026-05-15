@@ -3,8 +3,8 @@
  * Menu admin — enregistre le top-level et les sous-pages.
  *
  * Historique :
- *  - V0.1 : UI classique en pages PHP (Préréglages / Tester / Normaliser /
- *    Journal). Top-level pointait sur Préréglages.
+ *  - V0.1 : UI classique en pages PHP (Règles / Tester / Normaliser /
+ *    Journal). Top-level pointait sur Règles.
  *  - V1.0 (rc4) : SPA React ajoutée comme sous-page « Normaliser V1 »,
  *    cohabitant avec les 4 pages V0.1.
  *  - Post-rc4 : la SPA devient le **point d'entrée unique** — le top-level
@@ -110,13 +110,13 @@ final class Menu {
 		// existant dans un favori) mais aucune entrée n'apparaît dans le
 		// sidebar admin.
 		//
-		// Préréglages prend un slug dédié `…-presets` (au lieu de l'ancien
+		// Règles prend un slug dédié `…-presets` (au lieu de l'ancien
 		// alias sur le top-level) — sinon il entrerait en conflit avec le
 		// nouveau top-level qui pointe sur la SPA.
 		add_submenu_page(
 			self::SLUG,
-			__( 'Préréglages (V0.1)', '100son-html-normalizer' ),
-			__( 'Préréglages (V0.1)', '100son-html-normalizer' ),
+			__( 'Règles (V0.1)', '100son-html-normalizer' ),
+			__( 'Règles (V0.1)', '100son-html-normalizer' ),
 			self::CAPABILITY,
 			self::SLUG . '-presets',
 			array( $this->presets_page, 'render' )
@@ -162,7 +162,7 @@ final class Menu {
 		// par WP (qui réutilise le slug du top-level) sortent du menu visible.
 		// Le sidebar n'affiche plus que l'entrée top-level « HTML Normalizer ».
 		remove_submenu_page( self::SLUG, self::SLUG );                // alias auto-créé du top-level
-		remove_submenu_page( self::SLUG, self::SLUG . '-presets' );   // V0.1 Préréglages
+		remove_submenu_page( self::SLUG, self::SLUG . '-presets' );   // V0.1 Règles
 		remove_submenu_page( self::SLUG, self::SLUG . '-tester' );    // V0.1 Tester
 		remove_submenu_page( self::SLUG, self::SLUG . '-posts' );     // V0.1 Normaliser
 		remove_submenu_page( self::SLUG, self::SLUG . '-logs' );      // V0.1 Journal

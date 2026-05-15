@@ -13,6 +13,7 @@ namespace Cent_Son\Html_Normalizer\Rest;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Lifecycle\RuleAutoDisabler;
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticBatchRunner;
@@ -51,9 +52,12 @@ use WP_REST_Response;
 final class DiagnosticsController extends BaseController {
 
 	/**
-	 * Limite max `per_page` (cf. §4.5.2 — pas de pagination géante côté SPA).
+	 * Limite max `per_page`. Plafond élevé à 1000 (post-rc4) pour permettre
+	 * l'option « Tous » côté SPA — le corpus MMM-2 fait 758 articles, on
+	 * garde une marge confortable. Cap dur côté serveur quoi qu'il arrive
+	 * pour éviter une requête runaway si la SPA est court-circuitée.
 	 */
-	public const MAX_PER_PAGE = 200;
+	public const MAX_PER_PAGE = 1000;
 
 	/**
 	 * Page par défaut.
@@ -66,19 +70,25 @@ final class DiagnosticsController extends BaseController {
 	private const ALLOWED_STATUSES = array( 'normal', 'to_improve', 'stale' );
 
 	/**
-	 * @param DiagnosticBatchRunner $runner     Orchestrateur scan batch (F12 — Phase 3.3).
-	 * @param DiagnosticsRepository $repo       Persistance diagnostics (F12 — Phase 2.2).
-	 * @param ?BuilderClassifier    $classifier Fallback classification au render
-	 *                                          pour les rows pré-2.1.0 sans
-	 *                                          `builder_type` persisté. Optionnel
-	 *                                          (rétro-compat) — si null, les
-	 *                                          builder_type null restent null
-	 *                                          (badge `—` côté SPA).
+	 * @param DiagnosticBatchRunner $runner        Orchestrateur scan batch (F12 — Phase 3.3).
+	 * @param DiagnosticsRepository $repo          Persistance diagnostics (F12 — Phase 2.2).
+	 * @param ?BuilderClassifier    $classifier    Fallback classification au render
+	 *                                             pour les rows pré-2.1.0 sans
+	 *                                             `builder_type` persisté. Optionnel
+	 *                                             (rétro-compat) — si null, les
+	 *                                             builder_type null restent null
+	 *                                             (badge `—` côté SPA).
+	 * @param ?RuleAutoDisabler     $auto_disabler Évaluateur de fin de scan
+	 *                                             (POST /diagnostics/finalize-scan).
+	 *                                             Optionnel (rétro-compat tests) —
+	 *                                             si null, l'endpoint retourne
+	 *                                             toujours une liste vide.
 	 */
 	public function __construct(
 		private readonly DiagnosticBatchRunner $runner,
 		private readonly DiagnosticsRepository $repo,
 		private readonly ?BuilderClassifier $classifier = null,
+		private readonly ?RuleAutoDisabler $auto_disabler = null,
 	) {}
 
 	/**
@@ -105,6 +115,12 @@ final class DiagnosticsController extends BaseController {
 		register_rest_route( $ns, '/diagnostics/run/chunk', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'run_chunk' ),
+			'permission_callback' => $can_read,
+		) );
+
+		register_rest_route( $ns, '/diagnostics/finalize-scan', array(
+			'methods'             => 'POST',
+			'callback'            => array( $this, 'finalize_scan' ),
 			'permission_callback' => $can_read,
 		) );
 
@@ -148,7 +164,7 @@ final class DiagnosticsController extends BaseController {
 	 *  - `year` (int > 0)   : année (sur `wp_posts.post_date`).
 	 *  - `month` (int 1-12) : mois (combiné avec year).
 	 *  - `builder` (string) : `siteorigin` (couvre flat) | `gutenberg` | `other` | `out`.
-	 *  - `rule_ids[]` (list<string>) : IDs internes (`P1`…`P9`), filtre OR
+	 *  - `rule_ids[]` (list<string>) : IDs internes (`R1`…`R9`), filtre OR
 	 *                                   sur les règles applicables (au moins
 	 *                                   une match dans le JSON `matching_rules`).
 	 *
@@ -228,11 +244,11 @@ final class DiagnosticsController extends BaseController {
 	 *  - `builders` : map<string, int>, count par type (siteorigin / gutenberg
 	 *    / other / out / unknown).
 	 *  - `applicable_rules` : map<string, int>, count d'articles par règle
-	 *    applicable. Clés : 9 préréglages `PresetRegistry::PRESETS`. Tout
-	 *    rule_id est présent même à 0 (UX stable côté SPA).
+	 *    applicable. Clés : tous les règles de `PresetRegistry::PRESETS`.
+	 *    Tout rule_id est présent même à 0 (UX stable côté SPA).
 	 *
 	 * Pas paginé — les volumes sont faibles (catégories : <100 typique,
-	 * années : <30, builders : 5, applicable_rules : 9). Cache HTTP côté
+	 * années : <30, builders : 5, applicable_rules : ~11). Cache HTTP côté
 	 * WP-REST suffit.
 	 *
 	 * @param WP_REST_Request $request Requête (inutilisée).
@@ -373,6 +389,39 @@ final class DiagnosticsController extends BaseController {
 		) );
 	}
 
+	/**
+	 * `POST /diagnostics/finalize-scan` — appelé par la SPA après la
+	 * dernière boucle de chunks d'un scan. Délègue à `RuleAutoDisabler`
+	 * qui désactive les règles `complete` (épuisées) si le scan couvre
+	 * 100 % du corpus, no-op sinon.
+	 *
+	 * Réponse 200 : `{ auto_disabled_rules: list<string>, fully_scanned: bool }`.
+	 *  - `auto_disabled_rules` : IDs auto-désactivés dans cet appel.
+	 *  - `fully_scanned`       : indication de couverture (vrai si toutes
+	 *                            les `publish` × post_types F8 sont
+	 *                            diagnostiquées). Permet à la SPA de
+	 *                            distinguer « scan partiel, on n'a rien
+	 *                            évalué » d'un « scan complet, 0 règle
+	 *                            désactivée ».
+	 *
+	 * @param WP_REST_Request $request Requête.
+	 * @return WP_REST_Response
+	 */
+	public function finalize_scan( WP_REST_Request $request ): WP_REST_Response {
+		unset( $request );
+		if ( null === $this->auto_disabler ) {
+			return $this->respond( array(
+				'auto_disabled_rules' => array(),
+				'fully_scanned'       => false,
+			) );
+		}
+		$result = $this->auto_disabler->evaluate_and_disable();
+		return $this->respond( array(
+			'auto_disabled_rules' => $result['disabled'],
+			'fully_scanned'       => $result['fully_scanned'],
+		) );
+	}
+
 	// =========================================================================
 	//  Helpers privés
 	// =========================================================================
@@ -417,7 +466,7 @@ final class DiagnosticsController extends BaseController {
 	 *  - `month`      : absint ; ignoré si hors [1,12].
 	 *  - `builder`    : sanitize_key ; whitelist 4 valeurs (post-arbitrage UX).
 	 *  - `rule_ids[]` : tableau de strings, whitelist `PresetRegistry::PRESETS`
-	 *                   (9 préréglages), dédoublonné. Tout ID inconnu est
+	 *                   (11 règles), dédoublonné. Tout ID inconnu est
 	 *                   silencieusement ignoré.
 	 *
 	 * @param WP_REST_Request $request Requête.
@@ -467,7 +516,7 @@ final class DiagnosticsController extends BaseController {
 		}
 
 		// rule_ids[] : accepte un array de strings, whitelist `PresetRegistry::PRESETS`.
-		// WP-REST parse `?rule_ids[]=P1&rule_ids[]=P5` en array natif PHP.
+		// WP-REST parse `?rule_ids[]=R1&rule_ids[]=R5` en array natif PHP.
 		$rule_ids_raw = $request->get_param( 'rule_ids' );
 		if ( is_array( $rule_ids_raw ) ) {
 			$allowed  = PresetRegistry::PRESETS;

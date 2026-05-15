@@ -5,6 +5,465 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Règles destructives (`LossyRule`) + bucket `pending_articles` séparé
+
+**Problème observé** : R3 (Shareaholic) appliquée à tout le corpus laissait 100 articles avec encore des occurrences. Diagnostic : le `RegressionDetector` (seuils par défaut `text_loss_pct = 0` et `words_loss_pct = 0`) bloquait l'écriture sur 100 articles dont le retrait du shortcode `[shareaholic id="..."]` causait une perte mesurable de caractères/mots. Ces articles tombaient en `regression_pending`, mais **le compteur du step les classait erronément en `errored_articles`** — d'où la fausse impression de "scan terminé" alors qu'un arbitrage admin était en attente.
+
+**Deux corrections orthogonales** :
+
+**A) Marker `LossyRule` pour les règles délibérément destructives**
+
+- Nouvelle interface marqueur `Cent_Son\Html_Normalizer\Core\Rules\LossyRule` (aucune méthode — uniquement un tag `instanceof`).
+- Implémentée par **R3** (ShareaholicShortcodeRule) et **R4** (PinterestArtifactsRule) — les deux règles dont la mission est de retirer physiquement du contenu textuel non-éditorial (shortcodes, snippets `data-pin-*`, bouton « Save » Pinterest).
+- Nouvelle méthode `RegressionThresholds::relax_text_checks_for_lossy()` qui retourne une copie avec `text_loss_pct = 100` et `words_loss_pct = 100` (désactive de fait les vérifications de perte texte/mots). Les seuils structurels (paragraphes, headings, images, links, lists) restent inchangés.
+- `StepRunner::process_article()` détecte via `subset_contains_lossy_rule()` si le sous-ensemble appliqué contient au moins une `LossyRule`, et passe les seuils relâchés à `RegressionDetector::analyze()` dans ce cas. Les checks structurels continuent d'attraper les vraies régressions (image perdue, h2 disparu, etc.).
+
+**B) Bucket `pending_articles` dans `son100_htmln_steps`**
+
+- Schéma : `pending_articles INT UNSIGNED NOT NULL DEFAULT 0` (DB_VERSION bumpée 2.1.0 → **2.2.0**, migration automatique via `Plugin::maybe_run_db_upgrade()`).
+- `StepRecord` gagne la propriété `pending_articles` ; `StepsRepository::finalize()` accepte un paramètre supplémentaire ; `StepRunner::count_terminal_statuses()` retourne désormais 4 buckets distincts (`success` / `refused` / `errored` / **`pending`**) au lieu d'absorber `regression_pending` dans `errored`.
+- Endpoint REST `GET /steps` + détail expose le champ `pending_articles`.
+- SPA :
+  - `<StepsTable>` (onglet Historique) : nouveau compteur « ⏸ N » affiché quand `pending_articles > 0`.
+  - `<StepDetailDrawer>` : ligne « N au total · ✓ … · ✗ … · ⚠ … · **⏸ N en attente** ».
+
+**Impact sur le corpus existant** : un script ponctuel (cf. `wp eval` dans le commit) recompte `pending_articles` pour les steps existants à partir de `per_article_results`. Le step 1 du sandbox MMM-2 passe de `errored=100` (faux) à `pending=100` (correct).
+
+**Tests** : 5 nouveaux cas — `RegressionThresholdsTest::test_relax_text_checks_*` (×2) + `StepRunnerTest::test_lossy_rule_in_subset_relaxes_text_checks` / `test_non_lossy_rule_keeps_strict_text_checks` / `test_lossy_rule_still_blocks_on_structural_regression`. Stats globales : **966 tests verts**.
+
+**Suite à donner par l'admin** : les 100 articles `regression_pending` du step 1 peuvent désormais être ré-attaqués via un nouveau step R3 → la `LossyRule` lèvera le blocage texte/mots, et les structures (images, headings, liens) restent vérifiées.
+
+### Auto-désactivation des règles épuisées après scan complet
+
+Suite au verrou « règle appliquée à tout le corpus » (cf. section ci-dessous), une règle dans l'état `complete` (au moins une fois appliquée, plus aucune occurrence dans le corpus) gardait `enabled = true` et continuait à tourner inutilement dans le pipeline — sur 758 articles × N règles épuisées, plusieurs milliers de traversées DOM jetées.
+
+À la fin de **chaque scan couvrant 100 % du corpus**, la SPA appelle désormais `POST /diagnostics/finalize-scan` qui :
+
+1. **Vérifie la couverture** via `DiagnosticsRepository::is_corpus_fully_scanned()` : `count(diagnostics) >= count(wp_posts WHERE post_status='publish' AND post_type IN <F8>)`. Le `>=` (non `===`) tolère le drift d'une dépublication post-scan.
+2. **Évalue chaque règle de `PresetRegistry::PRESETS`** via `Core/Lifecycle/RuleAutoDisabler`. Une règle est désactivable si :
+   - état `complete` (applicable_count == 0 ET `last_applied_at !== null`),
+   - jamais auto-désactivée auparavant (champ `auto_disabled_at` absent — garde-fou anti-récidive),
+   - actuellement `enabled = true` (on ne s'attribue pas un état utilisateur).
+3. **Persiste** `enabled = false` + `auto_disabled_at = gmdate('Y-m-d H:i:s')` dans l'option `son100_htmln_presets`.
+
+**Scope volontairement limité aux règles `complete`** : les règles `unused` (jamais appliquées, 0 occurrences) ne sont pas auto-désactivées car un `countMatches()` bugué donnerait aussi 0 et masquerait une régression silencieusement. À reconsidérer en v1.1+ avec un mode debug.
+
+**UX** :
+
+- **Onglet Normaliser** : à la fin d'un scan complet, une `<Notice success>` succincte sous `<ScanBar>` liste les IDs désactivés (« 3 règle(s) sans occurrence détectée ont été désactivées : R3, R4, R8. ») et renvoie l'utilisateur vers l'onglet Règles pour réactiver si besoin.
+- **Onglet Règles** : le bandeau vert `complete` enrichit son libellé en « Appliquée à tout le corpus le X. Désactivée automatiquement. » quand `auto_disabled_at` est posé. Le toggle « Activée » reste **directement modifiable** (pas besoin de passer par « Réactiver pour cette session ») — la décision auto est posée mais l'utilisateur garde le contrôle final.
+- **Garde-fou** : si l'utilisateur réactive manuellement une règle auto-désactivée, le marqueur `auto_disabled_at` reste posé en BDD — on ne re-désactive jamais après ce point, même si l'état redevient `complete`. La réactivation manuelle = signal explicite « laisse-moi gérer ».
+
+**Câblage** :
+
+- **Backend** :
+  - `Core/Lifecycle/RuleAutoDisabler` (nouveau) — orchestrateur ; reçoit `SettingsRepository`, `DiagnosticsRepository`, `StepsRepository`. Méthode unique `evaluate_and_disable(): {disabled: list<string>, fully_scanned: bool}`.
+  - `DiagnosticsRepository::count_total()` (nouveau) — COUNT(*) trivial.
+  - `DiagnosticsRepository::is_corpus_fully_scanned(SettingsRepository $settings)` (nouveau) — compare la couverture diagnostics vs corpus F8 publish.
+  - `Rest/DiagnosticsController::finalize_scan()` (nouveau endpoint `POST /diagnostics/finalize-scan`) — délègue au RuleAutoDisabler injecté en constructor (param optionnel pour rétro-compat tests).
+  - `Rest/PresetsController::preset_to_array()` — expose `auto_disabled_at` (nullable string) dans le payload de chaque preset.
+  - `Plugin::build_rest_controllers()` — câblage DI complet.
+- **SPA** :
+  - `api/diagnostics.js` : `finalizeScan()` helper.
+  - `hooks/useScanBatch.js` : appel finalizeScan à la fin de la boucle de chunks, expose `lastFinalize` dans le retour du hook. Failure non bloquante (le scan reste valide même si le finalize échoue).
+  - `views/Normalize.jsx` : propage `lastFinalize` à `<ScanBar>`.
+  - `views/Normalize/ScanBar.jsx` : nouvelle `<Notice success>` dismissible.
+  - `views/Rules.jsx` : `<RuleCompletionBanner>` enrichi (libellé « Désactivée automatiquement »), `isLocked` désactivé quand `auto_disabled_at` est posé pour laisser le toggle directement modifiable.
+
+**Tests** : 17 nouveaux cas (10 `RuleAutoDisablerTest` couvrant désactivation, idempotence, scopes pending/unused/déjà-auto-désactivée/déjà-off-manuel, mixed-state + `DiagnosticsRepositoryTest` : `count_total` + 6 cas `is_corpus_fully_scanned`). Stats globales : **961 tests verts**.
+
+### Verrou « règle appliquée à tout le corpus »
+
+Chaque carte de l'onglet **Règles** affiche désormais un **état de complétion** qui verrouille les contrôles (case « Sélectionnée », toggle « Activée par défaut », champs de paramètres) lorsque la règle n'a plus rien à faire sur le corpus.
+
+**Trois états dérivés côté serveur** (`GET /presets`) :
+
+- `pending` — `applicable_count > 0` : au moins un article comporte encore une occurrence de la règle. Aucune marque visuelle, carte normalement opérationnelle.
+- `complete` — `applicable_count == 0` **et** la règle a déjà été appliquée au moins une fois (présente dans le `applied_rules` d'un pas fini). Bandeau vert « ✓ Appliquée à tout le corpus le *<date>* » + verrou actif. Le bouton **« Réactiver pour cette session »** lève le verrou localement (state React, jamais persisté) pour autoriser un re-test ponctuel après modification de la règle.
+- `unused` — `applicable_count == 0` mais la règle n'a jamais été appliquée. Bandeau gris discret « ○ Aucun article ne nécessite cette règle. » Pas de verrou (la règle peut tout de même être lancée).
+
+**Justification du verrou permanent** : sur ce corpus le pipeline est figé (758 articles publiés, pas d'import futur). Une règle qui ne capture plus aucune occurrence après application complète n'a plus de raison d'être rejouée — sauf si on modifie sa logique pour la rendre plus stricte/permissive, d'où l'override par session.
+
+**Câblage** :
+
+- **Backend** :
+  - `StepsRepository::last_applied_for_rule(string $rule_id): ?string` — `MAX(finished_at)` filtré sur `JSON_SEARCH(applied_rules, 'one', %s)`. Sémantique stricte, pas de faux positif `R1`/`R10`.
+  - `PresetsController` accepte désormais `?StepsRepository $steps` et `?DiagnosticsRepository $diagnostics` (paramètres optionnels — la réponse REST reste compatible si non câblés). Trois champs ajoutés au payload `preset` : `last_applied_at` (string MySQL ou null), `applicable_count` (int), `completion_state` (`pending` | `complete` | `unused`).
+  - `Plugin.php` câble le repo des pas + le repo des diagnostics dans le contrôleur.
+- **SPA** :
+  - `Rules.jsx` : `useState( overrideLock )` par carte (éphémère). `isLocked = 'complete' === completionState && !overrideLock` désactive les contrôles. Nouveau composant `<RuleCompletionBanner>` rendu entre l'en-tête et la description.
+  - SCSS : `.htmln-rule__completion` + modifiers `--complete` (vert) / `--unused` (gris), `.htmln-rule--locked` (carte assombrie + interactions bloquées).
+
+**Tests** : 5 cas unitaires sur `StepsRepository::last_applied_for_rule` (null, empty string, datetime, vérification du SQL `MAX(finished_at) + finished_at IS NOT NULL + JSON_SEARCH('one')`, absence de `LIKE`). Stats globales : **944 tests verts**.
+
+### Nouvelle règle R16 — strip des préfixes de titre (numéros, puces)
+
+Retire les préfixes typographiques placés en tête d'un `<h1>`-`<h6>` :
+
+```html
+<h2>1. Pourquoi bioclimatique ?</h2>   →  <h2>Pourquoi bioclimatique ?</h2>
+<h2>• Spécialiste de la terrasse</h2>  →  <h2>Spécialiste de la terrasse</h2>
+<h3>— Sous-titre</h3>                  →  <h3>Sous-titre</h3>
+```
+
+**Convention sémantique** : un heading porte un titre, pas une marque de liste. La numérotation appartient soit à une vraie `<ol>` (si les sections sont courtes), soit au thème CSS via `counter-reset` + `::before`. De même les puces appartiennent à `<ul>`.
+
+**Préfixes ciblés** :
+
+- **Numéros** : 1-2 chiffres + `.` / `)` / `°` + espace (« 1. », « 23) », « 5° »). Refus : « 100. » (3 chiffres = peu probable pour un titre) et « 1.5 » (sans espace = décimal volontaire).
+- **Puces** : `•` `‣` `►` `▸` `*` + espace.
+- **Tirets** : `-` `–` `—` + espace.
+
+**Walk DOM** : trouve le préfixe même s'il est emballé dans un inline (`<h2><strong>1.</strong> Texte</h2>` → strip fonctionne). Préfixes en milieu de chaîne préservés (« Section avec 1. dans le milieu »).
+
+**Audit corpus MMM-2** : 7 articles concernés, 38 strippings au total. Cas notables :
+- **1065** « Les pergolas bioclimatiques en 8 questions/réponses » : 8 h2 numérotés
+- **2013** « Top 4 objets déco cultes Noël 2017 » : 4 h2 numérotés
+- **3552** « 5 idées pour repenser son intérieur » : 4 h2 numérotés
+- **3787** « Bien utiliser son poêle à bois » : 3 h2 numérotés
+- **892** « Terrasse en bois » : 5 h2 commençant par `•`
+
+**Position pipeline** : entre R15 (fusion d'inlines) et R9/R12/R11 (transformations h4). Place choisie pour que :
+- R15 ait d'abord tassé les `<strong>` adjacents au préfixe ;
+- R11/R12/R9 reçoivent un h4 sans préfixe (le `<figcaption>`/p.chapo qui en naîtra sera propre) ;
+- R2 nettoie en fin de pipeline les headings devenus vides après strip (cas pathologique « `<h2>1. </h2>` » qui ne contient que le préfixe).
+
+**Nouvel ordre canonique du pipeline** :
+
+```
+R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R15 → R16 → R9 → R12 → R11 → R10 → R1 → R2
+```
+
+**Câblage** :
+
+- `includes/Core/Rules/StripHeadingPrefixRule.php` (nouveau, DOM-based, ~160 LOC).
+- `includes/Core/Registry/PresetRegistry.php` — `PRESETS` const inclut `'R16'` entre `'R15'` et `'R9'`, factory + metadata.
+- `includes/Activator.php` — defaults étendu.
+- `includes/Rest/PresetsController.php` — `KNOWN_IDS` + `DEFAULTS` + regex `R(?:1[0-6]|[1-9])`.
+- SPA : `ALL_RULE_IDS`, `RULE_TOOLTIPS`, `RULE_DISPLAY_ORDER`, `RULE_EXAMPLES`.
+
+**Tests** : 33 cas unitaires (préfixes numériques 1./23)/5°, puces • ‣ ► * et tirets - – —, niveaux h1-h6, préfixes wrappés dans `<strong>`/`<span>`, leading whitespace, multiple headings, negatives : pas de préfixe / 3 chiffres / sans espace après / mid-string / `<p>` ignoré, heading entièrement préfixe → vide, idempotence, countMatches). Stats globales : **939 tests verts**.
+
+### R11 étendue — disposition contextuelle des h4 orphelins
+
+R11 traitait jusqu'ici uniquement le pattern `<p><img></p><h4>texte</h4>` (fusion en `<figure>` + `<figcaption>`). Les **autres** `<h4>` du fragment étaient laissés intacts. Or la convention éditoriale MMM est que **tout `<h4>` est un détournement typographique** — jamais un vrai sous-titre de section.
+
+R11 démote désormais chaque `<h4>` selon **3 cas** :
+
+1. **`<p><img></p><h4>texte</h4>` adjacent** → `<figure><img><figcaption>texte</figcaption></figure>` (comportement historique).
+2. **h4 orphelin juste après un chapô-lead seul** (un `<p class="chapo">` immédiatement devant, sans autre `<p class="chapo">` en amont dans le parent) → promotion en chapô-crédit `<p class="chapo">texte</p>`. Le gras éventuel est strippé par `ChapoFormatter`. Cas typique : « Photos : BlueCut Production », « LA RÉDACTION » détournés en h4.
+3. **h4 orphelin ailleurs** (corps d'article, ou chapô ayant déjà ≥ 2 `<p class="chapo">`) → démotion en `<p><strong>texte</strong></p>`. Le h4 servait visuellement de texte fort, la sémantique est rendue explicite via `<strong>`.
+
+**Cas écartés** (toujours délégués aux règles dédiées) :
+- h4 vide → R2
+- h4 contenant uniquement une image → R9
+- h4 mixte image+texte → R12
+
+**Article 3584** (cas d'usage qui a motivé l'extension) : structure historique `<h2>chapô</h2>&nbsp;<h4>Photos : BlueCut…</h4>` + plusieurs `<h4>` dans le corps. Avant l'extension, R11 ne touchait aucun h4. Après : (a) R13 démote le h2 chapô en `<p class="chapo">`, (b) R11 promote le h4 « Photos : … » en crédit chapô, (c) R11 démote les h4 du corps en `<p><strong>`. Résultat : 2 `<p class="chapo">` (lead + crédit) et 6 `<p><strong>` (sous-titres corps).
+
+**Tests** : R11 passe de 31 à 41 cas (+10 pour le orphan handling). Stats globales : **906 tests verts**.
+
+### Nouvelle règle R14 — marquage `class="chapo"` sur le 1er `<p>` phrase
+
+Complément de R13 : ajoute la classe `chapo` au **premier paragraphe significatif** du fragment lorsqu'il porte une (ou plusieurs) phrase(s). Couvre les articles dont le chapô est déjà rédigé en `<p>` (pas en `<h2>` détourné).
+
+```html
+<p>Basée sur la région toulousaine, Laetitia Moreau de l'Atelier
+In Vitro décline le verre en aménagement intérieur.</p>
+```
+
+devient :
+
+```html
+<p class="chapo">Basée sur la région toulousaine, Laetitia Moreau de l'Atelier
+In Vitro décline le verre en aménagement intérieur.</p>
+```
+
+**Audit corpus** : 423 captures sur 758 articles SiteOrigin (chapô en `<p>` au lieu de `<h2>`).
+
+**Critères de match identiques à R13** (cumulatifs) :
+
+- ≥ 5 mots ;
+- contient au moins une ponctuation `.` / `!` / `?` ;
+- **strictement conservateur** : le premier élément significatif du fragment doit être un `<p>` (les paragraphes vides en tête sont sautés). Si le premier élément non-vide est un `<h2>` court, une image, une liste… on renonce.
+- Idempotent : si le `<p>` a déjà la classe `chapo` (typiquement parce que R13 vient de démoter un h2-chapô), R14 ne fait rien.
+
+**Préservation** : la classe `chapo` est **ajoutée** à l'attribut `class` existant (séparée par un espace), pas substituée. Les autres attributs (`style`, `id`, `data-*`…) restent inchangés.
+
+**Couverture combinée R13 + R14** : ensemble, les deux règles couvrent **571 articles** sur 758 SO (75 %) avec un marquage `class="chapo"` homogène, qu'ils soient initialement en h2 ou en p.
+
+**Position pipeline** : juste après R13. Nouvel ordre canonique :
+
+```
+R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2
+```
+
+Invariants :
+
+1. **R13 avant R14** : le chapô-h2 est démoté en `p.chapo` d'abord. Si R13 a fait son job, le premier `<p>` porte déjà `class="chapo"` → R14 idempotent skip. Sinon (article SO avec chapô-p directement, 423 cas), R14 marque ce p.
+2. **R14 avant R6** : neutre car R6 ne touche pas à `class` (seulement `style`).
+
+**Câblage** :
+
+- `includes/Core/Rules/FirstParagraphChapoRule.php` (nouveau, DOM-based, ~220 LOC).
+- `includes/Core/Registry/PresetRegistry.php` — `PRESETS` const inclut `'R14'` entre `'R13'` et `'R6'` ; factory + metadata.
+- `includes/Activator.php` — defaults étendu.
+- `includes/Rest/PresetsController.php` — `KNOWN_IDS` + `DEFAULTS` + regex `R(?:1[0-4]|[1-9])`.
+- SPA : `ALL_RULE_IDS`, `RULE_TOOLTIPS`, `RULE_DISPLAY_ORDER`, `RULE_EXAMPLES`.
+
+**Tests** : 30 cas unitaires (positifs, attributs préservés, idempotence, négatifs h2/image/liste/short/no-punctuation, ≥5 mots seuil, countMatches, fixture intégrale) + 1 cas intégration `apply_filters`. Stats agrégées : **844 tests verts** (813 → +30 R14 + 1 intégration).
+
+**Note opérationnelle** : `countMatches` sur le `post_content` brut SiteOrigin renvoie 1 capture (et non 423) car le premier élément du fragment est un `<div id="pl-…">` (panel-layout). R14 est conçue pour opérer sur le contenu **interne** du widget Editor, qui sera fourni par SO to Blocks après désencapsulation. Les 423 captures de l'audit se matérialiseront dans ce contexte.
+
+### Nouvelle règle R13 — promotion `<h2>` chapô → `<p class="chapo">`
+
+Convertit le **premier** `<h2>` du fragment en `<p class="chapo">` lorsqu'il porte une (ou plusieurs) phrase(s) — c'est-à-dire un **chapô** au sens journalistique (lead / standfirst) et non un sous-titre de section.
+
+```html
+<h2>Il est rare de rénover sa maison en une unique session de travaux.
+La plupart du temps, ils s'échelonnent par tranches sur plusieurs années.</h2>
+```
+
+devient :
+
+```html
+<p class="chapo">Il est rare de rénover sa maison en une unique session de travaux.
+La plupart du temps, ils s'échelonnent par tranches sur plusieurs années.</p>
+```
+
+**Audit corpus** : 148 captures sur 758 articles SiteOrigin (h2 ≥ 5 mots + ponctuation `.`/`!`/`?`).
+
+**Pourquoi** : sémantiquement, un `<h2>` est une tête de section (en complément d'un `<h1>` titre d'article). L'usage du `<h2>` pour un chapô était une commodité typographique de l'éditeur SiteOrigin (Helvetica large) sans intention de hiérarchie de section. Le HTML5 ne fournit pas de balise dédiée au chapô ; la convention française `<p class="chapo">` est compatible Gutenberg `core/paragraph` via l'attribut `className`.
+
+**Critères de match** (cumulatifs) :
+
+- élément `<h2>` ;
+- **uniquement le premier** h2 du fragment dans l'ordre du document (les h2 ultérieurs sont de vrais sous-titres de section et restent intacts) ;
+- `textContent` (NBSP normalisé) compte ≥ 5 mots ;
+- contient au moins une ponctuation `.` / `!` / `?` (signature d'une phrase entière).
+
+**Préservés** dans le `<p class="chapo">` : tous les enfants inline du `<h2>` (`<a>`, `<em>`, `<strong>`, `<br>`, `<span>`…). Les attributs du `<h2>` (style, id, class) sont abandonnés — le `<p>` produit n'a que `class="chapo"` ; les éventuels styles inline auraient été stripés par R6 en aval de toute façon.
+
+**Position pipeline** : entre R8 et R6. Nouvel ordre canonique :
+
+```
+R3 → R4 → R8 → R13 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2
+```
+
+Invariants assurés :
+
+1. **R8 avant R13** : récupération sémantique des styles dans les inlines du chapô (bold/italic) faite avant qu'on perde les attributs du `<h2>`.
+2. **R13 avant R6** : la transformation produit un nouveau `<p>` sans `style`, R6 trouve juste à dépouiller les inlines descendants restants.
+
+**Câblage** :
+
+- `includes/Core/Rules/H2ChapoToParagraphRule.php` (nouveau, DOM-based, ~190 LOC).
+- `includes/Core/Registry/PresetRegistry.php` — `PRESETS` const inclut `'R13'` entre `'R8'` et `'R6'` ; factory + metadata complétés.
+- `includes/Activator.php` — `seed_presets()` ajoute `'R13' => array( 'enabled' => true )`. Propagé sur sites déjà activés via le merge `$existing + $defaults`.
+- `includes/Rest/PresetsController.php` — `KNOWN_IDS` étendu à `R13`, regex de la route REST passe de `R(?:1[012]|[1-9])` à `R(?:1[0-3]|[1-9])`, `DEFAULTS` ajoute `'R13' => array()`.
+- `assets/src/admin-spa/utils/ruleLabels.js` — `RULE_TOOLTIPS` ajoute `R13: 'Promotion h2-chapô'`, `RULE_DISPLAY_ORDER` ajoute `R13: 13`.
+- `assets/src/admin-spa/views/Rules.jsx` — `RULE_EXAMPLES.R13`.
+- `assets/src/admin-spa/store/index.js` — `ALL_RULE_IDS` étendu à `R13`.
+
+**Tests** :
+
+- `tests/Unit/Rules/H2ChapoToParagraphRuleTest.php` — 26 cas (positifs : phrase basique, multi-phrases, point/exclam/interrog, inlines em/strong/a, lien, `<br>`, ≥ 5 mots ; abandon attributs du h2 ; seuls le premier h2 ciblé ; négatifs : h2 court < 5 mots, sans ponctuation, vide, whitespace, h1/h3/h4/h5/h6 jamais touchés, `<p>` phrase en tête jamais touché, exactement 4 mots sous seuil ; seuil 5 mots inclusif ; countMatches + idempotence ; fixture intégrale).
+- `tests/fixtures/html/h2-chapo-input.html` + `h2-chapo-expected.html` — fixture issue du corpus (post 491 anonymisé).
+- `tests/fixtures/html/full-pipeline-*.html` — section N (placée en tête pour être le 1er h2 vu par R13).
+- `tests/Integration/PublicApiTest.php` — `test_filter_promotes_h2_chapo_to_paragraph` via `apply_filters('htmln/normalize', …)`.
+- `tests/Unit/Rest/PresetsControllerTest.php` — `test_list_returns_thirteen_presets_in_canonical_order` (count 12 → 13, regex maj).
+- `tests/Unit/ActivatorTest.php` — boucle `seed_presets` étendue à R13.
+- `tests/Unit/Rest/DiagnosticsControllerTest.php` — facets `applicable_rules` étendus à R13.
+
+Stats agrégées : **813 tests verts** (786 avant + 26 R13 + 1 intégration), PHPStan baseline inchangée.
+
+### Nouvelle règle R12 — `<h4>` mixtes image + légende → `<figure>` multi-img
+
+Variante **inline** de R11 (qui traite l'adjacence `<p><img></p><h4>texte</h4>`). R12 cible le pattern où **image et légende sont mixées dans le même `<h4>`** — courant dans le corpus MMM-2 où le rédacteur emboîtait directement :
+
+```html
+<h4>
+  <a href="big.jpg"><img src="thumb.jpg" alt="..."></a>
+  Texte de légende qui décrit l'image.
+</h4>
+```
+
+devient :
+
+```html
+<figure>
+  <a href="big.jpg"><img src="thumb.jpg" alt="..."></a>
+  <figcaption>Texte de légende qui décrit l'image.</figcaption>
+</figure>
+```
+
+**Audit corpus** : 136 captures sur ~110 articles (3ᵉ famille de h4-img après les 199 unwrappés par R9 et les 477 adjacences couvertes par R11).
+
+**Mode tolérant multi-images** : sur les 6 articles du corpus dont un `<h4>` contient 2 images partageant une légende commune (IDs 756, 1238, 1291, 1602, 3534, 6654), R12 produit un `<figure>` à **deux `<img>` consécutifs suivis d'un `<figcaption>` unique** — forme HTML5 normative pour un groupe d'images partageant une caption (cf. exemple de la spec). SO to Blocks consommera ensuite la `<figure>` multi-img pour produire un bloc `core/gallery`.
+
+**Critères de match** (cumulatifs) — implémenté DOM-based dans `HeadingMixedToFigureRule` :
+
+- `<h4>` uniquement (convention corpus, aligné sur R11) ;
+- contient ≥ 1 `<img>` descendant ;
+- `textContent` (NBSP normalisé, trim) non vide après retrait des wrappers d'image — il faut une caption réelle.
+
+**Nettoyage bordures de caption** : les `<br>`, commentaires et text nodes blancs/NBSP en début/fin de caption sont retirés (séparateurs visuels parasites entre image et texte). Le premier text node restant est lui-même trimé en tête.
+
+**Wrappers préservés** dans la `<figure>` : `<a>` (lightbox), `<picture>`, `<figure>` interne. Inlines préservés dans la `<figcaption>` : `<a>` textuel, `<em>`, `<strong>`.
+
+**Position pipeline** : entre R9 et R11. Nouvel ordre canonique :
+
+```
+R3 → R4 → R8 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2
+```
+
+Invariants assurés :
+
+1. **R9 avant R12** : les `<h4>` image-seule sont déjà désencapsulés ; R12 n'agit que sur les h4 mixtes restants.
+2. **R12 avant R11** : R12 traite le pattern *inline* (image+texte dans le même h4), R11 le pattern *adjacent* (`<p><img></p><h4>texte</h4>`). Pas de chevauchement, mais l'ordre garantit que les `<figure>` produites par R12 ne perturbent pas la détection d'adjacence de R11 en aval.
+
+**Câblage** :
+
+- `includes/Core/Rules/HeadingMixedToFigureRule.php` (nouveau, DOM-based, ~290 LOC).
+- `includes/Core/Registry/PresetRegistry.php` — `PRESETS` const inclut `'R12'` entre `'R9'` et `'R11'` ; factory + metadata complétés.
+- `includes/Activator.php` — `seed_presets()` ajoute `'R12' => array( 'enabled' => true )`. Propagé sur sites déjà activés via le merge `$existing + $defaults`.
+- `includes/Rest/PresetsController.php` — `KNOWN_IDS` étendu à `R12`, regex de la route REST passe de `R(?:1[01]|[1-9])` à `R(?:1[012]|[1-9])`, `DEFAULTS` ajoute `'R12' => array()`.
+- `assets/src/admin-spa/utils/ruleLabels.js` — `RULE_TOOLTIPS` ajoute `R12: 'Titres mixtes image + légende'`, `RULE_DISPLAY_ORDER` ajoute `R12: 12`.
+- `assets/src/admin-spa/views/Rules.jsx` — `RULE_EXAMPLES.R12` (+ exemples manquants R10/R11 ajoutés au passage).
+
+**Tests** :
+
+- `tests/Unit/Rules/HeadingMixedToFigureRuleTest.php` — 28 cas (positifs : single img + text, anchor wrap, br/nbsp dropped, inlines em/strong/a préservés, text avant image, 2 imgs avec caption commune, 3 imgs ; négatifs : h4 sans image, h4 image-seule (R9), h2/h3/h5/h6 mixtes, paragraph mixte ; multiple in sequence ; mixed match/non-match ; countMatches + idempotence ; fixture intégrale).
+- `tests/fixtures/html/heading-mixed-input.html` + `heading-mixed-expected.html` — fixture issue du corpus (posts 756 et 892 anonymisés).
+- `tests/fixtures/html/full-pipeline-*.html` — section M ajoutée pour valider R12 dans la pipeline complète.
+- `tests/Integration/PublicApiTest.php` — `test_filter_converts_h4_mixed_image_caption_to_figure` + `test_filter_converts_h4_multi_image_to_figure` via `apply_filters('htmln/normalize', …)`.
+- `tests/Unit/Rest/PresetsControllerTest.php` — `test_list_returns_twelve_presets_in_canonical_order` (count 11 → 12, regex maj).
+- `tests/Unit/ActivatorTest.php` — boucle `seed_presets` étendue à R12.
+- `tests/Unit/Rest/DiagnosticsControllerTest.php` — facets `applicable_rules` étendus à R12.
+
+Stats agrégées : **786 tests verts** (756 avant + 28 R12 + 2 intégration), PHPStan baseline inchangée.
+
+### Renommage global Pn → Rn + « Préréglage » → « Règle »
+
+Renommage **systémique** de tous les identifiants de règles internes (`P1..P11` → `R1..R11`) et du terme « préréglage » → « règle » dans toute l'interface, la documentation et le code. Objectif : alignement complet de l'interface, du nommage interne et de la documentation utilisateur — la cohabitation `P9` interne vs « préréglage » côté UI vs « règle » côté CDC créait une dissonance qu'on supprime ici.
+
+**Périmètre code** (rename atomique via `sed -E 's/\bP(1[01]|[1-9])\b/R\1/g'` sur les chaînes littérales et les commentaires) :
+
+- 12 classes de règles : `id()` retournent désormais `R1`..`R11` (au lieu de `P1`..`P11`).
+- `Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry::PRESETS` const + factory `build_rule()` (case statements) + metadata.
+- `Activator::seed_presets()` defaults (clés `R1..R11`).
+- `Cent_Son\Html_Normalizer\Rest\PresetsController::KNOWN_IDS` + `DEFAULTS` + route REST `/presets/(?P<id>R(?:1[01]|[1-9]))` (auparavant `P(?:…)`).
+- SPA : `RULE_TOOLTIPS`, `RULE_DISPLAY_ORDER` (`assets/src/admin-spa/utils/ruleLabels.js`), `RULE_EXAMPLES` (`Rules.jsx`), composants `R5Params`/`R6Params`/`R7Params`/`R8Params` (auparavant `P5Params`…).
+- Tests : ~280 references mises à jour (PHPUnit assertions, fixtures `tests/fixtures/html/*`, `ActivatorTest`, `PresetsControllerTest`, `DiagnosticsControllerTest`, `PipelineTest`, `PresetRegistryTest`).
+- Docs : README, CHANGELOG (cette entrée), descriptions des règles dans `PresetRegistry::get_all_presets_metadata()`.
+
+**Migration BDD (sandbox `ma-maison-mag-2`)** appliquée via `wp eval` one-shot :
+
+1. Option `son100_htmln_presets` : 11 clés `P1..P11` renommées en `R1..R11` (avec leur config `enabled`/`params` intacte).
+2. Tables `wp_son100_htmln_diagnostics.matching_rules` (JSON `rule_id`) et `wp_son100_htmln_steps.applied_rules` (JSON list) : 0 ligne avait des Pn (sandbox fraîche post-rc4, pas de scan complet récent). Le pattern de migration reste à appliquer sur tout autre site déjà activé (cf. instructions plan).
+
+**Périmètre conservé volontairement** (architecture interne, hors UI) :
+
+- Classes `PresetRegistry`, `PresetsController`, `PresetsPage`, `UserRulesRepository` : les noms internes restent. Renommer les classes implique de toucher namespaces, autoload, ServiceProvider, factories de tests — bénéfice incrémental zéro pour l'utilisateur, coût significatif. Le commit reste focalisé sur ce qui change l'expérience.
+- Méthodes `is_preset_enabled`, `set_preset_config`, `get_preset_config`, `get_all_presets_metadata` : idem (API interne stable).
+- Clé d'option `son100_htmln_presets` : conserve le préfixe historique ; aucun bénéfice à renommer en `son100_htmln_rules` (migration BDD additionnelle inutile, casserait toute compatibilité descendante).
+
+**Terme « préréglage » → « règle »** : remplacé partout sauf dans les identifiants de code conservés ci-dessus. Inclut UI strings (`__()`), descriptions HTML rendues côté SPA, libellés admin V0.1, commentaires de code. Corrections grammaticales accompagnantes (`un règle` → `une règle`, `du règle` → `de la règle`, etc.). Mises à jour de comptes : `Les 9 préréglages` / `R1..R8` etc. → `Les 11 règles` / `R1..R11`.
+
+**Stats agrégées post-rename** : **756 tests verts** inchangés, PHPStan baseline inchangée, lint-js 0, build SPA OK, filtre `htmln/normalize` validé via `wp eval` après migration BDD.
+
+### Onglet Règles — layout 3 colonnes
+
+Refonte du layout de l'onglet *Règles* en **CSS Grid 3 colonnes** (au lieu d'une pile verticale `flex column` mono-colonne) pour réduire le scroll vertical et permettre une comparaison visuelle plus rapide entre règles.
+
+- `.htmln-rules__list` : `grid-template-columns: repeat(3, minmax(0, 1fr))` avec breakpoints `2` cols à ≤ 1400 px et `1` col à ≤ 900 px.
+- Cards compactées : `padding 20px 24px` → `16px 18px`, `min-width: 0` pour autoriser la troncature.
+- `.htmln-rule__header` passe en **flex column** (titre puis actions empilés) plutôt qu'en flex row qui devenait illisible à 340 px de large.
+- `.htmln-rule__actions` empile les 2 contrôles (« Sélectionnée pour le prochain lot » + « Activée par défaut ») verticalement.
+- `.htmln-rule__example` (Avant/Après) toujours empilé verticalement dans la card — l'ancienne grille `1fr 1fr` devenait illisible à 235 px par colonne.
+
+Aucun changement comportemental — tous les contrôles existants restent fonctionnels, seule la disposition change.
+
+### Nouvelle règle R11 — `<h4>` détournés en légende d'image → `<figcaption>`
+
+Convertit le pattern récurrent du corpus MMM-2 où un `<h4>` placé immédiatement après un `<p>` contenant uniquement une image jouait le rôle de légende (faute de `<figcaption>` côté SiteOrigin Editor) :
+
+```html
+<p><a href="big.jpg"><img src="thumb.jpg" alt="…"></a></p>
+<h4>Texte de légende</h4>
+```
+
+devient :
+
+```html
+<figure>
+  <a href="big.jpg"><img src="thumb.jpg" alt="…"></a>
+  <figcaption>Texte de légende</figcaption>
+</figure>
+```
+
+**Audit corpus** : 482 captures single-image sur ~180 articles (484 totales avec multi-images non traités).
+
+**Critères de match** (cumulatifs) — implémenté DOM-based dans `HeadingCaptionToFigcaptionRule` (`includes/Core/Rules/`) :
+
+- niveau de titre **`<h4>` uniquement** — les `<h2>`/`<h3>`/`<h5>`/`<h6>` restent intacts (vrais sous-titres du corpus) ;
+- le `<h4>` contient du texte (sinon P2/P9 s'en chargent) ;
+- son frère élément précédent est un `<p>` (whitespace text-nodes entre les deux tolérés) ;
+- ce `<p>` contient **exactement une** `<img>` descendante (mapping légende→image non trivial sinon — 2 cas corpus multi-image non traités, limite assumée) ;
+- son `textContent` (NBSP normalisé, trim) est vide (pas de texte autour de l'image).
+
+**Inlines préservés** dans la `<figcaption>` : `<a>`, `<em>`, `<strong>`, `<br>`. Wrapper d'image préservé dans la `<figure>` (`<a>`, `<figure>`, `<picture>` interne).
+
+**Position pipeline** : entre P9 et P10. Nouvel ordre canonique :
+
+```
+P3 → P4 → P8 → P6 → P7 → P5 → P9 → P11 → P10 → P1 → P2
+```
+
+Invariants assurés :
+
+1. **P9 avant P11** : tout `<h4>` restant après P9 a forcément du texte (les h4-image-seule sont désencapsulés en amont).
+2. **P11 avant P10** : le `<p>` autour de l'image est encore présent — signal d'adjacence nécessaire à la détection de la paire image/légende. Après P10 le `<p>` aurait été retiré, le signal serait perdu.
+
+**Niveau HTML uniquement** : aucune classe Gutenberg n'est injectée (`wp-block-image`, `wp-element-caption`, …) — c'est le rôle de SO to Blocks de produire la block grammar à partir du `<figure>` propre.
+
+**Câblage** :
+
+- `includes/Core/Registry/PresetRegistry.php` — `PRESETS` const inclut `'P11'` entre `'P9'` et `'P10'` ; factory `build_rule()` instancie `HeadingCaptionToFigcaptionRule` pour `case 'P11'` ; metadata `get_all_presets_metadata()` documente la règle avec ses limites.
+- `includes/Activator.php` — `seed_presets()` ajoute `'P11' => array( 'enabled' => true )` dans les defaults. Propagé sur sites déjà activés via le merge `$existing + $defaults` (réactivation du plugin).
+- `includes/Rest/PresetsController.php` — `KNOWN_IDS` étendu à `P11`, regex de la route REST passe de `P(?:10|[1-9])` à `P(?:1[01]|[1-9])`, `DEFAULTS` ajoute `'P11' => array()`.
+- `assets/src/admin-spa/utils/ruleLabels.js` — `RULE_TOOLTIPS` ajoute `P11: "Titres légendes d'images"`, `RULE_DISPLAY_ORDER` ajoute `P11: 11`.
+
+**Tests** :
+
+- `tests/Unit/Rules/HeadingCaptionToFigcaptionRuleTest.php` — 31 cas (positifs : canonique, anchor wrap, figure interne, inlines em/strong/a, br, NBSP, br autour, whitespace, paires multiples, mixé ; négatifs : texte autour image, multi-image, h2/h3/h5/h6, sans `<p><img>` avant, vide, whitespace, commentaire intercalaire, non-`<p>` ; countMatches + idempotence ; fixture intégrale).
+- `tests/fixtures/html/heading-caption-input.html` + `heading-caption-expected.html` — fixture d'article 491 anonymisée.
+- `tests/fixtures/html/full-pipeline-*.html` — section L ajoutée pour valider P11 dans la pipeline complète.
+- `tests/Integration/PublicApiTest.php` — `test_filter_converts_h4_caption_to_figcaption` via `apply_filters('htmln/normalize', …)`.
+- `tests/Unit/Rest/PresetsControllerTest.php` — `test_list_returns_eleven_presets_in_canonical_order` (count 10 → 11, regex maj).
+- `tests/Unit/ActivatorTest.php` — boucle `seed_presets` étendue à P10/P11.
+- `tests/Unit/Rest/DiagnosticsControllerTest.php` — facets `applicable_rules` étendus à P10/P11.
+
+Stats agrégés : **756 tests verts** (724 avant + 31 P11 + 1 intégration), PHPStan baseline inchangée.
+
+### Naming cleanup — retour aux IDs internes en affichage SPA
+
+Suppression du remapping famille `P1.1 / P1.2 / P2.1 / P2.2` introduit aux rc2/rc3 via `RULE_DISPLAY_LABELS` dans `assets/src/admin-spa/utils/ruleLabels.js`. La cohabitation `P1.1` côté SPA vs `P1` partout ailleurs (`README.md`, `CHANGELOG.md`, tests PHP, `PresetRegistry::PRESETS`, BDD, REST) créait une charge cognitive sans bénéfice tangible.
+
+**Modifications** :
+
+- `RULE_DISPLAY_LABELS` vidé (`{}`) — `getRuleLabel()` retombe sur l'ID lui-même via le fallback existant.
+- `RULE_DISPLAY_ORDER` réordonné en **ordre naturel P1..P11** (au lieu de la séquence famille `P1, P10, P2, P9, P3, …`).
+- `RULE_TOOLTIPS` conservé intégralement + ajout de P11.
+- JSDoc d'en-tête réécrit : retire les choix éditoriaux famille, explicite le nouveau régime (affichage = ID interne, ordre naturel).
+- Commentaires stale mis à jour dans `Rules.jsx`, `main.scss`, `DiffModal.jsx`, `ArticlesTable.jsx`, `FiltersBar.jsx`.
+
+**Pas de migration BDD** — les IDs internes (`P1..P11`) étaient déjà la source de vérité côté PHP, BDD et REST. Le changement est purement JS/SPA. Les sites déjà activés conservent leurs choix `enabled` / paramètres ; seul l'affichage change.
+
+**Effet utilisateur** : onglet *Règles* affiche désormais les cards avec libellés `P1, P2, P3, …, P11` (ordre naturel) au lieu de `P1.1, P1.2, P2.1, P2.2, P3, P4, P5, P6, P7, P8`. Tableau Normaliser, modale Diff, drawer d'historique : IDs bruts partout.
+
+L'API publique (`getRuleLabel`) est conservée pour permettre un remapping futur ponctuel sans toucher les composants consommateurs.
+
 ### Modale Diff — boutons « Ouvrir sur Site 1 / Site 2 » + libellé « Surligner » sur le bouton pinceau
 
 #### Boutons « Ouvrir sur… » sous le résumé des pertes

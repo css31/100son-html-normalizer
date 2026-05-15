@@ -1,6 +1,6 @@
 <?php
 /**
- * P9 — UnwrapHeadingImageRule.
+ * R9 — UnwrapHeadingImageRule.
  *
  * Désencapsule les `<h1>` à `<h6>` qui ne contiennent qu'une image (sans
  * texte) — typique des contenus WP migrés où un éditeur visuel a wrappé
@@ -17,12 +17,12 @@
  * (s'il existe) bloque le matching — un titre légitime avec image et
  * légende texte n'est pas désencapsulé.
  *
- * Symétrique de P2 (titres vides) mais ciblé sur les titres « pseudo-vides »
- * qui sont en fait des wrappers d'image. P2 préserve ces titres
- * volontairement (présence d'`<img>` = élément structurel) — c'est P9
+ * Symétrique de R2 (titres vides) mais ciblé sur les titres « pseudo-vides »
+ * qui sont en fait des wrappers d'image. R2 préserve ces titres
+ * volontairement (présence d'`<img>` = élément structurel) — c'est R9
  * qui les nettoie.
  *
- * Pipeline : placé après P5 (split br→p) et avant P1/P2 (cleanup final).
+ * Pipeline : placé après R5 (split br→p) et avant R1/R2 (cleanup final).
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -38,12 +38,12 @@ use DOMElement;
 use DOMNode;
 
 /**
- * Préréglage P9 : désencapsulation des titres autour d'images.
+ * Règle R9 : désencapsulation des titres autour d'images.
  */
 final class UnwrapHeadingImageRule implements RuleInterface {
 
 	/**
-	 * Tags ciblés (idem P2 pour cohérence).
+	 * Tags ciblés (idem R2 pour cohérence).
 	 *
 	 * @var list<string>
 	 */
@@ -53,7 +53,7 @@ final class UnwrapHeadingImageRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P9';
+		return 'R9';
 	}
 
 	/**
@@ -78,7 +78,7 @@ final class UnwrapHeadingImageRule implements RuleInterface {
 		}
 
 		// Collecter avant modification — modifier la live NodeList pendant
-		// itération est risqué (cf. P1/P2 pour le même pattern).
+		// itération est risqué (cf. R1/R2 pour le même pattern).
 		$headings = array();
 		foreach ( self::HEADING_TAGS as $tag ) {
 			foreach ( $doc->getElementsByTagName( $tag ) as $heading ) {

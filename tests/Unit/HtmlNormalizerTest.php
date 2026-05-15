@@ -34,11 +34,11 @@ final class HtmlNormalizerTest extends TestCase {
 			}
 			public function get_preset_config( string $preset_id ): array {
 				switch ( $preset_id ) {
-					case 'P5':
+					case 'R5':
 						return [ 'enabled' => true, 'threshold' => 2 ];
-					case 'P6':
+					case 'R6':
 						return [ 'enabled' => true, 'keep_text_align' => true ];
-					case 'P7':
+					case 'R7':
 						return [
 							'enabled'        => true,
 							'threshold'      => 2,
@@ -48,7 +48,7 @@ final class HtmlNormalizerTest extends TestCase {
 							],
 							'custom_markers' => [],
 						];
-					case 'P8':
+					case 'R8':
 						return [
 							'enabled'  => true,
 							'mappings' => [ 'bold' => true, 'italic' => true ],
@@ -70,7 +70,7 @@ final class HtmlNormalizerTest extends TestCase {
 		// Test mini : <p style> + shareaholic + <p>&nbsp;</p>
 		$input = '<p style="color:red"></p><p>OK</p>[shareaholic id="123"]';
 		$out   = $this->normalizer->normalize( $input );
-		// Apres pipeline : le 1er <p> vide P1, le shareaholic vire P3, reste <p>OK</p>.
+		// Apres pipeline : le 1er <p> vide R1, le shareaholic vire R3, reste <p>OK</p>.
 		$this->assertHtmlEquals( '<p>OK</p>', $out );
 	}
 

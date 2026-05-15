@@ -1,18 +1,18 @@
 <?php
 /**
- * P8 — RecoverSemanticStylesRule.
+ * R8 — RecoverSemanticStylesRule.
  *
- * Recupere le sens semantique de styles inline de presentation AVANT que P6
+ * Recupere le sens semantique de styles inline de presentation AVANT que R6
  * ne les strippe :
  *  - font-weight: bold (ou >= 700) -> enrobe le contenu dans <strong>
  *  - font-style: italic            -> enrobe dans <em>
  *
  * Comportement chirurgical : seule la declaration semantique est retiree
  * du style, les autres declarations (text-align, color, font-size...)
- * restent intactes pour P6. Si plusieurs mappings detectes : ordre fige
+ * restent intactes pour R6. Si plusieurs mappings detectes : ordre fige
  * <strong> exterieur, <em> interieur.
  *
- * Cf. cahier section 3.1 F2.P8, section 8 F2.P8, section 14 hyp. 23.
+ * Cf. cahier section 3.1 F2.R8, section 8 F2.R8, section 14 hyp. 23.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -29,7 +29,7 @@ use DOMNode;
 use DOMXPath;
 
 /**
- * Preset P8 : recuperation semantique des styles inline.
+ * Preset R8 : recuperation semantique des styles inline.
  */
 final class RecoverSemanticStylesRule implements RuleInterface {
 
@@ -62,7 +62,7 @@ final class RecoverSemanticStylesRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P8';
+		return 'R8';
 	}
 
 	/**

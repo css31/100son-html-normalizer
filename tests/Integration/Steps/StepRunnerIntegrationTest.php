@@ -74,7 +74,7 @@ final class StepRunnerIntegrationTest extends TestCase {
 		$this->wpdb->insert_return = 1;
 
 		$runner = Plugin::make_step_runner();
-		$uuid   = $runner->start_step( array( 100, 101 ), array( 'P1' ), 5 );
+		$uuid   = $runner->start_step( array( 100, 101 ), array( 'R1' ), 5 );
 
 		// UUID v4 généré côté serveur (cf. §13 garde-fou cahier).
 		$this->assertMatchesRegularExpression(

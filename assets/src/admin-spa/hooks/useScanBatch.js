@@ -20,12 +20,19 @@
  * scan peut être relancé : `DiagnosticBatchRunner::start_batch` réénumère
  * la liste, le diagnostic existant est écrasé via upsert.
  *
- * @param {() => void} [onComplete] Callback déclenché en fin de scan réussi.
- *                                  Typiquement `refetchStats` + `refetchList`.
+ * En fin de boucle, le hook appelle `POST /diagnostics/finalize-scan` qui
+ * applique l'auto-désactivation des règles épuisées (état `complete`) si
+ * le scan couvre 100 % du corpus. Le résultat est exposé dans
+ * `lastFinalize` et peut être affiché par la SPA (notice succincte).
+ *
+ * @param {(finalize?: {auto_disabled_rules: string[], fully_scanned: boolean}) => void} [onComplete]
+ *                                                                                                    Callback déclenché en fin de scan réussi.
+ *                                                                                                    Reçoit le payload de finalize-scan.
  * @return {{
  *   isScanning: boolean,
  *   progress: ?{processed: number, total: number},
  *   error: ?string,
+ *   lastFinalize: ?{auto_disabled_rules: string[], fully_scanned: boolean},
  *   startScan: (postIds?: ?number[]) => Promise<void>,
  *   reset: () => void,
  * }}
@@ -45,6 +52,7 @@ export function useScanBatch( onComplete ) {
 	const [ isScanning, setIsScanning ] = useState( false );
 	const [ progress, setProgress ] = useState( null );
 	const [ error, setError ] = useState( null );
+	const [ lastFinalize, setLastFinalize ] = useState( null );
 
 	/**
 	 * Lance un scan diagnostic.
@@ -114,7 +122,22 @@ export function useScanBatch( onComplete ) {
 					setProgress( { processed, total } );
 				}
 
-				onComplete?.();
+				// Finalize : auto-désactivation des règles épuisées si le
+				// scan couvre 100 % du corpus. Failure non bloquante — on
+				// invalide le résultat client mais on ne propage pas
+				// l'erreur (le scan en lui-même a réussi).
+				let finalize = null;
+				try {
+					finalize = await api.diagnostics.finalizeScan();
+				} catch ( finalizeErr ) {
+					finalize = {
+						auto_disabled_rules: [],
+						fully_scanned: false,
+					};
+				}
+				setLastFinalize( finalize );
+
+				onComplete?.( finalize );
 			} catch ( err ) {
 				setError(
 					err && err.message ? String( err.message ) : 'unknown_error'
@@ -129,7 +152,8 @@ export function useScanBatch( onComplete ) {
 	const reset = useCallback( () => {
 		setError( null );
 		setProgress( null );
+		setLastFinalize( null );
 	}, [] );
 
-	return { isScanning, progress, error, startScan, reset };
+	return { isScanning, progress, error, lastFinalize, startScan, reset };
 }

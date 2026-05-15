@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests P6 — RemoveInlineStylesRule.
+ * Tests R6 — RemoveInlineStylesRule.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -19,7 +19,7 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 
 	public function test_id_and_label(): void {
 		$rule = new RemoveInlineStylesRule();
-		$this->assertSame( 'P6', $rule->id() );
+		$this->assertSame( 'R6', $rule->id() );
 		$this->assertNotEmpty( $rule->label() );
 	}
 
@@ -371,7 +371,7 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 
 	public function test_unwraps_nested_spans_recursively(): void {
 		// Spans imbriques : `<span style="A"><span style="B">x</span></span>`.
-		// Apres P6 : `<span><span>x</span></span>`. Comme on itere sur tous
+		// Apres R6 : `<span><span>x</span></span>`. Comme on itere sur tous
 		// les elements styles dans l'ordre du document, les deux sont
 		// unwrappes → texte nu.
 		$rule  = new RemoveInlineStylesRule( false );

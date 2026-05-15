@@ -1,11 +1,11 @@
 <?php
 /**
- * P3 — ShareaholicShortcodeRule.
+ * R3 — ShareaholicShortcodeRule.
  *
  * Supprime tout shortcode `[shareaholic ...]` du HTML, en préservant les
  * autres shortcodes (notamment WP natifs ou tiers).
  *
- * Cf. cahier §3.1 F2.P3 et §8 F2.P3.
+ * Cf. cahier §3.1 F2.R3 et §8 F2.R3.
  *
  * @package Cent_Son\Html_Normalizer
  */
@@ -17,9 +17,15 @@ namespace Cent_Son\Html_Normalizer\Core\Rules;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Préréglage P3 : suppression du shortcode Shareaholic.
+ * Règle R3 : suppression du shortcode Shareaholic.
+ *
+ * Marquée `LossyRule` : retire physiquement le shortcode du HTML, ce qui
+ * réduit `chars` et `words` mesurés par `MetricsCalculator`. Sans le
+ * marker, le seuil `text_loss_pct = 0` (default) ferait passer tout
+ * article touché par R3 en `regression_pending` — voir CHANGELOG
+ * « Auto-désactivation des règles épuisées ».
  */
-final class ShareaholicShortcodeRule implements RuleInterface {
+final class ShareaholicShortcodeRule implements RuleInterface, LossyRule {
 
 	/**
 	 * Pattern de shortcode `[shareaholic ...]`.
@@ -39,7 +45,7 @@ final class ShareaholicShortcodeRule implements RuleInterface {
 	 * {@inheritDoc}
 	 */
 	public function id(): string {
-		return 'P3';
+		return 'R3';
 	}
 
 	/**

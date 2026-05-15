@@ -667,6 +667,7 @@ if ( ! class_exists( 'Son100_Htmln_Test_Wpdb' ) ) {
 	final class Son100_Htmln_Test_Wpdb {
 		public string $prefix = 'wptests_';
 		public string $postmeta = 'wptests_postmeta';
+		public string $posts = 'wptests_posts';
 		public int $insert_id = 0;
 		/** @var int|false Valeur retournee par insert/update/query (par defaut 1 = success ; false = echec). */
 		public int|false $insert_return = 1;

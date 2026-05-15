@@ -46,13 +46,13 @@ final class LoggerTest extends TestCase {
 	}
 
 	public function test_log_settings_creates_entry_with_null_post(): void {
-		$this->logger->log_settings_change( 'P3 désactivé' );
+		$this->logger->log_settings_change( 'R3 désactivé' );
 		$entries = $this->repo->all();
 		$this->assertSame( 'settings', $entries[0]['event'] );
 		$this->assertSame( 'updated', $entries[0]['status'] );
 		$this->assertNull( $entries[0]['post_id'] );
 		$this->assertNull( $entries[0]['post_title'] );
-		$this->assertSame( 'P3 désactivé', $entries[0]['message'] );
+		$this->assertSame( 'R3 désactivé', $entries[0]['message'] );
 	}
 
 	public function test_user_id_is_zero_in_test_env(): void {
