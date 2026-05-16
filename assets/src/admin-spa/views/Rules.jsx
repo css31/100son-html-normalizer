@@ -136,6 +136,12 @@ export default function Rules() {
 	// `Promise.all`, un par règle. Acceptable pour 16 règles ; si la
 	// latence devient gênante, un endpoint bulk `POST /presets/bulk-toggle`
 	// pourrait être ajouté côté backend (cf. discussion design).
+	//
+	// Cas particulier « Tout activer » : on saute les règles auto-désactivées
+	// par le backend après scan complet (corpus épuisé). Pour les ressusciter,
+	// l'utilisateur doit passer par « Réactiver pour cette session » dans la
+	// carte de la règle — un bulk activate ne doit pas court-circuiter ce
+	// garde-fou et relancer du travail déjà accompli.
 	const handleBulkSetEnabled = useCallback(
 		( targetEnabled ) => {
 			if ( ! Array.isArray( presets ) ) {
@@ -144,6 +150,14 @@ export default function Rules() {
 			Promise.all(
 				presets
 					.filter( ( p ) => Boolean( p.enabled ) !== targetEnabled )
+					.filter(
+						( p ) =>
+							! (
+								targetEnabled &&
+								'complete' === p.completion_state &&
+								p.auto_disabled_at
+							)
+					)
 					.map( ( p ) =>
 						save( p.id, { enabled: targetEnabled } ).catch(
 							() => {}
@@ -185,6 +199,16 @@ export default function Rules() {
 		Boolean( p.enabled )
 	).length;
 	const totalCount = presetsList.length || ALL_RULE_IDS.length;
+	// Règles que « Tout activer » ne ressuscite plus : auto-désactivées
+	// par le backend après scan complet (corpus épuisé). Compteur utilisé
+	// uniquement pour désactiver le bouton « Tout activer » dès qu'il n'a
+	// plus rien à faire — réactivation explicite uniquement.
+	const autoDisabledCount = presetsList.filter(
+		( p ) =>
+			! p.enabled &&
+			'complete' === p.completion_state &&
+			p.auto_disabled_at
+	).length;
 
 	return (
 		<div className="htmln-rules">
@@ -227,7 +251,10 @@ export default function Rules() {
 					<Button
 						variant="secondary"
 						onClick={ () => handleBulkSetEnabled( true ) }
-						disabled={ isSaving || enabledCount === totalCount }
+						disabled={
+							isSaving ||
+							enabledCount + autoDisabledCount === totalCount
+						}
 					>
 						{ __( 'Tout activer', '100son-html-normalizer' ) }
 					</Button>{ ' ' }
