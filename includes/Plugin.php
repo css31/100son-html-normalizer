@@ -45,6 +45,7 @@ use Cent_Son\Html_Normalizer\Rest\SettingsController;
 use Cent_Son\Html_Normalizer\Rest\StepsController;
 use Cent_Son\Html_Normalizer\Session\SessionLock;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
+use Cent_Son\Html_Normalizer\Steps\RollbackService;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
 use Cent_Son\Html_Normalizer\Steps\StepsRepository;
 
@@ -228,6 +229,7 @@ final class Plugin {
 			new StepsController(
 				self::make_step_runner(),
 				new StepsRepository(),
+				new RollbackService( new StepsRepository(), $diag_repo, $engine ),
 			),
 			new DiagnosticsController(
 				$batch_runner,
@@ -269,14 +271,19 @@ final class Plugin {
 		$diag_repo       = new DiagnosticsRepository();
 		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings, $classifier );
 
-		$steps_cmd     = new StepsCommand( self::make_step_runner(), new StepsRepository() );
+		$steps_cmd     = new StepsCommand(
+			self::make_step_runner(),
+			new StepsRepository(),
+			new RollbackService( new StepsRepository(), $diag_repo, $engine ),
+		);
 		$diagnose_cmd  = new DiagnoseCommand( $batch_runner, $engine, $diag_repo );
 
 		return array(
-			array( 'name' => 'htmln steps list',   'callable' => array( $steps_cmd, 'list_steps' ) ),
-			array( 'name' => 'htmln steps show',   'callable' => array( $steps_cmd, 'show' ) ),
-			array( 'name' => 'htmln steps export', 'callable' => array( $steps_cmd, 'export' ) ),
-			array( 'name' => 'htmln scan',          'callable' => $diagnose_cmd ),
+			array( 'name' => 'htmln steps list',     'callable' => array( $steps_cmd, 'list_steps' ) ),
+			array( 'name' => 'htmln steps show',     'callable' => array( $steps_cmd, 'show' ) ),
+			array( 'name' => 'htmln steps export',   'callable' => array( $steps_cmd, 'export' ) ),
+			array( 'name' => 'htmln steps rollback', 'callable' => array( $steps_cmd, 'rollback' ) ),
+			array( 'name' => 'htmln scan',           'callable' => $diagnose_cmd ),
 		);
 	}
 

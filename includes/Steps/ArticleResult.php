@@ -55,6 +55,11 @@ final class ArticleResult {
 	 * @param MetricsSnapshot       $metrics_after     Snapshot après application (= before si erreur précoce).
 	 * @param RegressionReport|null $regression_report Rapport si régression détectée, sinon null.
 	 * @param string|null           $error             Message d'erreur si status = `error`, sinon null.
+	 * @param int|null              $revision_id       ID de la révision WP créée juste avant l'écriture
+	 *                                                 (`wp_save_post_revision`) — non-null uniquement sur
+	 *                                                 les statuts qui ont déclenché une écriture
+	 *                                                 (`success` post-process_article ou post-confirm).
+	 *                                                 Persisté pour permettre le rollback F-rollback.
 	 */
 	private function __construct(
 		public readonly string $status,
@@ -62,6 +67,7 @@ final class ArticleResult {
 		public readonly MetricsSnapshot $metrics_after,
 		public readonly ?RegressionReport $regression_report,
 		public readonly ?string $error,
+		public readonly ?int $revision_id = null,
 	) {}
 
 	/**
@@ -72,17 +78,25 @@ final class ArticleResult {
 	 * régression (`StepRunner::confirm_article()`) — la trace est conservée
 	 * pour l'historique F16 et la SPA.
 	 *
+	 * `revision_id` provient de `wp_save_post_revision()` appelé juste avant
+	 * `wp_update_post()` — pivot du rollback (cf. RollbackService). Peut être
+	 * null si WP a refusé de créer une révision (post_type sans support
+	 * `revisions`, dédoublonnage côté `_wp_post_revision_fields`, etc.) —
+	 * dans ce cas l'article ne sera pas rollback-able pour ce step.
+	 *
 	 * @param MetricsSnapshot       $before            Snapshot avant.
 	 * @param MetricsSnapshot       $after             Snapshot après.
 	 * @param RegressionReport|null $regression_report Report préservé en cas de confirm sur régression.
+	 * @param int|null              $revision_id       ID révision pré-écriture, ou null si non capturée.
 	 * @return self
 	 */
 	public static function success(
 		MetricsSnapshot $before,
 		MetricsSnapshot $after,
-		?RegressionReport $regression_report = null
+		?RegressionReport $regression_report = null,
+		?int $revision_id = null
 	): self {
-		return new self( self::STATUS_SUCCESS, $before, $after, $regression_report, null );
+		return new self( self::STATUS_SUCCESS, $before, $after, $regression_report, null, $revision_id );
 	}
 
 	/**
@@ -160,11 +174,14 @@ final class ArticleResult {
 	 * `son100_htmln_steps.per_article_results[post_id]`.
 	 *
 	 * Shape strict imposé par `StepRecord::from_db_row()` :
-	 *  - `status`     : toujours présent ;
-	 *  - `regression` : présent ssi `regression_report` non null ;
-	 *  - `error`      : présent ssi `error` non null.
+	 *  - `status`      : toujours présent ;
+	 *  - `regression`  : présent ssi `regression_report` non null ;
+	 *  - `error`       : présent ssi `error` non null ;
+	 *  - `revision_id` : présent ssi `revision_id` non null (steps post-rollback
+	 *                    feature uniquement — les anciens steps n'ont rien à
+	 *                    cette clé et ne sont donc pas rollback-ables).
 	 *
-	 * @return array{status: string, regression?: array<string, mixed>, error?: string}
+	 * @return array{status: string, regression?: array<string, mixed>, error?: string, revision_id?: int}
 	 */
 	public function to_persistence_array(): array {
 		$row = array( 'status' => $this->status );
@@ -173,6 +190,9 @@ final class ArticleResult {
 		}
 		if ( null !== $this->error ) {
 			$row['error'] = $this->error;
+		}
+		if ( null !== $this->revision_id ) {
+			$row['revision_id'] = $this->revision_id;
 		}
 		return $row;
 	}

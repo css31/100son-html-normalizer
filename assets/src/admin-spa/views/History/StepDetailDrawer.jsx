@@ -20,9 +20,13 @@
  */
 
 import { __, sprintf } from '@wordpress/i18n';
+import { useState, useCallback } from '@wordpress/element';
 import { Modal, Spinner, Button } from '@wordpress/components';
 import { formatRuleIdList } from '../../utils/ruleLabels';
 import { formatLocalDateTime, parseUtcDatetime } from '../../utils/datetime';
+import { useIsReadOnly } from '../../hooks/useSession';
+import ReadOnlyTooltip from '../../components/ReadOnlyTooltip';
+import RollbackConfirmModal from './RollbackConfirmModal';
 
 /**
  * Format lisible d'une RegressionFailure (cf. RegressionFailure::to_array()).
@@ -180,11 +184,12 @@ function ProgressBlock( { progress } ) {
 
 /**
  * @param {Object}     props
- * @param {?Object}    props.step      StepRecord serialisé (cf. StepsController::step_to_array).
- * @param {?Object}    props.progress  Snapshot resume_progress ou null si finalisé.
- * @param {boolean}    props.isLoading Vrai durant le fetch.
- * @param {?string}    props.error     Message d'erreur ou null.
- * @param {() => void} props.onClose   Callback fermeture.
+ * @param {?Object}    props.step        StepRecord serialisé (cf. StepsController::step_to_array).
+ * @param {?Object}    props.progress    Snapshot resume_progress ou null si finalisé.
+ * @param {boolean}    props.isLoading   Vrai durant le fetch.
+ * @param {?string}    props.error       Message d'erreur ou null.
+ * @param {() => void} props.onClose     Callback fermeture.
+ * @param {() => void} [props.onRefetch] Refetch parent (post-rollback).
  * @return {JSX.Element} Modale plein écran.
  */
 export default function StepDetailDrawer( {
@@ -193,8 +198,30 @@ export default function StepDetailDrawer( {
 	isLoading,
 	error,
 	onClose,
+	onRefetch,
 } ) {
 	const uuid = step?.uuid ?? '';
+	const isReadOnly = useIsReadOnly();
+
+	// État rollback : `null` (fermé) | `{ postIds: null }` (tout le lot) |
+	// `{ postIds: [id] }` (un article ciblé). `postIds = null` est le signal
+	// « rollback complet » côté backend (cf. RollbackService::rollback_step).
+	const [ rollbackTarget, setRollbackTarget ] = useState( null );
+
+	const handleOpenRollback = useCallback(
+		( postIds ) => setRollbackTarget( { postIds } ),
+		[]
+	);
+	const handleCloseRollback = useCallback(
+		() => setRollbackTarget( null ),
+		[]
+	);
+	const handleRollbackComplete = useCallback( () => {
+		setRollbackTarget( null );
+		if ( 'function' === typeof onRefetch ) {
+			onRefetch();
+		}
+	}, [ onRefetch ] );
 
 	return (
 		<Modal
@@ -314,13 +341,44 @@ export default function StepDetailDrawer( {
 					</h3>
 					<PerArticleResults
 						perArticle={ step.per_article_results }
+						isReadOnly={ isReadOnly }
+						onRollbackArticle={ ( postId ) =>
+							handleOpenRollback( [ postId ] )
+						}
 					/>
 
 					<div className="htmln-step-detail__footer">
+						<ReadOnlyTooltip>
+							<Button
+								variant="primary"
+								isDestructive
+								onClick={ () => handleOpenRollback( null ) }
+								disabled={
+									isReadOnly ||
+									! hasRollbackableArticle(
+										step.per_article_results
+									)
+								}
+							>
+								{ __(
+									'Restaurer tout le lot',
+									'100son-html-normalizer'
+								) }
+							</Button>
+						</ReadOnlyTooltip>
 						<Button variant="secondary" onClick={ onClose }>
 							{ __( 'Fermer', '100son-html-normalizer' ) }
 						</Button>
 					</div>
+
+					{ rollbackTarget && (
+						<RollbackConfirmModal
+							uuid={ step.uuid }
+							postIds={ rollbackTarget.postIds }
+							onClose={ handleCloseRollback }
+							onComplete={ handleRollbackComplete }
+						/>
+					) }
 				</div>
 			) }
 		</Modal>
@@ -328,13 +386,34 @@ export default function StepDetailDrawer( {
 }
 
 /**
+ * Vrai s'il existe au moins une entrée `success` avec `revision_id`
+ * capturé — sinon le bouton « Restaurer tout le lot » est désactivé
+ * (cas typique : step antérieur à la feature rollback).
+ *
+ * @param {Object<string, {status: string, revision_id?: number}>} perArticle Map post_id → résultat.
+ * @return {boolean} Vrai s'il y a quelque chose à rollback.
+ */
+function hasRollbackableArticle( perArticle ) {
+	if ( ! perArticle || 'object' !== typeof perArticle ) {
+		return false;
+	}
+	return Object.values( perArticle ).some(
+		( e ) =>
+			'success' === String( e?.status ?? '' ) &&
+			Number( e?.revision_id ) > 0
+	);
+}
+
+/**
  * Tableau détaillé des résultats par article.
  *
- * @param {Object}                                                                props
- * @param {Object<string, {status: string, regression?: Object, error?: string}>} props.perArticle Map post_id → résultat.
+ * @param {Object}                                                                                      props
+ * @param {Object<string, {status: string, regression?: Object, error?: string, revision_id?: number}>} props.perArticle        Map post_id → résultat.
+ * @param {boolean}                                                                                     props.isReadOnly        Mode lecture seule (session secondaire).
+ * @param {(postId: number) => void}                                                                    props.onRollbackArticle Callback bouton « Restaurer » d'une ligne.
  * @return {JSX.Element} Tableau ou message « vide ».
  */
-function PerArticleResults( { perArticle } ) {
+function PerArticleResults( { perArticle, isReadOnly, onRollbackArticle } ) {
 	if ( ! perArticle || 'object' !== typeof perArticle ) {
 		return (
 			<p className="htmln-empty">
@@ -373,6 +452,12 @@ function PerArticleResults( { perArticle } ) {
 					<th scope="col">
 						{ __( 'Détail', '100son-html-normalizer' ) }
 					</th>
+					<th
+						scope="col"
+						className="htmln-per-article-table__col-action"
+					>
+						{ __( 'Action', '100son-html-normalizer' ) }
+					</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -386,6 +471,9 @@ function PerArticleResults( { perArticle } ) {
 						Array.isArray( entry.regression.failures )
 							? entry.regression.failures
 							: [];
+					const revisionId = Number( entry?.revision_id ) || 0;
+					const isRollbackable =
+						'success' === status && revisionId > 0;
 					return (
 						<tr key={ postId }>
 							<th scope="row">
@@ -434,6 +522,45 @@ function PerArticleResults( { perArticle } ) {
 								{ ! entry?.error &&
 									0 === failures.length &&
 									'—' }
+							</td>
+							<td>
+								{ isRollbackable ? (
+									<ReadOnlyTooltip>
+										<Button
+											variant="secondary"
+											isSmall
+											isDestructive
+											disabled={ isReadOnly }
+											onClick={ () =>
+												onRollbackArticle(
+													Number( postId )
+												)
+											}
+										>
+											{ __(
+												'Restaurer',
+												'100son-html-normalizer'
+											) }
+										</Button>
+									</ReadOnlyTooltip>
+								) : (
+									<span
+										className="htmln-per-article-table__no-rollback"
+										title={
+											'success' === status
+												? __(
+														'Révision non capturée (lot antérieur à la fonctionnalité rollback).',
+														'100son-html-normalizer'
+												  )
+												: __(
+														'Rollback applicable uniquement aux articles écrits avec succès.',
+														'100son-html-normalizer'
+												  )
+										}
+									>
+										—
+									</span>
+								) }
 							</td>
 						</tr>
 					);

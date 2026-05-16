@@ -66,3 +66,17 @@ export const finalize = ( uuid ) => post( `/steps/${ uuid }/finalize` );
  * @return {Promise<{items: Array, total: number, capped: boolean, capped_at: number}>} Pas exportés + drapeau si capé.
  */
 export const exportAll = ( params = {} ) => get( '/steps/export', params );
+
+/**
+ * `POST /steps/<uuid>/rollback` — restaure le contenu antérieur via les
+ * révisions WP capturées. Pattern 2 phases : `dry_run=true` retourne le plan
+ * + cascade (à présenter dans une modale de confirmation), puis appel sans
+ * `dry_run` pour exécuter. Si `post_ids` est omis ou vide, rollback de tout
+ * le step ; sinon restreint au sous-ensemble.
+ *
+ * @param {string}                                   uuid UUID v4 du pas.
+ * @param {{post_ids?: number[], dry_run?: boolean}} body Sous-ensemble + flag dry-run.
+ * @return {Promise<{step: {uuid: string, finished_at: string|null}|null, actions: Array<{post_id: number, status: string, reason?: string, revision_id?: number, message?: string}>, cascade: Object<number, string[]>, summary: {rolled_back: number, skipped: number, errors: number, dry_run: boolean}}>} Plan ou résultat exécuté.
+ */
+export const rollback = ( uuid, body = {} ) =>
+	post( `/steps/${ uuid }/rollback`, body );

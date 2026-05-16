@@ -13,6 +13,7 @@ namespace Cent_Son\Html_Normalizer\Cli;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Steps\RollbackService;
 use Cent_Son\Html_Normalizer\Steps\StepRecord;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
 use Cent_Son\Html_Normalizer\Steps\StepsRepository;
@@ -50,12 +51,14 @@ class StepsCommand {
 	public const DEFAULT_LIST_LIMIT = 50;
 
 	/**
-	 * @param StepRunner      $runner Orchestrateur Phase 4 (pour resume_progress).
-	 * @param StepsRepository $repo   Persistance pas (lecture historique).
+	 * @param StepRunner       $runner   Orchestrateur Phase 4 (pour resume_progress).
+	 * @param StepsRepository  $repo     Persistance pas (lecture historique).
+	 * @param RollbackService  $rollback Orchestrateur du rollback (F-rollback).
 	 */
 	public function __construct(
 		private readonly StepRunner $runner,
 		private readonly StepsRepository $repo,
+		private readonly RollbackService $rollback,
 	) {}
 
 	/**
@@ -147,6 +150,64 @@ class StepsCommand {
 			return;
 		}
 		WP_CLI::success( sprintf( 'Exported %d steps to %s (%d bytes).', count( $items ), $file, $bytes ) );
+	}
+
+	/**
+	 * `wp htmln steps rollback <uuid> [--post-id=<id>...] [--dry-run]`.
+	 *
+	 * Restaure le contenu antérieur d'un step via les révisions WP capturées.
+	 * Par défaut : rollback de tout le step. Avec un ou plusieurs `--post-id`,
+	 * restreint au sous-ensemble correspondant.
+	 *
+	 * `--dry-run` : pas d'écriture, retourne le plan d'action + la cascade
+	 * (steps postérieurs ayant remodifié les articles à rollback). Utile
+	 * pour valider avant de lancer en LIVE — symétrique du pattern dry-run
+	 * SPA (modale de confirmation).
+	 *
+	 * @param list<string>          $args       `[<uuid>]`.
+	 * @param array<string, string> $assoc_args Flags `--post-id` (répétable
+	 *                                          via `--post-id=12,34,56`) et `--dry-run`.
+	 * @return void
+	 */
+	public function rollback( array $args, array $assoc_args ): void {
+		$uuid = isset( $args[0] ) ? (string) $args[0] : '';
+		if ( '' === $uuid ) {
+			WP_CLI::error( 'Usage: wp htmln steps rollback <uuid> [--post-id=ID,ID2,...] [--dry-run]' );
+			return;
+		}
+
+		$post_ids = null;
+		if ( isset( $assoc_args['post-id'] ) ) {
+			$raw      = (string) $assoc_args['post-id'];
+			$post_ids = array_values( array_filter(
+				array_map( 'intval', explode( ',', $raw ) ),
+				static fn( int $v ): bool => $v > 0
+			) );
+			if ( array() === $post_ids ) {
+				WP_CLI::error( '--post-id must contain at least one positive integer' );
+				return;
+			}
+		}
+
+		$dry_run = isset( $assoc_args['dry-run'] );
+
+		$result = $this->rollback->rollback_step( $uuid, $post_ids, $dry_run );
+		if ( null === $result['step'] ) {
+			WP_CLI::error( sprintf( 'No step found for uuid %s', $uuid ) );
+			return;
+		}
+
+		WP_CLI::log( $this->encode_json( $result ) );
+
+		$summary = $result['summary'];
+		$label   = $dry_run ? 'DRY-RUN' : 'LIVE';
+		WP_CLI::success( sprintf(
+			'[%s] rolled_back:%d | skipped:%d | errors:%d',
+			$label,
+			$summary['rolled_back'],
+			$summary['skipped'],
+			$summary['errors']
+		) );
 	}
 
 	// =========================================================================

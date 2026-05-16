@@ -58,6 +58,53 @@ final class StepsRepositoryTest extends TestCase {
 		$this->assertTrue( $record->is_finished() );
 	}
 
+	public function test_find_by_uuid_decodes_revision_id_in_per_article_results(): void {
+		$this->wpdb->get_row_queue[] = array(
+			'id'                  => '12',
+			'step_uuid'           => 'uuid-rev',
+			'applied_rules'       => '["R5"]',
+			'affected_post_ids'   => '[200,201,202]',
+			'total_articles'      => '3',
+			'successful_articles' => '2',
+			'refused_articles'    => '0',
+			'errored_articles'    => '1',
+			'pending_articles'    => '0',
+			// 200 success avec revision_id ; 201 success sans revision_id (legacy) ;
+			// 202 error sans revision_id (jamais écrit).
+			'per_article_results' => '{"200":{"status":"success","revision_id":555},"201":{"status":"success"},"202":{"status":"error","error":"boom"}}',
+			'user_id'             => '5',
+			'started_at'          => '2026-05-09 10:00:00',
+			'finished_at'         => '2026-05-09 10:05:00',
+		);
+		$record = $this->repo->find_by_uuid( 'uuid-rev' );
+		$this->assertInstanceOf( StepRecord::class, $record );
+		$this->assertSame( 555, $record->per_article_results[200]['revision_id'] );
+		$this->assertArrayNotHasKey( 'revision_id', $record->per_article_results[201] );
+		$this->assertArrayNotHasKey( 'revision_id', $record->per_article_results[202] );
+	}
+
+	public function test_decode_per_article_results_rejects_non_positive_revision_id(): void {
+		$this->wpdb->get_row_queue[] = array(
+			'id'                  => '1',
+			'step_uuid'           => 'uuid-bad-rev',
+			'applied_rules'       => '["R5"]',
+			'affected_post_ids'   => '[100]',
+			'total_articles'      => '1',
+			'successful_articles' => '1',
+			'refused_articles'    => '0',
+			'errored_articles'    => '0',
+			'pending_articles'    => '0',
+			// revision_id=0 doit être rejeté (pas de révision capturée), idem si négatif.
+			'per_article_results' => '{"100":{"status":"success","revision_id":0}}',
+			'user_id'             => null,
+			'started_at'          => '2026-05-09 10:00:00',
+			'finished_at'         => '2026-05-09 10:05:00',
+		);
+		$record = $this->repo->find_by_uuid( 'uuid-bad-rev' );
+		$this->assertInstanceOf( StepRecord::class, $record );
+		$this->assertArrayNotHasKey( 'revision_id', $record->per_article_results[100] );
+	}
+
 	public function test_insert_running_creates_record_in_running_state(): void {
 		$this->wpdb->insert_return = 1;
 		$id = $this->repo->insert_running(
@@ -277,5 +324,57 @@ final class StepsRepositoryTest extends TestCase {
 		$this->repo->last_applied_for_rule( 'R1' );
 		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
 		$this->assertStringNotContainsString( 'LIKE', $last_sql );
+	}
+
+	// =========================================================================
+	//  find_subsequent_steps_for_post (F-rollback — cascade detection)
+	// =========================================================================
+
+	public function test_find_subsequent_steps_filters_on_post_id_and_after(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->find_subsequent_steps_for_post( 1234, '2026-05-09 10:00:00', null );
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'finished_at IS NOT NULL', $last_sql );
+		$this->assertStringContainsString( 'finished_at > ', $last_sql );
+		$this->assertStringContainsString( '2026-05-09 10:00:00', $last_sql );
+		$this->assertStringContainsString( 'JSON_CONTAINS(affected_post_ids', $last_sql );
+		$this->assertStringContainsString( '1234', $last_sql );
+		$this->assertStringContainsString( 'ORDER BY finished_at ASC', $last_sql );
+	}
+
+	public function test_find_subsequent_steps_excludes_source_uuid_when_provided(): void {
+		$this->wpdb->get_results_queue[] = array();
+		$this->repo->find_subsequent_steps_for_post(
+			1234,
+			'2026-05-09 10:00:00',
+			'source-uuid-aaaa'
+		);
+		$last_sql = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		$this->assertStringContainsString( 'step_uuid <> ', $last_sql );
+		$this->assertStringContainsString( 'source-uuid-aaaa', $last_sql );
+	}
+
+	public function test_find_subsequent_steps_returns_decoded_records(): void {
+		$this->wpdb->get_results_queue[] = array(
+			array(
+				'id'                  => '7',
+				'step_uuid'           => 'later-uuid',
+				'applied_rules'       => '["R5"]',
+				'affected_post_ids'   => '[1234,1235]',
+				'total_articles'      => '2',
+				'successful_articles' => '2',
+				'refused_articles'    => '0',
+				'errored_articles'    => '0',
+				'pending_articles'    => '0',
+				'per_article_results' => '{"1234":{"status":"success","revision_id":99}}',
+				'user_id'             => '5',
+				'started_at'          => '2026-05-10 09:00:00',
+				'finished_at'         => '2026-05-10 09:05:00',
+			),
+		);
+		$records = $this->repo->find_subsequent_steps_for_post( 1234, '2026-05-09 23:59:59' );
+		$this->assertCount( 1, $records );
+		$this->assertSame( 'later-uuid', $records[0]->step_uuid );
+		$this->assertSame( 99, $records[0]->per_article_results[1234]['revision_id'] );
 	}
 }

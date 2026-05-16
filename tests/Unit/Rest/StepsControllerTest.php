@@ -165,21 +165,49 @@ final class StepsControllerTest extends TestCase {
 
 	private function make_controller(
 		?StepRunner $runner = null,
-		?StepsRepository $repo = null
+		?StepsRepository $repo = null,
+		?\Cent_Son\Html_Normalizer\Steps\RollbackService $rollback = null
 	): StepsController {
 		return new StepsController(
 			$runner ?? $this->runner_stub(),
 			$repo ?? $this->repo_stub(),
+			$rollback ?? $this->rollback_stub(),
 		);
+	}
+
+	/**
+	 * Stub minimal de RollbackService — extends pour court-circuiter le
+	 * constructeur (qui exige des dépendances `final readonly`). Comme on ne
+	 * teste pas le rollback dans cette suite, on retourne un résultat vide
+	 * neutre — les tests de rollback proprement dits vivent ailleurs.
+	 */
+	private function rollback_stub(): \Cent_Son\Html_Normalizer\Steps\RollbackService {
+		return new class() extends \Cent_Son\Html_Normalizer\Steps\RollbackService {
+			public function __construct() {} // phpcs:ignore Generic.CodeAnalysis.UselessOverriding
+			public function rollback_step( string $uuid, ?array $post_ids = null, bool $dry_run = false ): array {
+				return array(
+					'step'    => null,
+					'actions' => array(),
+					'cascade' => array(),
+					'summary' => array(
+						'rolled_back' => 0,
+						'skipped'     => 0,
+						'errors'      => 0,
+						'dry_run'     => $dry_run,
+					),
+				);
+			}
+		};
 	}
 
 	// =========================================================================
 	//  register_routes
 	// =========================================================================
 
-	public function test_register_routes_creates_seven_endpoints(): void {
+	public function test_register_routes_creates_eight_endpoints(): void {
+		// Post-rollback : ajout de `POST /steps/<uuid>/rollback` (cf. F-rollback).
 		$this->make_controller()->register_routes();
-		$this->assertCount( 7, $GLOBALS['son100_htmln_test_rest_routes'] );
+		$this->assertCount( 8, $GLOBALS['son100_htmln_test_rest_routes'] );
 	}
 
 	public function test_register_routes_uses_htmln_v1_namespace(): void {

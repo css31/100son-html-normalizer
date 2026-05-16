@@ -56,6 +56,7 @@ if ( ! function_exists( 'esc_html' ) ) {
 if ( ! class_exists( 'WP_Post' ) ) {
 	final class WP_Post {
 		public int $ID                = 0;
+		public int $post_parent       = 0;
 		public string $post_content    = '';
 		public string $post_title      = '';
 		public string $post_status     = 'publish';
@@ -242,6 +243,25 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 		\Son100_Htmln_Test_Posts_Registry::$posts[ $post_id ]->post_content = (string) ( $data['post_content'] ?? '' );
 		\Son100_Htmln_Test_Posts_Registry::$updates[ $post_id ]            = (string) ( $data['post_content'] ?? '' );
 		return $post_id;
+	}
+}
+
+if ( ! function_exists( 'wp_restore_post_revision' ) ) {
+	$GLOBALS['son100_htmln_test_restored_revisions'] = $GLOBALS['son100_htmln_test_restored_revisions'] ?? array();
+	$GLOBALS['son100_htmln_test_restore_returns']    = $GLOBALS['son100_htmln_test_restore_returns'] ?? array();
+	/**
+	 * Stub : enregistre l'appel et retourne soit `null` (échec WP), soit
+	 * le post_parent (succès WP) selon la valeur dans
+	 * `$GLOBALS['son100_htmln_test_restore_returns'][$rev_id]`. Par défaut
+	 * succès (retourne le post_parent récupéré depuis le registre).
+	 */
+	function wp_restore_post_revision( int $revision_id ): ?int {
+		$GLOBALS['son100_htmln_test_restored_revisions'][] = $revision_id;
+		if ( array_key_exists( $revision_id, $GLOBALS['son100_htmln_test_restore_returns'] ) ) {
+			return $GLOBALS['son100_htmln_test_restore_returns'][ $revision_id ];
+		}
+		$revision = \Son100_Htmln_Test_Posts_Registry::$posts[ $revision_id ] ?? null;
+		return $revision ? (int) $revision->post_parent : null;
 	}
 }
 

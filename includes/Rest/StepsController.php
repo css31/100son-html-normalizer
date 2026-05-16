@@ -14,6 +14,7 @@ namespace Cent_Son\Html_Normalizer\Rest;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Steps\ArticleResult;
+use Cent_Son\Html_Normalizer\Steps\RollbackService;
 use Cent_Son\Html_Normalizer\Steps\StepRecord;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
 use Cent_Son\Html_Normalizer\Steps\StepsRepository;
@@ -59,12 +60,14 @@ final class StepsController extends BaseController {
 	public const EXPORT_MAX = 200;
 
 	/**
-	 * @param StepRunner      $runner Orchestrateur Phase 4.
-	 * @param StepsRepository $steps  Persistance pas (lecture historique).
+	 * @param StepRunner       $runner   Orchestrateur Phase 4.
+	 * @param StepsRepository  $steps    Persistance pas (lecture historique).
+	 * @param RollbackService  $rollback Orchestrateur du rollback (F-rollback).
 	 */
 	public function __construct(
 		private readonly StepRunner $runner,
 		private readonly StepsRepository $steps,
+		private readonly RollbackService $rollback,
 	) {}
 
 	/**
@@ -116,6 +119,12 @@ final class StepsController extends BaseController {
 		register_rest_route( $ns, '/steps/(?P<uuid>[a-f0-9-]+)/finalize', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'finalize' ),
+			'permission_callback' => $can_write,
+		) );
+
+		register_rest_route( $ns, '/steps/(?P<uuid>[a-f0-9-]+)/rollback', array(
+			'methods'             => 'POST',
+			'callback'            => array( $this, 'rollback' ),
 			'permission_callback' => $can_write,
 		) );
 	}
@@ -312,6 +321,41 @@ final class StepsController extends BaseController {
 		return $this->respond( array(
 			'step' => $this->step_to_array( $finalized ),
 		) );
+	}
+
+	/**
+	 * `POST /steps/<uuid>/rollback` — restaure le contenu antérieur d'un step
+	 * via les révisions WP capturées par `StepRunner::write_post_content()`.
+	 *
+	 * Pattern 2 phases pour gérer la cascade sans aller-retour multiples :
+	 *  - `dry_run=true` → renvoie le plan + la cascade (steps postérieurs ayant
+	 *    remodifié les articles). La SPA présente le plan à l'admin.
+	 *  - `dry_run=false` → effectue les `wp_restore_post_revision()`.
+	 *
+	 * Body : `{ post_ids?: list<int>, dry_run?: bool }`.
+	 *  - `post_ids` vide / absent → rollback de tout le step.
+	 *  - `post_ids` non vide → restreint au sous-ensemble (intersection avec
+	 *    `affected_post_ids`).
+	 *
+	 * Réponse 200 : structure `RollbackService::rollback_step()`.
+	 * Réponse 404 si UUID inconnu.
+	 *
+	 * @param WP_REST_Request $request Requête.
+	 * @return WP_REST_Response
+	 */
+	public function rollback( WP_REST_Request $request ): WP_REST_Response {
+		$uuid     = $this->extract_uuid( $request );
+		$post_ids_raw = $request->get_param( 'post_ids' );
+		$post_ids = is_array( $post_ids_raw ) && array() !== $post_ids_raw
+			? $this->sanitize_int_list( $post_ids_raw )
+			: null;
+		$dry_run  = (bool) $request->get_param( 'dry_run' );
+
+		$result = $this->rollback->rollback_step( $uuid, $post_ids, $dry_run );
+		if ( null === $result['step'] ) {
+			return $this->step_not_found( $uuid );
+		}
+		return $this->respond( $result );
 	}
 
 	/**

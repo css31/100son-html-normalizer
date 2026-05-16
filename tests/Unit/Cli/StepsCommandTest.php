@@ -119,12 +119,38 @@ final class StepsCommandTest extends TestCase {
 
 	private function make_command(
 		?StepRunner $runner = null,
-		?StepsRepository $repo = null
+		?StepsRepository $repo = null,
+		?\Cent_Son\Html_Normalizer\Steps\RollbackService $rollback = null
 	): StepsCommand {
 		return new StepsCommand(
 			$runner ?? $this->runner_stub(),
 			$repo ?? $this->repo_stub(),
+			$rollback ?? $this->rollback_stub(),
 		);
+	}
+
+	/**
+	 * Stub minimal de RollbackService — n'invoque pas le parent::__construct
+	 * (qui exigerait des dépendances réelles). La suite CLI courante ne teste
+	 * pas la sous-commande `rollback` ; les tests dédiés vivent ailleurs.
+	 */
+	private function rollback_stub(): \Cent_Son\Html_Normalizer\Steps\RollbackService {
+		return new class() extends \Cent_Son\Html_Normalizer\Steps\RollbackService {
+			public function __construct() {} // phpcs:ignore Generic.CodeAnalysis.UselessOverriding
+			public function rollback_step( string $uuid, ?array $post_ids = null, bool $dry_run = false ): array {
+				return array(
+					'step'    => null,
+					'actions' => array(),
+					'cascade' => array(),
+					'summary' => array(
+						'rolled_back' => 0,
+						'skipped'     => 0,
+						'errors'      => 0,
+						'dry_run'     => $dry_run,
+					),
+				);
+			}
+		};
 	}
 
 	// =========================================================================

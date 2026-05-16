@@ -165,6 +165,65 @@ class StepsRepository {
 	}
 
 	/**
+	 * Steps postérieurs à `$after_datetime` ayant touché l'article `$post_id`.
+	 * Sert à la modale de confirmation Rollback : avertir l'admin qu'un
+	 * rollback du step N sur 1234 va aussi perdre les écritures des steps
+	 * N+1, N+2... qui ont remodifié 1234. Filtre via `JSON_CONTAINS` sur
+	 * la colonne `affected_post_ids` (JSON list d'int).
+	 *
+	 * Sémantique stricte : on retourne les steps **finalisés** dont
+	 * `finished_at > $after_datetime` ET qui contiennent `$post_id` dans
+	 * `affected_post_ids`. Le step source du rollback (passé via
+	 * `$exclude_uuid`) est exclu pour ne pas s'auto-référencer.
+	 *
+	 * NB : `affected_post_ids` est le snapshot au démarrage du pas — un
+	 * article qui y figure peut avoir terminé en `error` ou `regression_pending`
+	 * (donc sans écriture). Le caller doit donc reconfirmer via
+	 * `per_article_results[post_id].status === 'success'` pour parler de
+	 * cascade *réelle*.
+	 *
+	 * @param int         $post_id        Article concerné.
+	 * @param string      $after_datetime Datetime MySQL exclusif (typiquement
+	 *                                    `finished_at` du step source).
+	 * @param string|null $exclude_uuid   UUID à exclure (le step source), ou null.
+	 * @return list<StepRecord>
+	 */
+	public function find_subsequent_steps_for_post(
+		int $post_id,
+		string $after_datetime,
+		?string $exclude_uuid = null
+	): array {
+		// JSON_CONTAINS sur JSON list d'int : on encode le post_id en JSON
+		// (int → string sans guillemets) puis on délègue à wpdb->prepare()
+		// pour quoter les arguments.
+		$post_id_json = (string) $post_id;
+		if ( null !== $exclude_uuid && '' !== $exclude_uuid ) {
+			$sql = $this->wpdb->prepare(
+				"SELECT * FROM `{$this->table}`
+				 WHERE finished_at IS NOT NULL
+				   AND finished_at > %s
+				   AND step_uuid <> %s
+				   AND JSON_CONTAINS(affected_post_ids, %s)
+				 ORDER BY finished_at ASC",
+				$after_datetime,
+				$exclude_uuid,
+				$post_id_json
+			);
+		} else {
+			$sql = $this->wpdb->prepare(
+				"SELECT * FROM `{$this->table}`
+				 WHERE finished_at IS NOT NULL
+				   AND finished_at > %s
+				   AND JSON_CONTAINS(affected_post_ids, %s)
+				 ORDER BY finished_at ASC",
+				$after_datetime,
+				$post_id_json
+			);
+		}
+		return $this->fetch_records( $sql );
+	}
+
+	/**
 	 * Nombre de pas dans une fenêtre temporelle. Sert au calcul de
 	 * `total_pages` côté SPA (F16).
 	 *

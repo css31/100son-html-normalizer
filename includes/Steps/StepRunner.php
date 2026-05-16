@@ -207,23 +207,23 @@ class StepRunner {
 		}
 
 		// 7c. Écriture validée — révision SYSTÉMATIQUE avant update (§13).
-		$write_error = $this->write_post_content( $post_id, $html_after );
-		if ( null !== $write_error ) {
+		$write = $this->write_post_content( $post_id, $html_after );
+		if ( null !== $write['error'] ) {
 			return $this->persist_and_return(
 				$uuid,
 				$post_id,
-				ArticleResult::error( $write_error, $before, $after )
+				ArticleResult::error( $write['error'], $before, $after )
 			);
 		}
 
 		// 8. Recalcul du diagnostic post-écriture.
 		$this->refresh_diagnostic_for( $post_id );
 
-		// 9. Persister le résultat success.
+		// 9. Persister le résultat success — revision_id capturé pour rollback.
 		return $this->persist_and_return(
 			$uuid,
 			$post_id,
-			ArticleResult::success( $before, $after )
+			ArticleResult::success( $before, $after, null, $write['revision_id'] )
 		);
 	}
 
@@ -295,23 +295,23 @@ class StepRunner {
 		}
 		$after = $this->metrics->compute( $html_after );
 
-		$write_error = $this->write_post_content( $post_id, $html_after );
-		if ( null !== $write_error ) {
+		$write = $this->write_post_content( $post_id, $html_after );
+		if ( null !== $write['error'] ) {
 			return $this->persist_and_return(
 				$uuid,
 				$post_id,
-				ArticleResult::error( $write_error, $before, $after ),
+				ArticleResult::error( $write['error'], $before, $after ),
 				$entry
 			);
 		}
 
 		$this->refresh_diagnostic_for( $post_id );
 
-		// Résultat success avec trace de la régression confirmée.
+		// Résultat success avec trace de la régression confirmée + revision_id rollback.
 		return $this->persist_and_return(
 			$uuid,
 			$post_id,
-			ArticleResult::success( $before, $after, $preserved_report ),
+			ArticleResult::success( $before, $after, $preserved_report, $write['revision_id'] ),
 			$entry
 		);
 	}
@@ -478,12 +478,22 @@ class StepRunner {
 	/**
 	 * Écrit le HTML normalisé : révision systématique (§13) puis `wp_update_post`.
 	 *
+	 * Retourne un tuple `{error, revision_id}` — la révision capturée alimente
+	 * `ArticleResult::success()` puis `per_article_results[post_id].revision_id`
+	 * en BDD, pivot du rollback (cf. RollbackService). `revision_id` peut être
+	 * `null` même en succès si WP n'a pas créé de révision (post_type sans
+	 * support `revisions`, dédoublonnage, etc.) — l'article ne sera alors pas
+	 * rollback-able pour ce step.
+	 *
 	 * @param int    $post_id    Article concerné.
 	 * @param string $html_after HTML normalisé à persister.
-	 * @return string|null `null` en cas de succès, message d'erreur sinon.
+	 * @return array{error: string|null, revision_id: int|null} `error` null en succès, message sinon ;
+	 *                                                          `revision_id` non-null ssi WP a créé une révision.
 	 */
-	private function write_post_content( int $post_id, string $html_after ): ?string {
-		wp_save_post_revision( $post_id );
+	private function write_post_content( int $post_id, string $html_after ): array {
+		$rev_raw     = wp_save_post_revision( $post_id );
+		$revision_id = is_int( $rev_raw ) && $rev_raw > 0 ? $rev_raw : null;
+
 		$updated = wp_update_post(
 			array(
 				'ID'           => $post_id,
@@ -492,12 +502,21 @@ class StepRunner {
 			true
 		);
 		if ( $updated instanceof WP_Error ) {
-			return 'wp_update_post: ' . $updated->get_error_message();
+			return array(
+				'error'       => 'wp_update_post: ' . $updated->get_error_message(),
+				'revision_id' => $revision_id,
+			);
 		}
 		if ( 0 === $updated ) {
-			return 'wp_update_post returned 0 for post ' . $post_id;
+			return array(
+				'error'       => 'wp_update_post returned 0 for post ' . $post_id,
+				'revision_id' => $revision_id,
+			);
 		}
-		return null;
+		return array(
+			'error'       => null,
+			'revision_id' => $revision_id,
+		);
 	}
 
 	/**

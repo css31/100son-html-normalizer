@@ -48,6 +48,7 @@ export default function History() {
 		progress,
 		isLoading: isDetailLoading,
 		error: detailError,
+		refetch: refetchDetail,
 	} = useStepDetail( selectedUuid );
 
 	const handleChangePage = useCallback(
@@ -109,6 +110,7 @@ export default function History() {
 					isLoading={ isDetailLoading }
 					error={ detailError }
 					onClose={ handleCloseDetail }
+					onRefetch={ refetchDetail }
 				/>
 			) }
 		</div>

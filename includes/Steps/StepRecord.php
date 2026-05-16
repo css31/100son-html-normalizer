@@ -38,7 +38,7 @@ final class StepRecord {
 	 * @param int                                                                                            $refused_articles    Articles refusés (régression rejetée par admin).
 	 * @param int                                                                                            $errored_articles    Articles en erreur technique.
 	 * @param int                                                                                            $pending_articles    Articles en `regression_pending` à la finalisation (admin n'a pas arbitré).
-	 * @param array<int, array{status: string, regression?: array<string, mixed>, error?: string}>           $per_article_results Détail par article.
+	 * @param array<int, array{status: string, regression?: array<string, mixed>, error?: string, revision_id?: int}> $per_article_results Détail par article.
 	 * @param int|null                                                                                       $user_id             Auteur du pas (null en CLI).
 	 * @param string                                                                                         $started_at          Datetime MySQL au lancement.
 	 * @param string|null                                                                                    $finished_at         Datetime MySQL à la finalisation, ou null si inachevé.
@@ -168,7 +168,7 @@ final class StepRecord {
 	 * Décode `per_article_results` : map post_id => result.
 	 *
 	 * @param string $json Chaine JSON.
-	 * @return array<int, array{status: string, regression?: array<string, mixed>, error?: string}>
+	 * @return array<int, array{status: string, regression?: array<string, mixed>, error?: string, revision_id?: int}>
 	 */
 	private static function decode_per_article_results( string $json ): array {
 		if ( '' === $json ) {
@@ -193,6 +193,12 @@ final class StepRecord {
 			}
 			if ( isset( $entry['error'] ) ) {
 				$record['error'] = (string) $entry['error'];
+			}
+			if ( isset( $entry['revision_id'] ) && is_numeric( $entry['revision_id'] ) ) {
+				$revision_id = (int) $entry['revision_id'];
+				if ( $revision_id > 0 ) {
+					$record['revision_id'] = $revision_id;
+				}
 			}
 			$result[ (int) $post_id ] = $record;
 		}
