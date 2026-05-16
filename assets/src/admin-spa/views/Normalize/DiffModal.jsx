@@ -524,9 +524,32 @@ export default function DiffModal( {
 							     les environnements externes. Le permalien
 							     vient du payload REST. Chaque bouton n'est
 							     rendu que si son toggle est activé en config
-							     ET que l'URL composable n'est pas null. */ }
-							{ ( externalUrls.old || externalUrls.prod ) && (
+							     ET que l'URL composable n'est pas null. Le
+							     bouton « Actuel » ouvre l'article sur le
+							     site courant (celui qui héberge l'extension)
+							     via le permalien WP natif — pas besoin de
+							     buildExternalUrl. */ }
+							{ ( payload.permalink ||
+								externalUrls.old ||
+								externalUrls.prod ) && (
 								<div className="htmln-diff-modal__open-on">
+									{ payload.permalink && (
+										<a
+											href={ payload.permalink }
+											target="_blank"
+											rel="noopener noreferrer"
+											className="button button-small htmln-diff-modal__open-on-btn"
+											title={ __(
+												'Ouvrir sur le site actuel (nouvel onglet)',
+												'100son-html-normalizer'
+											) }
+										>
+											{ __(
+												'Actuel',
+												'100son-html-normalizer'
+											) }
+										</a>
+									) }
 									{ externalUrls.old && (
 										<a
 											href={ externalUrls.old }
