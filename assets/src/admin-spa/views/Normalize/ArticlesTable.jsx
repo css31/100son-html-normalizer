@@ -26,6 +26,7 @@ import { Spinner, Button } from '@wordpress/components';
 import BuilderBadge from './BuilderBadge';
 import PaginationBar from './PaginationBar';
 import { buildExternalUrl } from '../../utils/buildExternalUrl';
+import { formatLocalDateTime, parseUtcDatetime } from '../../utils/datetime';
 import {
 	getRuleLabel,
 	getRuleTooltip,
@@ -447,11 +448,16 @@ export default function ArticlesTable( {
 							<td>{ sumViolations( item.matching_rules ) }</td>
 							<td>
 								<time
-									dateTime={ String(
-										item.diagnosed_at ?? ''
-									) }
+									dateTime={
+										parseUtcDatetime(
+											item.diagnosed_at
+										)?.toISOString() ?? ''
+									}
 								>
-									{ String( item.diagnosed_at ?? '—' ) }
+									{ formatLocalDateTime( item.diagnosed_at, {
+										dateStyle: 'short',
+										timeStyle: 'short',
+									} ) }
 								</time>
 							</td>
 							<td>

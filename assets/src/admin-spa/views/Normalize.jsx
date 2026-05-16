@@ -44,6 +44,8 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState, useCallback, useEffect, useMemo } from '@wordpress/element';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { Button } from '@wordpress/components';
+import { useIsReadOnly } from '../hooks/useSession';
+import ReadOnlyTooltip from '../components/ReadOnlyTooltip';
 import TabsHeader from './Normalize/TabsHeader';
 import ArticlesTable from './Normalize/ArticlesTable';
 import ScanBar from './Normalize/ScanBar';
@@ -59,6 +61,7 @@ import { useStepRunner } from '../hooks/useStepRunner';
 import { useScanBatch } from '../hooks/useScanBatch';
 import { useBeforeunload } from '../hooks/useBeforeunload';
 import { useExternalSites } from '../hooks/useExternalSites';
+import { usePresets } from '../hooks/usePresets';
 import { STORE_NAME, ALL_RULE_IDS } from '../store';
 import { formatRuleIdList } from '../utils/ruleLabels';
 
@@ -100,6 +103,38 @@ export default function Normalize() {
 	const selectedRules = useSelect(
 		( select ) => select( STORE_NAME ).getSelectedRules(),
 		[]
+	);
+
+	// Fetch des presets : sert deux objectifs depuis cette vue.
+	//   1) Déclenche la sync `removeSelectedRules(complete+!enabled)` même
+	//      si l'utilisateur ne visite jamais l'onglet Règles — sinon une
+	//      règle auto-désactivée par le backend resterait dans la sélection
+	//      localStorage et apparaîtrait dans le recap « N / 16 règles ».
+	//   2) Donne la liste des règles complètes pour le filtre défensif
+	//      ci-dessous dans `handleApplyStep` au cas où le sync n'a pas
+	//      encore tourné au moment du clic (premier render avant fetch).
+	const { presets: presetsList } = usePresets();
+	const completeRuleIds = useMemo( () => {
+		if ( ! Array.isArray( presetsList ) ) {
+			return new Set();
+		}
+		return new Set(
+			presetsList
+				.filter(
+					( p ) =>
+						'complete' === p.completion_state && false === p.enabled
+				)
+				.map( ( p ) => p.id )
+		);
+	}, [ presetsList ] );
+
+	// Vue dérivée : sélection moins les règles complètes auto-désactivées.
+	// Utilisée à la fois pour le recap (« N / 16 règles sélectionnées — R3,
+	// R4 ») et pour le payload envoyé à `POST /steps/run`. Garantit la
+	// cohérence affichage / action.
+	const applicableRules = useMemo(
+		() => selectedRules.filter( ( id ) => ! completeRuleIds.has( id ) ),
+		[ selectedRules, completeRuleIds ]
 	);
 
 	// Domaines externes (Old / Prod) — pour les boutons d'ouverture par ligne
@@ -262,11 +297,11 @@ export default function Normalize() {
 
 	const handleApplyStep = useCallback( () => {
 		const postIds = Array.from( selectedPostIds );
-		if ( 0 === postIds.length || 0 === selectedRules.length ) {
+		if ( 0 === postIds.length || 0 === applicableRules.length ) {
 			return;
 		}
-		startStep( postIds, selectedRules );
-	}, [ selectedPostIds, selectedRules, startStep ] );
+		startStep( postIds, applicableRules );
+	}, [ selectedPostIds, applicableRules, startStep ] );
 
 	const activeUuid = progress?.uuid ?? null;
 
@@ -292,7 +327,7 @@ export default function Normalize() {
 				/>
 
 				<ApplyStepBar
-					selectedRules={ selectedRules }
+					selectedRules={ applicableRules }
 					selectedPostCount={ selectedPostIds.size }
 					disabled={ isRunning }
 					onApplyStep={ handleApplyStep }
@@ -397,6 +432,7 @@ function ApplyStepBar( {
 	disabled,
 	onApplyStep,
 } ) {
+	const isReadOnly = useIsReadOnly();
 	const ruleCount = selectedRules.length;
 	const totalRules = ALL_RULE_IDS.length;
 	const canApply = ! disabled && ruleCount > 0 && selectedPostCount > 0;
@@ -409,20 +445,22 @@ function ApplyStepBar( {
 	return (
 		<div className="htmln-normalize__apply-bar">
 			<div className="htmln-normalize__apply-bar-action">
-				<Button
-					variant="primary"
-					onClick={ onApplyStep }
-					disabled={ ! canApply }
-				>
-					{ sprintf(
-						// translators: %d = nombre d'articles cochés.
-						__(
-							'Appliquer ce lot à %d article(s)',
-							'100son-html-normalizer'
-						),
-						selectedPostCount
-					) }
-				</Button>
+				<ReadOnlyTooltip>
+					<Button
+						variant="primary"
+						onClick={ onApplyStep }
+						disabled={ ! canApply || isReadOnly }
+					>
+						{ sprintf(
+							// translators: %d = nombre d'articles cochés.
+							__(
+								'Appliquer ce lot à %d article(s)',
+								'100son-html-normalizer'
+							),
+							selectedPostCount
+						) }
+					</Button>
+				</ReadOnlyTooltip>
 			</div>
 			<div className="htmln-normalize__apply-bar-recap">
 				<strong>

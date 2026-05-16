@@ -14,6 +14,7 @@ namespace Cent_Son\Html_Normalizer\Rest;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Session\SessionLock;
 use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -51,6 +52,17 @@ abstract class BaseController {
 	public const CAPABILITY = 'manage_options';
 
 	/**
+	 * Verrou de session injecté par `RestServiceProvider` avant
+	 * `register_routes()`. Null en contexte de test (ou avant injection) —
+	 * dans ce cas `permission_check_locked` retombe sur la check classique
+	 * `manage_options` (les tests unitaires de controllers existants ne
+	 * dépendent pas du verrou).
+	 *
+	 * @var SessionLock|null
+	 */
+	protected ?SessionLock $session_lock = null;
+
+	/**
 	 * Enregistre les routes du contrôleur via `register_rest_route()`.
 	 *
 	 * Appelée par `RestServiceProvider` au hook `rest_api_init`.
@@ -58,6 +70,19 @@ abstract class BaseController {
 	 * @return void
 	 */
 	abstract public function register_routes(): void;
+
+	/**
+	 * Setter d'injection appelé par `RestServiceProvider` juste avant
+	 * `register_routes()`. Méthode plutôt qu'argument constructeur pour
+	 * éviter de modifier la signature de tous les contrôleurs existants
+	 * (et leurs tests) — la dépendance reste optionnelle côté test.
+	 *
+	 * @param SessionLock $lock Verrou.
+	 * @return void
+	 */
+	public function set_session_lock( SessionLock $lock ): void {
+		$this->session_lock = $lock;
+	}
 
 	/**
 	 * Permission callback `manage_options` partagé par toutes les routes V1.0.
@@ -71,6 +96,35 @@ abstract class BaseController {
 	public function permission_check_manage_options( WP_REST_Request $request ): bool {
 		unset( $request );
 		return current_user_can( self::CAPABILITY );
+	}
+
+	/**
+	 * Permission callback à utiliser sur les routes mutatives (POST/PUT/
+	 * DELETE) : combine `manage_options` et la vérification d'ownership du
+	 * verrou de session single-user. Retourne :
+	 *  - `true` si le caller détient le verrou,
+	 *  - `WP_Error` 403 si la capability manque,
+	 *  - `WP_Error` 409 (`htmln_session_locked` / `htmln_session_required`)
+	 *    si un autre détient le verrou ou si le header session_id est absent.
+	 *
+	 * Fallback : si `$session_lock` est null (contexte test), retombe sur
+	 * `manage_options` seul — comportement transparent pour les tests
+	 * existants qui n'ont pas conscience du verrou.
+	 *
+	 * @param WP_REST_Request $request Requête.
+	 * @return true|WP_Error
+	 */
+	public function permission_check_locked( WP_REST_Request $request ): bool|WP_Error {
+		if ( null === $this->session_lock ) {
+			return current_user_can( self::CAPABILITY )
+				? true
+				: new WP_Error(
+					'rest_forbidden',
+					__( 'Permissions insuffisantes.', '100son-html-normalizer' ),
+					array( 'status' => 403 )
+				);
+		}
+		return $this->session_lock->guard( $request );
 	}
 
 	/**

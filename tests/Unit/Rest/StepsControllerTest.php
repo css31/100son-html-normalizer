@@ -190,12 +190,18 @@ final class StepsControllerTest extends TestCase {
 	}
 
 	public function test_register_routes_set_permission_callback_to_manage_options(): void {
+		// Post-v1.0.0 : les routes mutatives (POST/PUT/DELETE) sont protégées
+		// par `permission_check_locked` (capability + verrou session), les
+		// routes de lecture (GET) restent sur `permission_check_manage_options`.
 		$controller = $this->make_controller();
 		$controller->register_routes();
 		foreach ( $GLOBALS['son100_htmln_test_rest_routes'] as $entry ) {
 			$this->assertIsArray( $entry['args']['permission_callback'] );
 			$this->assertSame( $controller, $entry['args']['permission_callback'][0] );
-			$this->assertSame( 'permission_check_manage_options', $entry['args']['permission_callback'][1] );
+			$expected = 'GET' === $entry['args']['methods']
+				? 'permission_check_manage_options'
+				: 'permission_check_locked';
+			$this->assertSame( $expected, $entry['args']['permission_callback'][1] );
 		}
 	}
 

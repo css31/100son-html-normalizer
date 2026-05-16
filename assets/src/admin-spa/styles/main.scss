@@ -2583,3 +2583,164 @@
 	text-align: center;
 	color: var( --htmln-text-muted );
 }
+
+/* =============================================================================
+ *  SessionGate / SessionLockScreen — verrou single-user
+ *
+ *  Écran bloquant centré, affiché à la place de `<App>` quand un autre
+ *  administrateur (ou un autre onglet) détient le verrou. Couvre toute la
+ *  zone admin sans masquer la barre WordPress (pas de position fixed
+ *  full-screen — l'admin reste navigable, seul HTML Normalizer est gelé).
+ * ========================================================================== */
+
+.htmln-session-gate--pending {
+	min-height: 200px;
+}
+
+/* Header SPA : mince bandeau au-dessus de la barre d'onglets pour la
+ * pastille de mode de session. Reste discret quand vide (en V1.0, le mode
+ * `primary` est toujours présent une fois acquis, mais la pastille n'est
+ * pas un élément vital — pas de réserve d'espace si elle disparaît). */
+.htmln-app__header {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-bottom: 4px;
+	min-height: 24px;
+}
+
+/* Container du mode de session (pastille + bouton « Prendre la main » en
+ * lecture seule). `gap` aligné sur le reste du header. */
+.htmln-session-mode {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.htmln-session-mode__takeover {
+	/* Bouton compact pour ne pas alourdir le header. La taille `small` de
+	 * @wordpress/components est déjà appliquée — ce sélecteur sert juste
+	 * de hook pour d'éventuels overrides futurs. */
+}
+
+/* Pastille « Session principale / secondaire ». Style WP-Admin standard
+ * (border + bg léger), couleur sémantique selon le mode. */
+.htmln-session-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 10px;
+	border-radius: 12px;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.4;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+
+	&--primary {
+		color: #00541a;
+		background: #ebf6ee;
+		border: 1px solid #b8e0c2;
+	}
+
+	&--secondary {
+		color: #7a5400;
+		background: #fcf3da;
+		border: 1px solid #e6ce9d;
+	}
+}
+
+/* Wrapper du Tooltip ReadOnlyTooltip — capte le hover quand l'enfant
+ * est `disabled` (les navigateurs n'émettent pas mouseenter sur input
+ * désactivé). `display: inline-flex` pour ne pas casser l'alignement
+ * de la barre d'actions parente. */
+.htmln-readonly-wrap {
+	display: inline-flex;
+}
+
+/* Toast bas-droite affiché brièvement (5 s) quand un 409 mutatif arrive
+ * en mode lecture seule. Positionné fixed pour rester visible quelle
+ * que soit la vue active ; z-index au-dessus des Modal WP standards. */
+.htmln-session-toast {
+	position: fixed;
+	bottom: 24px;
+	right: 24px;
+	z-index: 100100;
+	max-width: 360px;
+}
+
+.htmln-session-lock {
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 40px 20px;
+}
+
+.htmln-session-lock__card {
+	max-width: 560px;
+	width: 100%;
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-left: 4px solid var( --htmln-color-warning );
+	border-radius: var( --htmln-radius-lg );
+	padding: 28px 32px;
+	box-shadow: 0 1px 2px rgba( 0, 0, 0, 0.04 );
+}
+
+.htmln-session-lock__title {
+	margin: 0 0 16px;
+	font-size: 20px;
+	line-height: 1.3;
+	color: var( --htmln-text );
+}
+
+.htmln-session-lock__intro {
+	margin: 0 0 16px;
+	font-size: 15px;
+	color: var( --htmln-text );
+}
+
+.htmln-session-lock__meta {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 16px;
+	margin: 0 0 20px;
+	padding: 12px 16px;
+	background: var( --htmln-bg-subtle );
+	border-radius: var( --htmln-radius );
+	font-size: 13px;
+
+	dt {
+		color: var( --htmln-text-muted );
+		font-weight: 500;
+	}
+
+	dd {
+		margin: 0;
+		color: var( --htmln-text );
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+.htmln-session-lock__explain {
+	margin: 0 0 20px;
+	font-size: 13px;
+	color: var( --htmln-text-muted );
+}
+
+.htmln-session-lock__error {
+	margin: 0 0 16px;
+}
+
+.htmln-session-lock__actions {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.htmln-session-lock__warning {
+	margin: 0;
+	font-size: 12px;
+	color: var( --htmln-text-faint );
+	font-style: italic;
+}

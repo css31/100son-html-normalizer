@@ -15,6 +15,11 @@
 
 import { createRoot } from '@wordpress/element';
 import App from './App';
+import SessionGate from './components/SessionGate';
+// Import du client REST avant tout autre import qui pourrait déclencher
+// un apiFetch — le middleware d'injection du header X-Htmln-Session-Id et
+// de capture des 409 doit être enregistré le plus tôt possible.
+import './api/client';
 import './store';
 import './styles/main.scss';
 
@@ -54,7 +59,11 @@ function bootSpa() {
 			);
 			return;
 		}
-		createRoot( container ).render( <App /> );
+		createRoot( container ).render(
+			<SessionGate>
+				<App />
+			</SessionGate>
+		);
 	} catch ( error ) {
 		// eslint-disable-next-line no-console
 		console.error( '[htmln-spa] boot error', error );

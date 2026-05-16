@@ -14,6 +14,8 @@
 
 import { __, sprintf } from '@wordpress/i18n';
 import { Button, Notice } from '@wordpress/components';
+import { useIsReadOnly } from '../../hooks/useSession';
+import ReadOnlyTooltip from '../../components/ReadOnlyTooltip';
 
 /**
  * @param {Object}                                                   props
@@ -39,6 +41,7 @@ export default function ScanBar( {
 	onDismissError,
 	onDismissFinalize,
 } ) {
+	const isReadOnly = useIsReadOnly();
 	const processed = progress?.processed ?? 0;
 	const total = progress?.total ?? 0;
 	const pct =
@@ -63,14 +66,16 @@ export default function ScanBar( {
 	return (
 		<div className="htmln-scan-bar">
 			<div className="htmln-scan-bar__main">
-				<Button
-					variant="secondary"
-					onClick={ onScan }
-					disabled={ isScanning || disabled }
-					isBusy={ isScanning }
-				>
-					{ buttonLabel }
-				</Button>
+				<ReadOnlyTooltip>
+					<Button
+						variant="secondary"
+						onClick={ onScan }
+						disabled={ isScanning || disabled || isReadOnly }
+						isBusy={ isScanning }
+					>
+						{ buttonLabel }
+					</Button>
+				</ReadOnlyTooltip>
 
 				{ isScanning && (
 					<div className="htmln-scan-bar__status">

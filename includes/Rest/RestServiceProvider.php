@@ -13,6 +13,8 @@ namespace Cent_Son\Html_Normalizer\Rest;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Session\SessionLock;
+
 /**
  * Hook unique `rest_api_init` qui boucle sur les contrôleurs fournis et
  * appelle `register_routes()` sur chacun.
@@ -42,9 +44,14 @@ final class RestServiceProvider {
 
 	/**
 	 * @param list<BaseController> $controllers Contrôleurs à enregistrer.
+	 * @param SessionLock|null     $lock        Verrou single-user injecté dans
+	 *                                          chaque contrôleur avant
+	 *                                          `register_routes()`. Null en
+	 *                                          tests (transparent).
 	 */
 	public function __construct(
 		private readonly array $controllers,
+		private readonly ?SessionLock $lock = null,
 	) {}
 
 	/**
@@ -73,6 +80,9 @@ final class RestServiceProvider {
 	 */
 	public function register_all_routes(): void {
 		foreach ( $this->controllers as $controller ) {
+			if ( null !== $this->lock ) {
+				$controller->set_session_lock( $this->lock );
+			}
 			$controller->register_routes();
 		}
 	}

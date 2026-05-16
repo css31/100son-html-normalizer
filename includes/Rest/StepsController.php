@@ -73,8 +73,9 @@ final class StepsController extends BaseController {
 	 * @return void
 	 */
 	public function register_routes(): void {
-		$ns       = self::REST_NAMESPACE;
-		$can_read = array( $this, 'permission_check_manage_options' );
+		$ns        = self::REST_NAMESPACE;
+		$can_read  = array( $this, 'permission_check_manage_options' );
+		$can_write = array( $this, 'permission_check_locked' );
 
 		register_rest_route( $ns, '/steps', array(
 			'methods'             => 'GET',
@@ -91,7 +92,7 @@ final class StepsController extends BaseController {
 		register_rest_route( $ns, '/steps/run', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'run_step' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/steps/(?P<uuid>[a-f0-9-]+)', array(
@@ -103,19 +104,19 @@ final class StepsController extends BaseController {
 		register_rest_route( $ns, '/steps/(?P<uuid>[a-f0-9-]+)/process', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'process_chunk' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/steps/(?P<uuid>[a-f0-9-]+)/confirm-article', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'confirm_article_decision' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/steps/(?P<uuid>[a-f0-9-]+)/finalize', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'finalize' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 	}
 

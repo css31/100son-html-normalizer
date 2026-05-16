@@ -56,7 +56,8 @@ final class NotesController extends BaseController {
 	 * @return void
 	 */
 	public function register_routes(): void {
-		$cap = array( $this, 'permission_check_manage_options' );
+		$cap       = array( $this, 'permission_check_manage_options' );
+		$can_write = array( $this, 'permission_check_locked' );
 
 		register_rest_route( self::REST_NAMESPACE, '/notes', array(
 			array(
@@ -67,12 +68,12 @@ final class NotesController extends BaseController {
 			array(
 				'methods'             => 'PUT',
 				'callback'            => array( $this, 'update_notes' ),
-				'permission_callback' => $cap,
+				'permission_callback' => $can_write,
 			),
 			array(
 				'methods'             => 'DELETE',
 				'callback'            => array( $this, 'delete_notes' ),
-				'permission_callback' => $cap,
+				'permission_callback' => $can_write,
 			),
 		) );
 	}

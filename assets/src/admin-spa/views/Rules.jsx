@@ -41,6 +41,7 @@ import {
 	getRuleLabel,
 	compareRuleIdsByDisplayOrder,
 } from '../utils/ruleLabels';
+import { formatLocalDateTime } from '../utils/datetime';
 
 /**
  * Exemples statiques par règle pour l'encart « Avant / Après ».
@@ -420,13 +421,7 @@ function RuleCompletionBanner( {
 
 	// 'complete'
 	const formattedDate = lastAppliedAt
-		? new Date( lastAppliedAt.replace( ' ', 'T' ) + 'Z' ).toLocaleString(
-				'fr-FR',
-				{
-					dateStyle: 'long',
-					timeStyle: 'short',
-				}
-		  )
+		? formatLocalDateTime( lastAppliedAt, { fallback: '' } )
 		: '';
 
 	const completionMessage = autoDisabledAt

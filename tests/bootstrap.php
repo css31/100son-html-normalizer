@@ -246,8 +246,11 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 }
 
 if ( ! function_exists( 'wp_get_current_user' ) ) {
+	$GLOBALS['son100_htmln_test_current_user'] = $GLOBALS['son100_htmln_test_current_user']
+		?? (object) [ 'ID' => 0, 'user_login' => '', 'display_name' => '' ];
 	function wp_get_current_user(): object {
-		return (object) [ 'ID' => 0, 'user_login' => '' ];
+		return $GLOBALS['son100_htmln_test_current_user']
+			?? (object) [ 'ID' => 0, 'user_login' => '', 'display_name' => '' ];
 	}
 }
 
@@ -384,6 +387,8 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 	final class WP_REST_Request {
 		/** @var array<string, mixed> */
 		private array $params = array();
+		/** @var array<string, string> */
+		private array $headers = array();
 		private string $method;
 		private string $route;
 
@@ -404,6 +409,15 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
 		public function set_param( string $key, mixed $value ): void {
 			$this->params[ $key ] = $value;
+		}
+
+		public function get_header( string $key ): ?string {
+			// WP normalise les en-têtes en lowercase à l'interne.
+			return $this->headers[ strtolower( $key ) ] ?? null;
+		}
+
+		public function set_header( string $key, string $value ): void {
+			$this->headers[ strtolower( $key ) ] = $value;
 		}
 	}
 }

@@ -22,6 +22,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { Modal, Spinner, Button } from '@wordpress/components';
 import { formatRuleIdList } from '../../utils/ruleLabels';
+import { formatLocalDateTime, parseUtcDatetime } from '../../utils/datetime';
 
 /**
  * Format lisible d'une RegressionFailure (cf. RegressionFailure::to_array()).
@@ -244,8 +245,14 @@ export default function StepDetailDrawer( {
 							{ __( 'Démarré le', '100son-html-normalizer' ) }
 						</dt>
 						<dd>
-							<time dateTime={ String( step.started_at ?? '' ) }>
-								{ String( step.started_at ?? '—' ) }
+							<time
+								dateTime={
+									parseUtcDatetime(
+										step.started_at
+									)?.toISOString() ?? ''
+								}
+							>
+								{ formatLocalDateTime( step.started_at ) }
 							</time>
 						</dd>
 
@@ -254,8 +261,14 @@ export default function StepDetailDrawer( {
 						</dt>
 						<dd>
 							{ step.finished_at ? (
-								<time dateTime={ String( step.finished_at ) }>
-									{ String( step.finished_at ) }
+								<time
+									dateTime={
+										parseUtcDatetime(
+											step.finished_at
+										)?.toISOString() ?? ''
+									}
+								>
+									{ formatLocalDateTime( step.finished_at ) }
 								</time>
 							) : (
 								<em>

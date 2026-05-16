@@ -63,7 +63,7 @@ final class DiffController extends BaseController {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'compute_diff' ),
-				'permission_callback' => array( $this, 'permission_check_manage_options' ),
+				'permission_callback' => array( $this, 'permission_check_locked' ),
 			)
 		);
 	}

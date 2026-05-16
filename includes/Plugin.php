@@ -16,11 +16,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Admin\Assets;
 use Cent_Son\Html_Normalizer\Admin\Menu;
-use Cent_Son\Html_Normalizer\Admin\Pages\LogsPage;
-use Cent_Son\Html_Normalizer\Admin\Pages\PostsPage;
-use Cent_Son\Html_Normalizer\Admin\Pages\PresetsPage;
 use Cent_Son\Html_Normalizer\Admin\Pages\SpaPage;
-use Cent_Son\Html_Normalizer\Admin\Pages\TesterPage;
 use Cent_Son\Html_Normalizer\Api\PublicApi;
 use Cent_Son\Html_Normalizer\Cli\CliServiceProvider;
 use Cent_Son\Html_Normalizer\Cli\DiagnoseCommand;
@@ -28,9 +24,6 @@ use Cent_Son\Html_Normalizer\Cli\StepsCommand;
 use Cent_Son\Html_Normalizer\Core\HtmlNormalizer;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticInvalidator;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
-use Cent_Son\Html_Normalizer\Core\Logs\Logger;
-use Cent_Son\Html_Normalizer\Core\Logs\LogRepository;
-use Cent_Son\Html_Normalizer\Core\Logs\NotesRepository;
 use Cent_Son\Html_Normalizer\Core\Pipeline;
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Posts\PostNormalizer;
@@ -47,8 +40,10 @@ use Cent_Son\Html_Normalizer\Rest\NotesController;
 use Cent_Son\Html_Normalizer\Rest\PostsController;
 use Cent_Son\Html_Normalizer\Rest\PresetsController;
 use Cent_Son\Html_Normalizer\Rest\RestServiceProvider;
+use Cent_Son\Html_Normalizer\Rest\SessionController;
 use Cent_Son\Html_Normalizer\Rest\SettingsController;
 use Cent_Son\Html_Normalizer\Rest\StepsController;
+use Cent_Son\Html_Normalizer\Session\SessionLock;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use Cent_Son\Html_Normalizer\Steps\StepRunner;
 use Cent_Son\Html_Normalizer\Steps\StepsRepository;
@@ -132,7 +127,12 @@ final class Plugin {
 		// Le provider branche un seul hook `rest_api_init` qui itérera sur
 		// la liste, donc ajouter un contrôleur en Phase 5.x = simple
 		// extension du tableau ci-dessous, sans modification du provider.
-		$rest_provider = new RestServiceProvider( $this->build_rest_controllers() );
+		//
+		// Verrou single-user (post-v1.0.0) : instancié une fois ici, injecté
+		// dans tous les controllers via le provider pour que `permission_check_locked`
+		// puisse appeler `guard()` sur les routes mutatives.
+		$session_lock  = new SessionLock();
+		$rest_provider = new RestServiceProvider( $this->build_rest_controllers( $session_lock ), $session_lock );
 		$rest_provider->register();
 
 		// V1.0 — Couche WP-CLI (Phase 5.5). Le provider est no-op si la
@@ -142,23 +142,14 @@ final class Plugin {
 		$cli_provider = new CliServiceProvider( $this->build_cli_commands() );
 		$cli_provider->register();
 
-		// UI admin V0.1 (pages PHP classiques) + SPA V1.0 (Phase 6.1) en
-		// cohabitation. La SPA est ajoutée comme sous-page « Normaliser V1 »
-		// — la migration complète des pages V0.1 vers la SPA est différée V1.1.
+		// UI admin V1.0 — uniquement la SPA. Les 4 pages PHP V0.1
+		// (PresetsPage / TesterPage / PostsPage / LogsPage) ont été retirées
+		// le 2026-05-16 ; leurs fonctionnalités sont toutes couvertes par
+		// la SPA. Le `Menu` enregistre maintenant un unique sous-onglet.
 		if ( is_admin() ) {
-			$log_repo        = new LogRepository();
-			$notes_repo      = new NotesRepository();
-			$logger          = new Logger( $log_repo );
-			$so_detector     = new SiteOriginDetector();
-			$post_normalizer = new PostNormalizer( $normalizer, $so_detector, $logger );
+			$spa_page = new SpaPage();
 
-			$presets_page = new PresetsPage( $settings, $preset_registry, $logger );
-			$tester_page  = new TesterPage( $normalizer );
-			$posts_page   = new PostsPage( $settings, $so_detector, $post_normalizer );
-			$logs_page    = new LogsPage( $log_repo, $notes_repo );
-			$spa_page     = new SpaPage();
-
-			$menu = new Menu( $presets_page, $tester_page, $posts_page, $logs_page, $spa_page );
+			$menu = new Menu( $spa_page );
 			$menu->register();
 
 			// Enqueue scope-restreint du bundle SPA — uniquement sur la page
@@ -214,10 +205,12 @@ final class Plugin {
 	 * Phase 5.4 : PostsController + DiffController.
 	 * Phase 6.7 : SettingsController (seuils γ pour la SPA Settings).
 	 * Post-rc1 : NotesController (onglet « Notes » SPA, édition Gutenberg).
+	 * Post-v1.0.0 : SessionController (verrou single-user).
 	 *
+	 * @param SessionLock $session_lock Verrou injecté dans SessionController.
 	 * @return list<\Cent_Son\Html_Normalizer\Rest\BaseController>
 	 */
-	private function build_rest_controllers(): array {
+	private function build_rest_controllers( SessionLock $session_lock ): array {
 		$settings        = new SettingsRepository();
 		$preset_registry = new PresetRegistry( $settings );
 		$pipeline        = new Pipeline();
@@ -250,6 +243,7 @@ final class Plugin {
 			new SettingsController( $settings ),
 			new PresetsController( $settings, $preset_registry, new StepsRepository(), $diag_repo ),
 			new NotesController( $rich_notes ),
+			new SessionController( $session_lock ),
 		);
 	}
 

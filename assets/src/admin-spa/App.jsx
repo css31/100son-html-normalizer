@@ -31,6 +31,7 @@ import History from './views/History';
 import Rules from './views/Rules';
 import Settings from './views/Settings';
 import Notes from './views/Notes';
+import SessionModeBadge from './components/SessionModeBadge';
 
 /**
  * Identifiants de routes (utilisés dans le hash et dans le state local).
@@ -106,6 +107,9 @@ export default function App() {
 
 	return (
 		<div className="htmln-spa-root htmln-app">
+			<div className="htmln-app__header">
+				<SessionModeBadge />
+			</div>
 			<nav
 				className="nav-tab-wrapper htmln-app__tabs"
 				aria-label={ __(

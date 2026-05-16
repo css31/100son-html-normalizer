@@ -55,16 +55,17 @@ final class SettingsControllerTest extends TestCase {
 	}
 
 	public function test_register_routes_uses_manage_options_permission(): void {
+		// Post-v1.0.0 : POST → permission_check_locked, GET → permission_check_manage_options.
 		$controller = $this->controller();
 		$controller->register_routes();
 		foreach ( $GLOBALS['son100_htmln_test_rest_routes'] as $entry ) {
 			foreach ( $entry['args'] as $row ) {
 				$this->assertIsArray( $row['permission_callback'] );
 				$this->assertSame( $controller, $row['permission_callback'][0] );
-				$this->assertSame(
-					'permission_check_manage_options',
-					$row['permission_callback'][1]
-				);
+				$expected = 'GET' === $row['methods']
+					? 'permission_check_manage_options'
+					: 'permission_check_locked';
+				$this->assertSame( $expected, $row['permission_callback'][1] );
 			}
 		}
 	}

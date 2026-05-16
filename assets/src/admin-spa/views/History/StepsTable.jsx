@@ -20,6 +20,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { Spinner, Button } from '@wordpress/components';
 import { formatRuleIdList } from '../../utils/ruleLabels';
+import { formatLocalDateTime, parseUtcDatetime } from '../../utils/datetime';
 
 /**
  * Tronque un UUID v4 à ses 8 premiers caractères pour affichage compact.
@@ -234,11 +235,19 @@ export default function StepsTable( {
 								</td>
 								<td>
 									<time
-										dateTime={ String(
-											step.started_at ?? ''
-										) }
+										dateTime={
+											parseUtcDatetime(
+												step.started_at
+											)?.toISOString() ?? ''
+										}
 									>
-										{ String( step.started_at ?? '—' ) }
+										{ formatLocalDateTime(
+											step.started_at,
+											{
+												dateStyle: 'short',
+												timeStyle: 'short',
+											}
+										) }
 									</time>
 								</td>
 								<td>{ rules || '—' }</td>

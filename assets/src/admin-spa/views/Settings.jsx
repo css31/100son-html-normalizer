@@ -29,6 +29,8 @@ import {
 } from '@wordpress/components';
 import { useSettings } from '../hooks/useSettings';
 import { useExternalSites } from '../hooks/useExternalSites';
+import { useIsReadOnly } from '../hooks/useSession';
+import ReadOnlyTooltip from '../components/ReadOnlyTooltip';
 
 /**
  * Schéma des 7 seuils — clé, libellé, unité, max recommandé pour
@@ -156,6 +158,8 @@ export default function Settings() {
 		save,
 		clearStatus,
 	} = useSettings();
+
+	const isReadOnly = useIsReadOnly();
 
 	// Le formulaire stocke les valeurs en string pour permettre à
 	// l'utilisateur de vider un champ sans perdre le focus. Les valeurs
@@ -367,14 +371,20 @@ export default function Settings() {
 				</div>
 
 				<div className="htmln-settings__actions">
-					<Button
-						type="submit"
-						variant="primary"
-						disabled={ isSaving || invalidFields.length > 0 }
-						isBusy={ isSaving }
-					>
-						{ __( 'Enregistrer', '100son-html-normalizer' ) }
-					</Button>{ ' ' }
+					<ReadOnlyTooltip>
+						<Button
+							type="submit"
+							variant="primary"
+							disabled={
+								isSaving ||
+								invalidFields.length > 0 ||
+								isReadOnly
+							}
+							isBusy={ isSaving }
+						>
+							{ __( 'Enregistrer', '100son-html-normalizer' ) }
+						</Button>
+					</ReadOnlyTooltip>{ ' ' }
 					<Button
 						type="button"
 						variant="secondary"
@@ -404,6 +414,7 @@ export default function Settings() {
 function ExternalSitesSection() {
 	const { sites, isLoading, isSaving, error, isDirty, save, clearStatus } =
 		useExternalSites();
+	const isReadOnly = useIsReadOnly();
 
 	// String state pour les inputs texte (URL + label) + boolean state pour
 	// les toggles. Le même `formValues` héberge les 6 clés ; le booléen
@@ -537,14 +548,16 @@ function ExternalSitesSection() {
 				</div>
 
 				<div className="htmln-settings__actions">
-					<Button
-						type="submit"
-						variant="primary"
-						disabled={ isSaving }
-						isBusy={ isSaving }
-					>
-						{ __( 'Enregistrer', '100son-html-normalizer' ) }
-					</Button>
+					<ReadOnlyTooltip>
+						<Button
+							type="submit"
+							variant="primary"
+							disabled={ isSaving || isReadOnly }
+							isBusy={ isSaving }
+						>
+							{ __( 'Enregistrer', '100son-html-normalizer' ) }
+						</Button>
+					</ReadOnlyTooltip>
 				</div>
 			</form>
 		</section>

@@ -97,8 +97,9 @@ final class DiagnosticsController extends BaseController {
 	 * @return void
 	 */
 	public function register_routes(): void {
-		$ns       = self::REST_NAMESPACE;
-		$can_read = array( $this, 'permission_check_manage_options' );
+		$ns        = self::REST_NAMESPACE;
+		$can_read  = array( $this, 'permission_check_manage_options' );
+		$can_write = array( $this, 'permission_check_locked' );
 
 		register_rest_route( $ns, '/diagnostics', array(
 			'methods'             => 'GET',
@@ -109,19 +110,19 @@ final class DiagnosticsController extends BaseController {
 		register_rest_route( $ns, '/diagnostics/run', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'run_batch' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/diagnostics/run/chunk', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'run_chunk' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/diagnostics/finalize-scan', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'finalize_scan' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/diagnostics/stats', array(
@@ -145,7 +146,7 @@ final class DiagnosticsController extends BaseController {
 		register_rest_route( $ns, '/diagnostics/(?P<post_id>\d+)', array(
 			'methods'             => 'DELETE',
 			'callback'            => array( $this, 'delete_diagnostic' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 	}
 

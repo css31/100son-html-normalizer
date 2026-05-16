@@ -48,16 +48,18 @@ final class NotesControllerTest extends TestCase {
 	}
 
 	public function test_register_routes_uses_manage_options_permission(): void {
+		// Post-v1.0.0 : GET reste sur manage_options, PUT/DELETE basculent
+		// sur permission_check_locked (verrou single-user).
 		$controller = $this->controller();
 		$controller->register_routes();
 		$entry = $GLOBALS['son100_htmln_test_rest_routes'][0];
 		foreach ( $entry['args'] as $row ) {
 			$this->assertIsArray( $row['permission_callback'] );
 			$this->assertSame( $controller, $row['permission_callback'][0] );
-			$this->assertSame(
-				'permission_check_manage_options',
-				$row['permission_callback'][1]
-			);
+			$expected = 'GET' === $row['methods']
+				? 'permission_check_manage_options'
+				: 'permission_check_locked';
+			$this->assertSame( $expected, $row['permission_callback'][1] );
 		}
 	}
 

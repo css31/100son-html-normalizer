@@ -116,8 +116,9 @@ final class PresetsController extends BaseController {
 	 * @return void
 	 */
 	public function register_routes(): void {
-		$ns  = self::REST_NAMESPACE;
-		$cap = array( $this, 'permission_check_manage_options' );
+		$ns        = self::REST_NAMESPACE;
+		$cap       = array( $this, 'permission_check_manage_options' );
+		$can_write = array( $this, 'permission_check_locked' );
 
 		register_rest_route( $ns, '/presets', array(
 			'methods'             => 'GET',
@@ -132,7 +133,7 @@ final class PresetsController extends BaseController {
 		register_rest_route( $ns, '/presets/(?P<id>R(?:1[0-6]|[1-9]))', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'update_preset' ),
-			'permission_callback' => $cap,
+			'permission_callback' => $can_write,
 		) );
 	}
 

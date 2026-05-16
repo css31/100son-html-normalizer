@@ -172,6 +172,11 @@ const DEFAULT_STATE = {
 	regressionThresholds: null,
 	selectedRules: loadPersistedSelectedRules(),
 	normalizeView: { ...DEFAULT_NORMALIZE_VIEW },
+	// Mode de session courant — alimenté par <SessionGate>. `null` tant que
+	// le premier acquire n'a pas répondu, `'primary'` quand on détient le
+	// verrou. Le mode `'secondary'` (lecture seule) est réservé à une
+	// future évolution si on autorise un second onglet en consultation.
+	sessionMode: null,
 };
 
 const actions = {
@@ -244,6 +249,23 @@ const actions = {
 	},
 
 	/**
+	 * Retire un sous-ensemble d'IDs de la sélection courante (sans toucher
+	 * aux autres). Utilisé pour synchroniser la sélection avec l'état
+	 * backend : quand une règle bascule à `completion_state === 'complete'`
+	 * et est auto-désactivée (`enabled === false`), elle ne doit plus
+	 * apparaître dans le « lot » du prochain pas — `usePresets` dispatch
+	 * cette action après chaque fetch.
+	 *
+	 * No-op si `ruleIds` est vide ou si aucun ID ne matche la sélection
+	 * actuelle (économise un re-render et une écriture localStorage).
+	 *
+	 * @param {string[]} ruleIds IDs à retirer.
+	 */
+	removeSelectedRules( ruleIds ) {
+		return { type: 'REMOVE_SELECTED_RULES', ruleIds };
+	},
+
+	/**
 	 * Met à jour partiellement l'état de la vue Normaliser. Accepte un
 	 * sous-ensemble de clés (tab, page, perPage, filters, selectedPostIds) ;
 	 * les clés absentes sont préservées. Permet à `Normalize.jsx` de
@@ -294,6 +316,16 @@ const actions = {
 	 */
 	clearNormalizeSelectedPosts() {
 		return { type: 'CLEAR_NORMALIZE_SELECTED_POSTS' };
+	},
+
+	/**
+	 * Met à jour le mode de session courant. Dispatch par `<SessionGate>`
+	 * au gré des transitions du verrou.
+	 *
+	 * @param {?('primary'|'secondary')} mode Mode courant (null = pas encore initialisé).
+	 */
+	setSessionMode( mode ) {
+		return { type: 'SET_SESSION_MODE', mode };
 	},
 };
 
@@ -407,6 +439,31 @@ function reducer( state = DEFAULT_STATE, action ) {
 				...state,
 				normalizeView: { ...state.normalizeView, selectedPostIds: [] },
 			};
+		case 'REMOVE_SELECTED_RULES': {
+			const toRemove = new Set(
+				Array.isArray( action.ruleIds ) ? action.ruleIds : []
+			);
+			if ( 0 === toRemove.size ) {
+				return state;
+			}
+			const next = state.selectedRules.filter(
+				( id ) => ! toRemove.has( id )
+			);
+			if ( next.length === state.selectedRules.length ) {
+				return state;
+			}
+			return { ...state, selectedRules: next };
+		}
+		case 'SET_SESSION_MODE': {
+			const mode =
+				'primary' === action.mode || 'secondary' === action.mode
+					? action.mode
+					: null;
+			if ( mode === state.sessionMode ) {
+				return state;
+			}
+			return { ...state, sessionMode: mode };
+		}
 		default:
 			return state;
 	}
@@ -462,6 +519,15 @@ const selectors = {
 	 * @return {NormalizeViewState} État courant.
 	 */
 	getNormalizeView: ( state ) => state.normalizeView,
+
+	/**
+	 * Mode de session courant : `'primary'` quand l'onglet détient le verrou,
+	 * `'secondary'` en lecture seule, `null` avant le premier acquire.
+	 *
+	 * @param {HtmlnSpaState} state État du store.
+	 * @return {?('primary'|'secondary')} Mode courant ou null.
+	 */
+	getSessionMode: ( state ) => state.sessionMode,
 };
 
 /**

@@ -61,6 +61,8 @@ import {
 	useCallback,
 } from '@wordpress/element';
 import { Button, Popover, SlotFillProvider } from '@wordpress/components';
+import { useIsReadOnly } from '../../hooks/useSession';
+import ReadOnlyTooltip from '../../components/ReadOnlyTooltip';
 import {
 	BlockEditorProvider,
 	BlockList,
@@ -213,6 +215,7 @@ export default function NotesEditor( {
 	onSave,
 	onClear,
 } ) {
+	const isReadOnly = useIsReadOnly();
 	const [ ready, setReady ] = useState( false );
 	const [ blocks, setBlocks ] = useState( () =>
 		parse( initialContent || '' )
@@ -345,22 +348,26 @@ export default function NotesEditor( {
 			</SlotFillProvider>
 
 			<div className="htmln-notes__actions">
-				<Button
-					variant="primary"
-					onClick={ handleSave }
-					disabled={ isSaving || ! isDirty }
-					isBusy={ isSaving && isDirty }
-				>
-					{ __( 'Enregistrer', '100son-html-normalizer' ) }
-				</Button>{ ' ' }
-				<Button
-					variant="secondary"
-					isDestructive
-					onClick={ handleClear }
-					disabled={ isSaving }
-				>
-					{ __( 'Vider la note', '100son-html-normalizer' ) }
-				</Button>
+				<ReadOnlyTooltip>
+					<Button
+						variant="primary"
+						onClick={ handleSave }
+						disabled={ isSaving || ! isDirty || isReadOnly }
+						isBusy={ isSaving && isDirty }
+					>
+						{ __( 'Enregistrer', '100son-html-normalizer' ) }
+					</Button>
+				</ReadOnlyTooltip>{ ' ' }
+				<ReadOnlyTooltip>
+					<Button
+						variant="secondary"
+						isDestructive
+						onClick={ handleClear }
+						disabled={ isSaving || isReadOnly }
+					>
+						{ __( 'Vider la note', '100son-html-normalizer' ) }
+					</Button>
+				</ReadOnlyTooltip>
 				{ isDirty && (
 					<span className="htmln-notes__dirty-hint description">
 						{ __(

@@ -50,8 +50,9 @@ final class SettingsController extends BaseController {
 	 * @return void
 	 */
 	public function register_routes(): void {
-		$ns  = self::REST_NAMESPACE;
-		$cap = array( $this, 'permission_check_manage_options' );
+		$ns        = self::REST_NAMESPACE;
+		$cap       = array( $this, 'permission_check_manage_options' );
+		$can_write = array( $this, 'permission_check_locked' );
 
 		register_rest_route( $ns, '/settings/regression-thresholds', array(
 			array(
@@ -62,7 +63,7 @@ final class SettingsController extends BaseController {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'update_regression_thresholds' ),
-				'permission_callback' => $cap,
+				'permission_callback' => $can_write,
 			),
 		) );
 
@@ -75,7 +76,7 @@ final class SettingsController extends BaseController {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'update_external_sites' ),
-				'permission_callback' => $cap,
+				'permission_callback' => $can_write,
 			),
 		) );
 	}

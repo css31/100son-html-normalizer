@@ -88,8 +88,9 @@ final class PostsController extends BaseController {
 	 * @return void
 	 */
 	public function register_routes(): void {
-		$ns       = self::REST_NAMESPACE;
-		$can_read = array( $this, 'permission_check_manage_options' );
+		$ns        = self::REST_NAMESPACE;
+		$can_read  = array( $this, 'permission_check_manage_options' );
+		$can_write = array( $this, 'permission_check_locked' );
 
 		register_rest_route( $ns, '/posts/post-types', array(
 			'methods'             => 'GET',
@@ -106,7 +107,7 @@ final class PostsController extends BaseController {
 		register_rest_route( $ns, '/posts/batch-normalize', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'batch_normalize' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 
 		register_rest_route( $ns, '/posts/(?P<id>\d+)/preview', array(
@@ -118,7 +119,7 @@ final class PostsController extends BaseController {
 		register_rest_route( $ns, '/posts/(?P<id>\d+)/normalize', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'normalize' ),
-			'permission_callback' => $can_read,
+			'permission_callback' => $can_write,
 		) );
 	}
 
