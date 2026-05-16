@@ -347,7 +347,13 @@ final class DiagnosticsController extends BaseController {
 			? null
 			: $this->sanitize_string_list( $post_types_raw );
 
-		$batch = $this->runner->start_batch( $chunk_size, $post_types );
+		// Post-rc4 : scope du scan via filtres (search/cat_id/year/month/builder)
+		// + exclude_normalized. Paramètres optionnels — absents = scan corpus
+		// complet (comportement V1.0 d'origine, rétro-compat).
+		$filters            = $this->sanitize_scan_filters( $request->get_param( 'filters' ) );
+		$exclude_normalized = (bool) $request->get_param( 'exclude_normalized' );
+
+		$batch = $this->runner->start_batch( $chunk_size, $post_types, $filters, $exclude_normalized );
 
 		return $this->respond( array(
 			'job_id'         => $batch['batch_id'],
@@ -355,6 +361,63 @@ final class DiagnosticsController extends BaseController {
 			'post_ids'       => $batch['post_ids'],
 			'chunk_size'     => $batch['chunk_size'],
 		) );
+	}
+
+	/**
+	 * Sanitize les filtres de scope passés à `start_batch()`. Whitelist stricte
+	 * sur 5 clés (search, cat_id, year, month, builder) — toute autre clé
+	 * du body est ignorée silencieusement. Valeurs invalides (mauvais type,
+	 * hors plage) → clé absente du résultat plutôt qu'erreur 400, pour
+	 * permettre à la SPA d'envoyer un blob générique sans peur de casse.
+	 *
+	 * Note : `rule_ids` est volontairement non supporté (un scan applique
+	 * toutes les règles à chaque article, scoper par règle n'a pas de sens).
+	 *
+	 * @param mixed $raw Valeur brute de `$request->get_param( 'filters' )`.
+	 * @return array<string,mixed> Filtres normalisés (vide si rien d'exploitable).
+	 */
+	private function sanitize_scan_filters( mixed $raw ): array {
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+		$filters = array();
+
+		if ( isset( $raw['search'] ) && is_scalar( $raw['search'] ) ) {
+			$search = sanitize_text_field( (string) $raw['search'] );
+			if ( '' !== $search ) {
+				$filters['search'] = $search;
+			}
+		}
+
+		if ( isset( $raw['cat_id'] ) ) {
+			$cat_id = absint( $raw['cat_id'] );
+			if ( $cat_id > 0 ) {
+				$filters['cat_id'] = $cat_id;
+			}
+		}
+
+		if ( isset( $raw['year'] ) ) {
+			$year = absint( $raw['year'] );
+			if ( $year > 0 ) {
+				$filters['year'] = $year;
+			}
+		}
+
+		if ( isset( $raw['month'] ) ) {
+			$month = absint( $raw['month'] );
+			if ( $month >= 1 && $month <= 12 ) {
+				$filters['month'] = $month;
+			}
+		}
+
+		if ( isset( $raw['builder'] ) && is_scalar( $raw['builder'] ) ) {
+			$builder = sanitize_text_field( (string) $raw['builder'] );
+			if ( in_array( $builder, \Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier::ALL_TYPES, true ) ) {
+				$filters['builder'] = $builder;
+			}
+		}
+
+		return $filters;
 	}
 
 	/**

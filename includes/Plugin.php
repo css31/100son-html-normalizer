@@ -218,9 +218,10 @@ final class Plugin {
 		$normalizer      = new HtmlNormalizer( $preset_registry, $pipeline );
 		$so_detector     = new SiteOriginDetector();
 		$post_normalizer = new PostNormalizer( $normalizer, $so_detector );
-		$engine          = new DiagnosticEngine( $preset_registry, $metrics, new BuilderClassifier() );
+		$classifier      = new BuilderClassifier();
+		$engine          = new DiagnosticEngine( $preset_registry, $metrics, $classifier );
 		$diag_repo       = new DiagnosticsRepository();
-		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
+		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings, $classifier );
 		$rich_notes      = new RichNotesRepository();
 
 		return array(
@@ -263,9 +264,10 @@ final class Plugin {
 		$settings        = new SettingsRepository();
 		$preset_registry = new PresetRegistry( $settings );
 		$metrics         = new MetricsCalculator();
-		$engine          = new DiagnosticEngine( $preset_registry, $metrics, new BuilderClassifier() );
+		$classifier      = new BuilderClassifier();
+		$engine          = new DiagnosticEngine( $preset_registry, $metrics, $classifier );
 		$diag_repo       = new DiagnosticsRepository();
-		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings );
+		$batch_runner    = new DiagnosticBatchRunner( $engine, $diag_repo, $settings, $classifier );
 
 		$steps_cmd     = new StepsCommand( self::make_step_runner(), new StepsRepository() );
 		$diagnose_cmd  = new DiagnoseCommand( $batch_runner, $engine, $diag_repo );

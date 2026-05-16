@@ -210,12 +210,19 @@ export default function PaginationBar( {
 				>
 					{ __( 'Par page', '100son-html-normalizer' ) }
 				</span>
-			</div>
-
-			<div className="htmln-pagination__count">
-				<span className="displaying-num">
+				{ /* Tiret cadratin (—, U+2014) entre « Par page » et le
+				 *   compteur de l'onglet actif. Aria-hidden : pour les
+				 *   lecteurs d'écran, le compteur suit immédiatement
+				 *   « Par page » sans annoncer le séparateur graphique. */ }
+				<span
+					className="htmln-pagination__separator"
+					aria-hidden="true"
+				>
+					—
+				</span>
+				<span className="htmln-pagination__count displaying-num">
 					{ sprintf(
-						// translators: %d = nombre total d'articles.
+						// translators: %d = nombre total d'articles dans l'onglet actif.
 						__( '%d article(s)', '100son-html-normalizer' ),
 						total
 					) }

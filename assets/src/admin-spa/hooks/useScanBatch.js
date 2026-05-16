@@ -25,6 +25,12 @@
  * le scan couvre 100 % du corpus. Le résultat est exposé dans
  * `lastFinalize` et peut être affiché par la SPA (notice succincte).
  *
+ * Post-rc4 : `startScan` accepte aussi `filters` (objet : search/cat_id/year/
+ * month/builder) + `excludeNormalized` (bool). Ces paramètres scopent le
+ * scan complet (mode `/run`) — ils n'ont aucun effet en mode sélection
+ * (`explicitPostIds` fourni) puisque le scope est déjà entièrement défini
+ * par la liste d'IDs.
+ *
  * @param {(finalize?: {auto_disabled_rules: string[], fully_scanned: boolean}) => void} [onComplete]
  *                                                                                                    Callback déclenché en fin de scan réussi.
  *                                                                                                    Reçoit le payload de finalize-scan.
@@ -33,7 +39,7 @@
  *   progress: ?{processed: number, total: number},
  *   error: ?string,
  *   lastFinalize: ?{auto_disabled_rules: string[], fully_scanned: boolean},
- *   startScan: (postIds?: ?number[]) => Promise<void>,
+ *   startScan: (postIds?: ?number[], filters?: Object, excludeNormalized?: boolean) => Promise<void>,
  *   reset: () => void,
  * }}
  */
@@ -57,11 +63,17 @@ export function useScanBatch( onComplete ) {
 	/**
 	 * Lance un scan diagnostic.
 	 *
-	 * @param {?number[]} [explicitPostIds] Liste d'IDs à scanner (mode
-	 *                                      sélection) ; si null/undefined/vide → scan complet via /run.
+	 * @param {?number[]} [explicitPostIds]   Liste d'IDs à scanner (mode
+	 *                                        sélection) ; si null/undefined/vide → scan complet via /run.
+	 * @param {Object}    [filters]           Filtres optionnels (mode `/run` uniquement) : search, cat_id, year, month, builder.
+	 * @param {boolean}   [excludeNormalized] Si true, exclut les articles classés Gutenberg (mode `/run` uniquement).
 	 */
 	const startScan = useCallback(
-		async ( explicitPostIds = null ) => {
+		async (
+			explicitPostIds = null,
+			filters = {},
+			excludeNormalized = false
+		) => {
 			if ( isScanning ) {
 				return;
 			}
@@ -90,8 +102,36 @@ export function useScanBatch( onComplete ) {
 					chunkSize = SELECTION_CHUNK_SIZE;
 					total = postIds.length;
 				} else {
-					// Mode complet : énumération via /run.
-					const batch = await api.diagnostics.runBatch();
+					// Mode complet : énumération via /run, scope optionnel
+					// via `filters` + `exclude_normalized` (le serveur
+					// applique les filtres SQL natifs + post-filtre PHP via
+					// BuilderClassifier — cf. DiagnosticBatchRunner::start_batch).
+					const runBody = {};
+					if ( filters && 'object' === typeof filters ) {
+						const cleaned = {};
+						if ( filters.search ) {
+							cleaned.search = filters.search;
+						}
+						if ( filters.cat_id ) {
+							cleaned.cat_id = filters.cat_id;
+						}
+						if ( filters.year ) {
+							cleaned.year = filters.year;
+						}
+						if ( filters.month ) {
+							cleaned.month = filters.month;
+						}
+						if ( filters.builder ) {
+							cleaned.builder = filters.builder;
+						}
+						if ( Object.keys( cleaned ).length > 0 ) {
+							runBody.filters = cleaned;
+						}
+					}
+					if ( excludeNormalized ) {
+						runBody.exclude_normalized = true;
+					}
+					const batch = await api.diagnostics.runBatch( runBody );
 					total = Number( batch.total_articles ?? 0 );
 					chunkSize = Math.max( 1, Number( batch.chunk_size ?? 20 ) );
 					postIds = Array.isArray( batch.post_ids )

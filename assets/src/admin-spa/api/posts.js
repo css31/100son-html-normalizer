@@ -23,25 +23,6 @@ export const postTypes = () => get( '/posts/post-types' );
 export const scan = ( params = {} ) => get( '/posts/scan', params );
 
 /**
- * `GET /posts/<id>/preview` — aperçu avant/après sans écriture.
- *
- * @param {number} postId Identifiant article.
- * @return {Promise<{status: string, html_before: string, html_after: string, has_panels_data: boolean, metrics?: Object}>} Aperçu de la normalisation.
- */
-export const preview = ( postId ) => get( `/posts/${ postId }/preview` );
-
-/**
- * `POST /posts/<id>/normalize` — applique + crée révision avant écriture.
- * Renvoie 409 (siteorigin_detected) si panels_data sans force.
- *
- * @param {number}                       postId Identifiant article.
- * @param {{force_siteorigin?: boolean}} [body] Drapeau force pour outrepasser la garde SO.
- * @return {Promise<{status: string, revision_id?: number, has_panels_data: boolean, metrics?: Object}>} Résultat de la normalisation.
- */
-export const normalize = ( postId, body = {} ) =>
-	post( `/posts/${ postId }/normalize`, body );
-
-/**
  * `POST /posts/batch-normalize` — lot ; SO ignorés silencieusement sans force.
  *
  * @param {{ids: number[], force_siteorigin?: boolean, chunk_size?: number}} body Identifiants + force éventuelle.

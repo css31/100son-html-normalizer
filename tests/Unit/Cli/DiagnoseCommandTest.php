@@ -55,10 +55,15 @@ final class DiagnoseCommandTest extends TestCase {
 					$settings,
 				);
 			}
-			public function start_batch( ?int $chunk_size = null, ?array $post_types_override = null ): array {
+			public function start_batch(
+				?int $chunk_size = null,
+				?array $post_types_override = null,
+				array $filters = array(),
+				bool $exclude_normalized = false
+			): array {
 				return isset( $this->overrides['start_batch'] )
-					? ( $this->overrides['start_batch'] )( $chunk_size, $post_types_override )
-					: parent::start_batch( $chunk_size, $post_types_override );
+					? ( $this->overrides['start_batch'] )( $chunk_size, $post_types_override, $filters, $exclude_normalized )
+					: parent::start_batch( $chunk_size, $post_types_override, $filters, $exclude_normalized );
 			}
 			public function process_chunk( array $post_ids ): array {
 				return isset( $this->overrides['process_chunk'] )

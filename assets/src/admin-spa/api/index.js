@@ -6,7 +6,7 @@
  *   import * as api from '@admin-spa/api';
  *   await api.diagnostics.stats();
  *   await api.steps.run({ post_ids, rule_ids });
- *   await api.posts.preview( 42 );
+ *   await api.posts.scan( { post_type: [ 'post' ], page: 1 } );
  *
  * Cf. `includes/Rest/*Controller.php` côté serveur — les fonctions ici
  * suivent strictement les routes V1.0 documentées en cahier §4.5.

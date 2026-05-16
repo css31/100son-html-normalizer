@@ -18,9 +18,7 @@
  */
 
 import { useEffect, useState, useCallback } from '@wordpress/element';
-import { useDispatch } from '@wordpress/data';
 import * as api from '../api';
-import { STORE_NAME } from '../store';
 
 /**
  * @typedef {Object} PresetEntry
@@ -51,57 +49,31 @@ export function usePresets() {
 	const [ isLoading, setIsLoading ] = useState( false );
 	const [ isSaving, setIsSaving ] = useState( false );
 	const [ error, setError ] = useState( null );
-	const { removeSelectedRules } = useDispatch( STORE_NAME );
 
-	const fetchPresets = useCallback(
-		async ( signal ) => {
-			setIsLoading( true );
-			setError( null );
-			try {
-				const result = await api.presets.list();
-				if ( signal && signal.cancelled ) {
-					return;
-				}
-				const list = Array.isArray( result.presets )
-					? result.presets
-					: [];
-				setPresets( list );
-
-				// Sync sélection « Dans le lot » avec l'état backend :
-				// une règle `complete` + auto-désactivée n'est plus
-				// applicable, on la retire de la sélection persistée
-				// (localStorage) pour qu'elle disparaisse du recap et
-				// du prochain `POST /steps/run`. Si l'utilisateur
-				// réactive manuellement la règle (`enabled = true`
-				// via la SPA Règles), elle redevient cochable
-				// normalement — ce sync ne s'applique qu'aux règles
-				// effectivement auto-désactivées par le backend.
-				const completeIds = list
-					.filter(
-						( p ) =>
-							'complete' === p.completion_state &&
-							false === p.enabled
-					)
-					.map( ( p ) => p.id );
-				if ( completeIds.length > 0 ) {
-					removeSelectedRules( completeIds );
-				}
-			} catch ( err ) {
-				if ( signal && signal.cancelled ) {
-					return;
-				}
-				setError(
-					err && err.message ? String( err.message ) : 'unknown_error'
-				);
-				setPresets( [] );
-			} finally {
-				if ( ! signal || ! signal.cancelled ) {
-					setIsLoading( false );
-				}
+	const fetchPresets = useCallback( async ( signal ) => {
+		setIsLoading( true );
+		setError( null );
+		try {
+			const result = await api.presets.list();
+			if ( signal && signal.cancelled ) {
+				return;
 			}
-		},
-		[ removeSelectedRules ]
-	);
+			const list = Array.isArray( result.presets ) ? result.presets : [];
+			setPresets( list );
+		} catch ( err ) {
+			if ( signal && signal.cancelled ) {
+				return;
+			}
+			setError(
+				err && err.message ? String( err.message ) : 'unknown_error'
+			);
+			setPresets( [] );
+		} finally {
+			if ( ! signal || ! signal.cancelled ) {
+				setIsLoading( false );
+			}
+		}
+	}, [] );
 
 	useEffect( () => {
 		const signal = { cancelled: false };

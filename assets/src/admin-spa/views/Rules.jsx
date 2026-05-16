@@ -1,11 +1,11 @@
 /**
  * Rules — vue racine de l'onglet « Règles » (post-rc1).
  *
- * Liste les 16 règles R1-R16 avec, pour chacun :
- *  - une **case « Sélectionnée pour le prochain pas »** (store +
- *    `localStorage`, partagée avec la vue Normaliser ; conservée d'une
- *    session à l'autre) ;
- *  - un **toggle « Activée par défaut »** (BDD, persisté via REST) ;
+ * Liste les 16 règles R1-R16 avec, pour chacune :
+ *  - un **toggle « Activée »** (BDD, persisté via REST). Depuis 2026-05-16,
+ *    ce toggle est le **seul** contrôle : il pilote à la fois l'évaluation
+ *    par le scan ET l'application au prochain « Appliquer ce lot ». La
+ *    case « Dans le lot » + son localStorage ont été supprimés.
  *  - la **description** rendue depuis PresetRegistry (HTML serveur de
  *    confiance, `dangerouslySetInnerHTML` autorisé) ;
  *  - les **paramètres modifiables** spécifiques à la règle (R5 seuil,
@@ -14,17 +14,15 @@
  *  - un **encart Avant / Après** sur un fragment HTML factice statique
  *    qui illustre l'effet de la règle.
  *
- * Persistance :
- *  - Sélection : store `htmln/spa.selectedRules` répliqué dans
- *    `localStorage` (clé `htmln-spa.selectedRules`) → préservée d'un
- *    rechargement à l'autre. First install : toutes les règles cochées.
- *  - `enabled` + paramètres : option WP `son100_htmln_presets` via
- *    POST /presets/<id>. Cohabite avec la page V0.1 PHP — les deux
- *    écrivent dans la même clé d'option.
+ * Bulk « Tout activer / Tout désactiver » : ces deux boutons pilotent
+ * désormais le toggle « Activée » de toutes les règles en parallèle
+ * (`Promise.all(presets.map(p => save(p.id, { enabled })))`).
+ *
+ * Persistance unique : `enabled` + paramètres → option WP
+ * `son100_htmln_presets` via `POST /presets/<id>`.
  */
 
 import { __, sprintf } from '@wordpress/i18n';
-import { useSelect, useDispatch } from '@wordpress/data';
 import { useState, useCallback } from '@wordpress/element';
 import {
 	Button,
@@ -35,7 +33,7 @@ import {
 	TextareaControl,
 	ToggleControl,
 } from '@wordpress/components';
-import { STORE_NAME, ALL_RULE_IDS } from '../store';
+import { ALL_RULE_IDS } from '../store';
 import { usePresets } from '../hooks/usePresets';
 import {
 	getRuleLabel,
@@ -121,12 +119,6 @@ const RULE_EXAMPLES = {
  */
 export default function Rules() {
 	const { presets, isLoading, isSaving, error, save } = usePresets();
-	const selectedRules = useSelect(
-		( select ) => select( STORE_NAME ).getSelectedRules(),
-		[]
-	);
-	const { toggleSelectedRule, selectAllRules, deselectAllRules } =
-		useDispatch( STORE_NAME );
 
 	const handleToggleEnabled = useCallback(
 		( id, checked ) => save( id, { enabled: checked } ).catch( () => {} ),
@@ -136,6 +128,30 @@ export default function Rules() {
 	const handleSaveParams = useCallback(
 		( id, partial ) => save( id, { params: partial } ).catch( () => {} ),
 		[ save ]
+	);
+
+	// Bulk activer/désactiver — post-2026-05-16 : ces boutons pilotent
+	// désormais le toggle « Activée » (et plus la case « Dans le lot »
+	// supprimée). N appels REST `POST /presets/<id>` en parallèle via
+	// `Promise.all`, un par règle. Acceptable pour 16 règles ; si la
+	// latence devient gênante, un endpoint bulk `POST /presets/bulk-toggle`
+	// pourrait être ajouté côté backend (cf. discussion design).
+	const handleBulkSetEnabled = useCallback(
+		( targetEnabled ) => {
+			if ( ! Array.isArray( presets ) ) {
+				return;
+			}
+			Promise.all(
+				presets
+					.filter( ( p ) => Boolean( p.enabled ) !== targetEnabled )
+					.map( ( p ) =>
+						save( p.id, { enabled: targetEnabled } ).catch(
+							() => {}
+						)
+					)
+			);
+		},
+		[ presets, save ]
 	);
 
 	if ( isLoading && null === presets ) {
@@ -164,8 +180,11 @@ export default function Rules() {
 		);
 	}
 
-	const selectedCount = selectedRules.length;
-	const totalCount = ALL_RULE_IDS.length;
+	const presetsList = Array.isArray( presets ) ? presets : [];
+	const enabledCount = presetsList.filter( ( p ) =>
+		Boolean( p.enabled )
+	).length;
+	const totalCount = presetsList.length || ALL_RULE_IDS.length;
 
 	return (
 		<div className="htmln-rules">
@@ -173,7 +192,7 @@ export default function Rules() {
 				<h2>{ __( 'Règles', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						'Les 16 règles du pipeline de normalisation. Pour chaque règle : la case « Sélectionnée » pilote le prochain lot et reste conservée d’une session à l’autre (stockage local du navigateur). Le toggle « Activée par défaut » et les paramètres sont persistés en base et partagés avec la page « Règles » (V0.1).',
+						"Les 16 règles du pipeline de normalisation. Le toggle « Activée » détermine si la règle est évaluée par le scan ET appliquée au prochain « Appliquer ce lot ». Les paramètres et l'état activé sont persistés en base.",
 						'100son-html-normalizer'
 					) }
 				</p>
@@ -195,29 +214,29 @@ export default function Rules() {
 			<div className="htmln-rules__toolbar">
 				<span className="htmln-rules__count">
 					{ sprintf(
-						// translators: 1 = sélectionnées, 2 = total.
+						// translators: 1 = règles activées, 2 = total.
 						__(
-							'%1$d / %2$d règles sélectionnées pour le prochain lot',
+							'%1$d / %2$d règles activées',
 							'100son-html-normalizer'
 						),
-						selectedCount,
+						enabledCount,
 						totalCount
 					) }
 				</span>
 				<div className="htmln-rules__toolbar-actions">
 					<Button
 						variant="secondary"
-						onClick={ selectAllRules }
-						disabled={ selectedCount === totalCount }
+						onClick={ () => handleBulkSetEnabled( true ) }
+						disabled={ isSaving || enabledCount === totalCount }
 					>
-						{ __( 'Tout cocher', '100son-html-normalizer' ) }
+						{ __( 'Tout activer', '100son-html-normalizer' ) }
 					</Button>{ ' ' }
 					<Button
 						variant="secondary"
-						onClick={ deselectAllRules }
-						disabled={ selectedCount === 0 }
+						onClick={ () => handleBulkSetEnabled( false ) }
+						disabled={ isSaving || enabledCount === 0 }
 					>
-						{ __( 'Tout décocher', '100son-html-normalizer' ) }
+						{ __( 'Tout désactiver', '100son-html-normalizer' ) }
 					</Button>
 				</div>
 			</div>
@@ -235,11 +254,7 @@ export default function Rules() {
 						<RuleCard
 							key={ preset.id }
 							preset={ preset }
-							isSelected={ selectedRules.includes( preset.id ) }
 							isSaving={ isSaving }
-							onToggleSelected={ () =>
-								toggleSelectedRule( preset.id )
-							}
 							onToggleEnabled={ ( checked ) =>
 								handleToggleEnabled( preset.id, checked )
 							}
@@ -257,22 +272,13 @@ export default function Rules() {
  * Carte d'une règle individuelle.
  *
  * @param {Object}                     props
- * @param {Object}                     props.preset           Entrée PresetEntry (cf. usePresets).
- * @param {boolean}                    props.isSelected       Cochée pour le prochain pas ?
- * @param {boolean}                    props.isSaving         Vrai pendant un POST.
- * @param {() => void}                 props.onToggleSelected Bascule la sélection éphémère.
- * @param {(checked: boolean) => void} props.onToggleEnabled  Toggle enabled.
- * @param {(partial: Object) => void}  props.onSaveParams     Save params partiels.
+ * @param {Object}                     props.preset          Entrée PresetEntry (cf. usePresets).
+ * @param {boolean}                    props.isSaving        Vrai pendant un POST.
+ * @param {(checked: boolean) => void} props.onToggleEnabled Toggle enabled (pilote scan + apply lot).
+ * @param {(partial: Object) => void}  props.onSaveParams    Save params partiels.
  * @return {JSX.Element} Carte.
  */
-function RuleCard( {
-	preset,
-	isSelected,
-	isSaving,
-	onToggleSelected,
-	onToggleEnabled,
-	onSaveParams,
-} ) {
+function RuleCard( { preset, isSaving, onToggleEnabled, onSaveParams } ) {
 	const example = RULE_EXAMPLES[ preset.id ] ?? null;
 
 	// État de complétion (cf. PresetsController::preset_to_array) :
@@ -324,13 +330,6 @@ function RuleCard( {
 					/>
 				</div>
 				<div className="htmln-rule__actions">
-					<CheckboxControl
-						label={ __( 'Dans le lot', '100son-html-normalizer' ) }
-						checked={ isSelected && ! isLocked }
-						onChange={ onToggleSelected }
-						disabled={ isLocked }
-						__nextHasNoMarginBottom
-					/>
 					<ToggleControl
 						label={ __( 'Activée', '100son-html-normalizer' ) }
 						checked={ preset.enabled }

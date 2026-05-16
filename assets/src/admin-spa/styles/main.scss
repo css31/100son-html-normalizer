@@ -259,15 +259,21 @@
 	min-width: 70px;
 }
 
+/* Compteur d'articles — depuis 2026-05-16, rendu inline dans
+ * `.htmln-pagination__per-page` après un tiret cadratin (—), donc plus
+ * besoin de `flex: 1 1 auto` ni de `text-align: center`. Les propriétés
+ * de couleur/taille restent pour la cohérence visuelle avec « Par page ». */
 .htmln-pagination__count {
-	flex: 1 1 auto;
-	text-align: center;
 	color: var( --htmln-text-muted );
 	font-size: 13px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
+	white-space: nowrap;
+}
+
+/* Tiret cadratin entre « Par page » et le compteur de l'onglet actif. */
+.htmln-pagination__separator {
+	color: var( --htmln-text-faint );
+	font-size: 13px;
+	user-select: none;
 }
 
 .htmln-pagination__nav {
@@ -741,6 +747,19 @@
 	color: var( --htmln-text-muted );
 	font-family: SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: 12px;
+}
+
+/* Bandeau de rappel « sauvegarde recommandée » au-dessus du bouton
+ * « Appliquer ce lot » dès que selectedPostCount >= LARGE_LOT_THRESHOLD.
+ * La Notice WP a un margin natif large (16px top/bottom) qu'on resserre
+ * ici pour ne pas casser la compacité de la barre apply. La largeur est
+ * forcée à 100 % pour s'aligner sur le wrapper flex parent qui aligne
+ * les boutons à droite via `align-items: flex-end`. */
+.htmln-normalize__backup-reminder {
+	&.components-notice {
+		margin: 0 0 8px;
+		width: 100%;
+	}
 }
 
 /* =============================================================================
@@ -2303,24 +2322,6 @@
 			color: var( --htmln-text );
 			background: var( --htmln-bg-subtle );
 		}
-	}
-}
-
-.htmln-tabs__count {
-	background: var( --htmln-bg-subtle );
-	border: 1px solid var( --htmln-border );
-	border-radius: 999px;
-	padding: 1px 8px;
-	font-size: 11px;
-	font-weight: 600;
-	color: var( --htmln-text-muted );
-	min-width: 22px;
-	text-align: center;
-
-	.htmln-tabs button[aria-selected='true'] & {
-		background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
-		border-color: transparent;
-		color: #fff;
 	}
 }
 

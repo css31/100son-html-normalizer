@@ -21,13 +21,7 @@
  * sélecteurs sont disponibles dès le premier render.
  */
 
-import { createReduxStore, register, select, subscribe } from '@wordpress/data';
-
-/**
- * Clé localStorage pour la sélection persistée des règles. Préfixée pour
- * éviter toute collision avec d'autres plugins WP sur le même domaine.
- */
-const SELECTED_RULES_STORAGE_KEY = 'htmln-spa.selectedRules';
+import { createReduxStore, register } from '@wordpress/data';
 
 /**
  * Identifiant du store. Exporté pour pouvoir l'utiliser dans
@@ -39,13 +33,13 @@ export const STORE_NAME = 'htmln/spa';
  * État initial — toutes les valeurs `null` signalent « pas encore chargé »
  * et permettent aux vues d'afficher un skeleton/loader avant le premier fetch.
  *
- * `selectedRules` est **persisté dans `localStorage`** (clé
- * `htmln-spa.selectedRules`) depuis post-rc4. Au premier chargement, la
- * sélection précédemment cochée est restaurée via `loadPersistedSelectedRules()`.
- * Si aucune sélection n'a jamais été stockée (first install / localStorage
- * indisponible), on retombe sur la liste complète R1..R16. Toute mutation
- * (toggle / selectAll / deselectAll) est répliquée dans `localStorage` par
- * la souscription du store en bas de ce module.
+ * Post-2026-05-16 : `selectedRules` (ancienne sélection « Dans le lot »
+ * locale au navigateur) a été supprimée du store. Le toggle « Activée »
+ * de chaque règle (persisté en BDD via l'option `son100_htmln_presets`)
+ * est désormais le **seul** flag — il pilote à la fois l'évaluation par
+ * le scan ET l'application au prochain lot. Les vues consomment
+ * `usePresets().presets` filtrées sur `enabled = true` pour reconstituer
+ * la liste des règles applicables.
  *
  * `normalizeView` est éphémère (perdu au reload) mais survit au
  * changement d'onglet primaire de l'App (`App.jsx` monte/démonte les vues —
@@ -62,7 +56,6 @@ export const STORE_NAME = 'htmln/spa';
  * @property {?{normal: number, to_improve: number, stale: number, total: number}} diagnosticsStats     Compteurs F13 onglets (null = pas encore chargé).
  * @property {?{uuid: string, progress?: Object}}                                  currentStep          Pas F14 en cours (null = aucun pas actif).
  * @property {?Object<string, number>}                                             regressionThresholds Seuils γ courants (Settings 6.7).
- * @property {string[]}                                                            selectedRules        Sélection éphémère des règles à appliquer au prochain pas.
  * @property {NormalizeViewState}                                                  normalizeView        État de l'onglet Normaliser persistant au switch d'onglets primaires.
  */
 
@@ -110,67 +103,10 @@ const DEFAULT_NORMALIZE_VIEW = {
 	selectedPostIds: [],
 };
 
-/**
- * Lit la sélection persistée depuis `localStorage`. Filtre les IDs inconnus
- * (cas où une règle a été supprimée entre deux versions) et préserve
- * l'ordre canonique. Retombe sur la liste complète si :
- *  - `window.localStorage` indisponible (SSR, mode privé restreint, etc.),
- *  - aucune entrée stockée (first install),
- *  - JSON invalide (corruption),
- *  - tableau vide stocké ?  → non, on respecte le choix « rien sélectionné ».
- *
- * @return {string[]} Liste des IDs cochés.
- */
-function loadPersistedSelectedRules() {
-	if ( 'undefined' === typeof window || ! window.localStorage ) {
-		return [ ...ALL_RULE_IDS ];
-	}
-	try {
-		const raw = window.localStorage.getItem( SELECTED_RULES_STORAGE_KEY );
-		if ( null === raw ) {
-			return [ ...ALL_RULE_IDS ];
-		}
-		const parsed = JSON.parse( raw );
-		if ( ! Array.isArray( parsed ) ) {
-			return [ ...ALL_RULE_IDS ];
-		}
-		// On respecte un tableau vide (utilisateur a tout décoché volontairement),
-		// mais on filtre les IDs inconnus et on rétablit l'ordre canonique.
-		return ALL_RULE_IDS.filter( ( id ) => parsed.includes( id ) );
-	} catch ( err ) {
-		return [ ...ALL_RULE_IDS ];
-	}
-}
-
-/**
- * Persiste la sélection dans `localStorage`. Silencieuse en cas de
- * quota dépassé ou de stockage désactivé — la persistance est un
- * confort, pas une garantie fonctionnelle.
- *
- * @param {string[]} ruleIds Sélection à sauvegarder.
- * @return {void}
- */
-function persistSelectedRules( ruleIds ) {
-	if ( 'undefined' === typeof window || ! window.localStorage ) {
-		return;
-	}
-	try {
-		window.localStorage.setItem(
-			SELECTED_RULES_STORAGE_KEY,
-			JSON.stringify( ruleIds )
-		);
-	} catch ( err ) {
-		// QuotaExceededError, SecurityError (mode privé Safari, etc.) :
-		// no-op. L'utilisateur reverra la sélection complète au prochain
-		// reload, c'est acceptable.
-	}
-}
-
 const DEFAULT_STATE = {
 	diagnosticsStats: null,
 	currentStep: null,
 	regressionThresholds: null,
-	selectedRules: loadPersistedSelectedRules(),
 	normalizeView: { ...DEFAULT_NORMALIZE_VIEW },
 	// Mode de session courant — alimenté par <SessionGate>. `null` tant que
 	// le premier acquire n'a pas répondu, `'primary'` quand on détient le
@@ -210,59 +146,6 @@ const actions = {
 	 */
 	setRegressionThresholds( thresholds ) {
 		return { type: 'SET_REGRESSION_THRESHOLDS', thresholds };
-	},
-
-	/**
-	 * Remplace la sélection de règles pour le prochain pas. Les ids
-	 * inconnus sont filtrés silencieusement, l'ordre canonique est
-	 * préservé pour cohérence d'affichage.
-	 *
-	 * @param {string[]} ruleIds Liste candidate.
-	 */
-	setSelectedRules( ruleIds ) {
-		return { type: 'SET_SELECTED_RULES', ruleIds };
-	},
-
-	/**
-	 * Bascule l'état d'un id dans la sélection. Ajoute s'il est absent,
-	 * retire s'il est présent.
-	 *
-	 * @param {string} ruleId Identifiant R1..R12.
-	 */
-	toggleSelectedRule( ruleId ) {
-		return { type: 'TOGGLE_SELECTED_RULE', ruleId };
-	},
-
-	/**
-	 * Coche les 11 règles canoniques.
-	 */
-	selectAllRules() {
-		return { type: 'SET_SELECTED_RULES', ruleIds: [ ...ALL_RULE_IDS ] };
-	},
-
-	/**
-	 * Décoche toutes les règles. Le bouton « Appliquer ce pas » sera
-	 * désactivé en aval tant que la sélection est vide.
-	 */
-	deselectAllRules() {
-		return { type: 'SET_SELECTED_RULES', ruleIds: [] };
-	},
-
-	/**
-	 * Retire un sous-ensemble d'IDs de la sélection courante (sans toucher
-	 * aux autres). Utilisé pour synchroniser la sélection avec l'état
-	 * backend : quand une règle bascule à `completion_state === 'complete'`
-	 * et est auto-désactivée (`enabled === false`), elle ne doit plus
-	 * apparaître dans le « lot » du prochain pas — `usePresets` dispatch
-	 * cette action après chaque fetch.
-	 *
-	 * No-op si `ruleIds` est vide ou si aucun ID ne matche la sélection
-	 * actuelle (économise un re-render et une écriture localStorage).
-	 *
-	 * @param {string[]} ruleIds IDs à retirer.
-	 */
-	removeSelectedRules( ruleIds ) {
-		return { type: 'REMOVE_SELECTED_RULES', ruleIds };
 	},
 
 	/**
@@ -346,29 +229,6 @@ function reducer( state = DEFAULT_STATE, action ) {
 			return { ...state, diagnosticsStats: action.stats };
 		case 'SET_REGRESSION_THRESHOLDS':
 			return { ...state, regressionThresholds: action.thresholds };
-		case 'SET_SELECTED_RULES': {
-			const candidates = Array.isArray( action.ruleIds )
-				? action.ruleIds
-				: [];
-			// Filtre les ids inconnus + préserve l'ordre canonique.
-			const filtered = ALL_RULE_IDS.filter( ( id ) =>
-				candidates.includes( id )
-			);
-			return { ...state, selectedRules: filtered };
-		}
-		case 'TOGGLE_SELECTED_RULE': {
-			const id = String( action.ruleId );
-			if ( ! ALL_RULE_IDS.includes( id ) ) {
-				return state;
-			}
-			const present = state.selectedRules.includes( id );
-			const next = present
-				? state.selectedRules.filter( ( r ) => r !== id )
-				: ALL_RULE_IDS.filter(
-						( r ) => state.selectedRules.includes( r ) || r === id
-				  );
-			return { ...state, selectedRules: next };
-		}
 		case 'SET_NORMALIZE_VIEW': {
 			const patch =
 				action.patch && 'object' === typeof action.patch
@@ -439,21 +299,6 @@ function reducer( state = DEFAULT_STATE, action ) {
 				...state,
 				normalizeView: { ...state.normalizeView, selectedPostIds: [] },
 			};
-		case 'REMOVE_SELECTED_RULES': {
-			const toRemove = new Set(
-				Array.isArray( action.ruleIds ) ? action.ruleIds : []
-			);
-			if ( 0 === toRemove.size ) {
-				return state;
-			}
-			const next = state.selectedRules.filter(
-				( id ) => ! toRemove.has( id )
-			);
-			if ( next.length === state.selectedRules.length ) {
-				return state;
-			}
-			return { ...state, selectedRules: next };
-		}
 		case 'SET_SESSION_MODE': {
 			const mode =
 				'primary' === action.mode || 'secondary' === action.mode
@@ -503,15 +348,6 @@ const selectors = {
 	getRegressionThresholds: ( state ) => state.regressionThresholds,
 
 	/**
-	 * Sélection éphémère de règles pour le prochain pas (R1..R12 par
-	 * défaut). Partagée entre l'onglet Règles et la vue Normaliser.
-	 *
-	 * @param {HtmlnSpaState} state État du store.
-	 * @return {string[]} Liste dans l'ordre canonique.
-	 */
-	getSelectedRules: ( state ) => state.selectedRules,
-
-	/**
 	 * État de la vue Normaliser (tab/page/perPage/filters/selectedPostIds).
 	 * Préservé au switch d'onglets primaires de l'App ; perdu au reload.
 	 *
@@ -544,27 +380,5 @@ export const storeConfig = {
 const store = createReduxStore( STORE_NAME, storeConfig );
 
 register( store );
-
-/**
- * Souscription : recopie `selectedRules` dans `localStorage` à chaque
- * changement de référence. Le test d'égalité référentielle suffit car le
- * reducer retourne toujours un nouveau tableau quand la sélection bouge —
- * voir `SET_SELECTED_RULES` / `TOGGLE_SELECTED_RULE`. Les autres actions
- * touchant l'état (currentStep, normalizeView, etc.) ne déclenchent pas
- * d'écriture inutile grâce à ce test.
- */
-( () => {
-	if ( 'undefined' === typeof window || ! window.localStorage ) {
-		return;
-	}
-	let prev = select( STORE_NAME ).getSelectedRules();
-	subscribe( () => {
-		const next = select( STORE_NAME ).getSelectedRules();
-		if ( next !== prev ) {
-			persistSelectedRules( next );
-			prev = next;
-		}
-	}, STORE_NAME );
-} )();
 
 export { store };

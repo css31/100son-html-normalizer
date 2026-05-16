@@ -4,16 +4,22 @@
  * Phase 6.3 : F13 (3 onglets + tableau paginé).
  * Phase 6.4 : F14 (sélection articles + sidebar règles + bandeaux + beforeunload).
  * Phase 6.5 : modales DiffModal + RegressionModal.
- * Post-rc1  : sidebar des règles **retirée**, déplacée dans l'onglet Règles
- *             dédié. La sélection des règles est désormais dans le store
- *             `htmln/spa.selectedRules` (partagée entre onglets).
+ * Post-rc1   : sidebar des règles **retirée**, déplacée dans l'onglet Règles
+ *              dédié.
+ * 2026-05-16 : fusion finale des concepts « Activée » et « Dans le lot ».
+ *              Le toggle « Activée » de chaque règle pilote désormais
+ *              à la fois l'évaluation par le scan ET l'application au
+ *              prochain « Appliquer ce lot ». La sélection éphémère
+ *              localStorage (`selectedRules`) a été supprimée du store.
+ *              `applicableRules` est dérivé à la volée de
+ *              `usePresets().presets` filtrés sur `enabled = true`.
  *
  * Layout post-rc4 :
  *
  *   ┌──────────────────────────────────────────────────┐
  *   │ ScanBar       [ Scanner… ]   hint                │
  *   │ ApplyStepBar  [ Appliquer ce lot à K articles ]  │
- *   │               N/11 règles sélectionnées — R1, …   │
+ *   │               N/16 règles activées — R1, …       │
  *   │ FiltersBar    (search, cat, year, …, rules)      │
  *   │ TabsHeader                                       │
  *   │ StepResumeBanner (si lot non-finalisé en BDD)    │
@@ -30,8 +36,6 @@
  *    Persistant au switch d'onglets primaires de l'App (sans store, le
  *    démontage de la vue lors d'un aller-retour `#/notes` ou `#/settings`
  *    réinitialiserait toute la configuration courante).
- *  - `selectedRules`  — règles cochées (F14.2). Toutes par défaut.
- *    Éditable depuis l'onglet Règles.
  *
  * Hooks composés :
  *  - `useDiagnosticsStats` (F13 compteurs onglets).
@@ -43,7 +47,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { useState, useCallback, useEffect, useMemo } from '@wordpress/element';
 import { useSelect, useDispatch } from '@wordpress/data';
-import { Button } from '@wordpress/components';
+import { Button, Notice } from '@wordpress/components';
 import { useIsReadOnly } from '../hooks/useSession';
 import ReadOnlyTooltip from '../components/ReadOnlyTooltip';
 import TabsHeader from './Normalize/TabsHeader';
@@ -68,6 +72,14 @@ import { formatRuleIdList } from '../utils/ruleLabels';
 // Les defaults (tab `to_improve`, perPage 50, page 1, filtres vides, aucune
 // sélection) vivent désormais dans `store/index.js > DEFAULT_NORMALIZE_VIEW`
 // pour survivre au mount/unmount provoqué par le routeur hash de `App.jsx`.
+
+// Seuil au-delà duquel `ApplyStepBar` affiche un bandeau de rappel
+// « sauvegarde recommandée » au-dessus du bouton « Appliquer ce lot ».
+// En-dessous (lots de test, ajustements ponctuels), le bandeau reste
+// silencieux pour éviter la friction. Choix éditorial : 10 — au-delà,
+// la portée d'un éventuel rollback manuel via les révisions WP devient
+// fastidieuse (10 articles à comparer un par un).
+const LARGE_LOT_THRESHOLD = 10;
 
 /**
  * @return {JSX.Element} Vue Normalize complète.
@@ -99,55 +111,55 @@ export default function Normalize() {
 		[ view.selectedPostIds ]
 	);
 
-	// Sélection des règles : lue depuis le store (alimentée par l'onglet Règles).
-	const selectedRules = useSelect(
-		( select ) => select( STORE_NAME ).getSelectedRules(),
-		[]
-	);
-
-	// Fetch des presets : sert deux objectifs depuis cette vue.
-	//   1) Déclenche la sync `removeSelectedRules(complete+!enabled)` même
-	//      si l'utilisateur ne visite jamais l'onglet Règles — sinon une
-	//      règle auto-désactivée par le backend resterait dans la sélection
-	//      localStorage et apparaîtrait dans le recap « N / 16 règles ».
-	//   2) Donne la liste des règles complètes pour le filtre défensif
-	//      ci-dessous dans `handleApplyStep` au cas où le sync n'a pas
-	//      encore tourné au moment du clic (premier render avant fetch).
-	const { presets: presetsList } = usePresets();
-	const completeRuleIds = useMemo( () => {
-		if ( ! Array.isArray( presetsList ) ) {
-			return new Set();
+	// Scope du scan — post-rc4. Trois axes cumulables :
+	//   - sélection d'articles (cochés dans le tableau) : priorité 1, court-circuite filtres + exclude_normalized.
+	//   - filtres FiltersBar actifs (cat/year/month/builder/search) : si présents, scope le scan complet.
+	//   - exclude_normalized (checkbox) : retire les articles classés Gutenberg.
+	// `hasActiveFilters` détecte au moins un filtre non-trivial pour piloter
+	// le libellé bouton de ScanBar (« Scanner les articles filtrés » vs « Scanner le corpus »).
+	const [ excludeNormalized, setExcludeNormalized ] = useState( false );
+	const hasActiveFilters = useMemo( () => {
+		if ( ! filters || 'object' !== typeof filters ) {
+			return false;
 		}
-		return new Set(
-			presetsList
-				.filter(
-					( p ) =>
-						'complete' === p.completion_state && false === p.enabled
-				)
-				.map( ( p ) => p.id )
+		const search = String( filters.search ?? '' ).trim();
+		return (
+			'' !== search ||
+			Number( filters.cat_id ) > 0 ||
+			Number( filters.year ) > 0 ||
+			Number( filters.month ) > 0 ||
+			'' !== String( filters.builder ?? '' )
 		);
-	}, [ presetsList ] );
+	}, [ filters ] );
 
-	// Vue dérivée : sélection moins les règles complètes auto-désactivées.
-	// Utilisée à la fois pour le recap (« N / 16 règles sélectionnées — R3,
-	// R4 ») et pour le payload envoyé à `POST /steps/run`. Garantit la
-	// cohérence affichage / action.
-	const applicableRules = useMemo(
-		() => selectedRules.filter( ( id ) => ! completeRuleIds.has( id ) ),
-		[ selectedRules, completeRuleIds ]
-	);
+	// Règles applicables au prochain « Appliquer ce lot » : depuis 2026-05-16,
+	// le toggle « Activée » de chaque règle pilote à la fois l'évaluation par
+	// le scan et l'application au lot — fini la dualité « Dans le lot » /
+	// « Activée ». La liste est donc dérivée directement des presets
+	// `enabled = true` (ordre canonique préservé par PresetRegistry côté
+	// serveur). Vide tant que `usePresets()` n'a pas résolu son premier fetch.
+	const { presets: presetsList } = usePresets();
+	const applicableRules = useMemo( () => {
+		if ( ! Array.isArray( presetsList ) ) {
+			return [];
+		}
+		return presetsList
+			.filter( ( p ) => Boolean( p.enabled ) )
+			.map( ( p ) => p.id );
+	}, [ presetsList ] );
 
 	// Domaines externes (Old / Prod) — pour les boutons d'ouverture par ligne
 	// dans le tableau. On consomme `sites` en lecture seule ; la persistance
 	// est gérée depuis l'onglet Réglages.
 	const { sites: externalSites } = useExternalSites();
 
-	const {
-		stats,
-		isLoading: isStatsLoading,
-		error: statsError,
-		refetch: refetchStats,
-	} = useDiagnosticsStats();
+	// `stats` et `isLoading` ne sont plus consommés depuis 2026-05-16 : les
+	// compteurs par onglet ne s'affichent plus dans `<TabsHeader>`. Le total
+	// affiché à côté de « Par page » provient de `useDiagnosticsList()` qui
+	// reflète l'état filtré courant. On garde le hook pour son `refetch()`
+	// déclenché côté code après chaque scan/lot, et `statsError` pour la
+	// notice utilisateur en cas d'échec du fetch.
+	const { error: statsError, refetch: refetchStats } = useDiagnosticsStats();
 
 	const {
 		facets,
@@ -314,14 +326,25 @@ export default function Normalize() {
 					error={ scanError }
 					disabled={ isRunning }
 					selectedPostCount={ selectedPostIds.size }
+					hasActiveFilters={ hasActiveFilters }
+					excludeNormalized={ excludeNormalized }
+					onToggleExcludeNormalized={ setExcludeNormalized }
 					lastFinalize={ scanLastFinalize }
-					onScan={ () =>
-						startScan(
-							selectedPostIds.size > 0
-								? Array.from( selectedPostIds )
-								: null
-						)
-					}
+					onScan={ () => {
+						// Trois modes mutuellement exclusifs :
+						//   - sélection (cochés) : `filters` + `excludeNormalized` ignorés serveur-side (mode chunk direct).
+						//   - filtres + exclude_normalized : scope du scan complet via `/run`.
+						//   - corpus complet : aucun param de scope.
+						const hasSelection = selectedPostIds.size > 0;
+						const postIds = hasSelection
+							? Array.from( selectedPostIds )
+							: null;
+						const runFilters = hasSelection ? {} : filters;
+						const runExcludeNormalized = hasSelection
+							? false
+							: excludeNormalized;
+						startScan( postIds, runFilters, runExcludeNormalized );
+					} }
 					onDismissError={ dismissScanError }
 					onDismissFinalize={ dismissScanError }
 				/>
@@ -342,8 +365,6 @@ export default function Normalize() {
 			/>
 
 			<TabsHeader
-				stats={ stats }
-				isLoading={ isStatsLoading }
 				currentTab={ currentTab }
 				onChangeTab={ handleChangeTab }
 			/>
@@ -393,7 +414,7 @@ export default function Normalize() {
 				<DiffModal
 					postId={ diffPostId }
 					postTitle={ diffPostTitle }
-					ruleIds={ selectedRules }
+					ruleIds={ applicableRules }
 					onClose={ handleCloseDiff }
 				/>
 			) }
@@ -402,7 +423,7 @@ export default function Normalize() {
 			{ regressionPending && (
 				<RegressionModal
 					pending={ regressionPending }
-					ruleIds={ selectedRules }
+					ruleIds={ applicableRules }
 					onDecision={ confirmDecision }
 				/>
 			) }
@@ -436,6 +457,13 @@ function ApplyStepBar( {
 	const ruleCount = selectedRules.length;
 	const totalRules = ALL_RULE_IDS.length;
 	const canApply = ! disabled && ruleCount > 0 && selectedPostCount > 0;
+	// Bandeau de rappel « sauvegarde » au-dessus du bouton dès que le lot
+	// atteint LARGE_LOT_THRESHOLD articles. Silencieux en-dessous (lots de
+	// test, ajustements ponctuels). Non bloquant, non dismissible — purement
+	// informatif. Le plugin lui-même ne fait pas de backup BDD (seules les
+	// révisions WP natives sont créées via `wp_save_post_revision()` avant
+	// chaque écriture, cf. StepRunner.php).
+	const isLargeLot = selectedPostCount >= LARGE_LOT_THRESHOLD;
 
 	const goToRules = useCallback( ( event ) => {
 		event.preventDefault();
@@ -443,51 +471,84 @@ function ApplyStepBar( {
 	}, [] );
 
 	return (
-		<div className="htmln-normalize__apply-bar">
-			<div className="htmln-normalize__apply-bar-action">
-				<ReadOnlyTooltip>
-					<Button
-						variant="primary"
-						onClick={ onApplyStep }
-						disabled={ ! canApply || isReadOnly }
-					>
+		<>
+			{ isLargeLot && (
+				<Notice
+					status="warning"
+					isDismissible={ false }
+					className="htmln-normalize__backup-reminder"
+				>
+					<strong>
 						{ sprintf(
-							// translators: %d = nombre d'articles cochés.
+							// translators: %d = nombre d'articles concernés par le lot.
 							__(
-								'Appliquer ce lot à %d article(s)',
+								'Lot important : %d articles.',
 								'100son-html-normalizer'
 							),
 							selectedPostCount
 						) }
-					</Button>
-				</ReadOnlyTooltip>
-			</div>
-			<div className="htmln-normalize__apply-bar-recap">
-				<strong>
-					{ sprintf(
-						// translators: 1 = règles sélectionnées, 2 = total.
-						__(
-							'%1$d / %2$d règles sélectionnées',
+					</strong>{ ' ' }
+					{ __(
+						'WordPress enregistre automatiquement une révision avant chaque modification (visible dans l’éditeur de chaque article via « Comparer les révisions »).',
+						'100son-html-normalizer'
+					) }{ ' ' }
+					<strong>
+						{ __(
+							'Avant un lot de cette taille, nous recommandons fortement une sauvegarde complète de la base de données via votre solution habituelle (UpdraftPlus, BackWPup, snapshot hébergeur, mysqldump…).',
 							'100son-html-normalizer'
-						),
-						ruleCount,
-						totalRules
+						) }
+					</strong>
+				</Notice>
+			) }
+			<div className="htmln-normalize__apply-bar">
+				<div className="htmln-normalize__apply-bar-action">
+					<ReadOnlyTooltip>
+						<Button
+							variant="primary"
+							onClick={ onApplyStep }
+							disabled={ ! canApply || isReadOnly }
+						>
+							{ sprintf(
+								// translators: %d = nombre d'articles cochés.
+								__(
+									'Appliquer ce lot à %d article(s)',
+									'100son-html-normalizer'
+								),
+								selectedPostCount
+							) }
+						</Button>
+					</ReadOnlyTooltip>
+				</div>
+				<div className="htmln-normalize__apply-bar-recap">
+					<strong>
+						{ sprintf(
+							// translators: 1 = règles activées, 2 = total.
+							__(
+								'%1$d / %2$d règles activées',
+								'100son-html-normalizer'
+							),
+							ruleCount,
+							totalRules
+						) }
+					</strong>
+					{ ruleCount > 0 && (
+						<>
+							{ ' — ' }
+							<span className="htmln-normalize__apply-bar-rules">
+								{ formatRuleIdList( selectedRules ) }
+							</span>
+						</>
 					) }
-				</strong>
-				{ ruleCount > 0 && (
-					<>
-						{ ' — ' }
-						<span className="htmln-normalize__apply-bar-rules">
-							{ formatRuleIdList( selectedRules ) }
-						</span>
-					</>
-				) }
-				{ ' (' }
-				<a href="#/rules" onClick={ goToRules }>
-					{ __( 'modifier dans Règles', '100son-html-normalizer' ) }
-				</a>
-				{ ')' }
+					{ ' (' }
+					<a href="#/rules" onClick={ goToRules }>
+						{ __(
+							'modifier dans Règles',
+							'100son-html-normalizer'
+						) }
+					</a>
+					{ ')' }
+				</div>
 			</div>
-		</div>
+		</>
 	);
 }

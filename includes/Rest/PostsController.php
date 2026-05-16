@@ -58,22 +58,8 @@ final class PostsController extends BaseController {
 	public const DEFAULT_PER_PAGE = 50;
 
 	/**
-	 * Mapping statuts terminaux PostNormalizer → code HTTP.
-	 *
-	 * @var array<string, int>
-	 */
-	private const STATUS_TO_HTTP = array(
-		PostNormalizer::STATUS_MODIFIED         => 200,
-		PostNormalizer::STATUS_UNCHANGED        => 200,
-		PostNormalizer::STATUS_SKIPPED_SO       => 409,
-		PostNormalizer::STATUS_ERROR_NOT_FOUND  => 404,
-		PostNormalizer::STATUS_ERROR_PERMISSION => 403,
-		PostNormalizer::STATUS_ERROR_WRITE      => 500,
-	);
-
-	/**
 	 * @param SettingsRepository $settings    Source des post_types F8 par défaut.
-	 * @param PostNormalizer     $normalizer  Service preview + normalize_post.
+	 * @param PostNormalizer     $normalizer  Service normalize_post (utilisé par batch_normalize).
 	 * @param SiteOriginDetector $so_detector Détection panels_data côté listing.
 	 */
 	public function __construct(
@@ -83,7 +69,14 @@ final class PostsController extends BaseController {
 	) {}
 
 	/**
-	 * Enregistre les 5 routes au hook `rest_api_init`.
+	 * Enregistre les 3 routes au hook `rest_api_init`.
+	 *
+	 * Post-V0.1 (2026-05-16) : les routes `GET /posts/<id>/preview` et
+	 * `POST /posts/<id>/normalize` ont été retirées avec leurs handlers —
+	 * elles n'étaient consommées que par les pages V0.1 (PostsPage) déjà
+	 * supprimées. La normalisation unitaire passe désormais exclusivement
+	 * par le flow F14 (`POST /steps/run` + `process` + `confirm-article`),
+	 * et le diff par `POST /posts/<id>/diff` (DiffController).
 	 *
 	 * @return void
 	 */
@@ -107,18 +100,6 @@ final class PostsController extends BaseController {
 		register_rest_route( $ns, '/posts/batch-normalize', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'batch_normalize' ),
-			'permission_callback' => $can_write,
-		) );
-
-		register_rest_route( $ns, '/posts/(?P<id>\d+)/preview', array(
-			'methods'             => 'GET',
-			'callback'            => array( $this, 'preview' ),
-			'permission_callback' => $can_read,
-		) );
-
-		register_rest_route( $ns, '/posts/(?P<id>\d+)/normalize', array(
-			'methods'             => 'POST',
-			'callback'            => array( $this, 'normalize' ),
 			'permission_callback' => $can_write,
 		) );
 	}
@@ -222,62 +203,6 @@ final class PostsController extends BaseController {
 	}
 
 	/**
-	 * `GET /posts/<id>/preview` — preview avant/après sans écriture.
-	 *
-	 * @param WP_REST_Request $request Requête.
-	 * @return WP_REST_Response
-	 */
-	public function preview( WP_REST_Request $request ): WP_REST_Response {
-		$post_id = (int) $request->get_param( 'id' );
-		$result  = $this->normalizer->preview( $post_id );
-
-		if ( PostNormalizer::STATUS_ERROR_NOT_FOUND === $result['status'] ) {
-			return $this->rest_error(
-				'post_not_found',
-				$result['message'] ?? 'Post not found',
-				404,
-				array( 'post_id' => $post_id ),
-			);
-		}
-
-		return $this->respond( $result );
-	}
-
-	/**
-	 * `POST /posts/<id>/normalize` — normalise + crée révision avant écriture.
-	 *
-	 * Body : `{ force_siteorigin?: bool }`.
-	 * Réponses : 200 (modified|unchanged), 404 (not_found), 409 (skipped_siteorigin),
-	 * 403 (permission), 500 (write error).
-	 *
-	 * @param WP_REST_Request $request Requête.
-	 * @return WP_REST_Response
-	 */
-	public function normalize( WP_REST_Request $request ): WP_REST_Response {
-		$post_id = (int) $request->get_param( 'id' );
-		$force   = (bool) $request->get_param( 'force_siteorigin' );
-
-		$result = $this->normalizer->normalize_post( $post_id, $force );
-		$status = (string) $result['status'];
-		$http   = self::STATUS_TO_HTTP[ $status ] ?? 500;
-
-		// 200/2xx : payload tel quel. 4xx/5xx : format erreur standardisé
-		// avec le payload PostNormalizer en `data`.
-		if ( $http < 400 ) {
-			return $this->respond( $result, $http );
-		}
-		return $this->rest_error(
-			$this->status_to_error_code( $status ),
-			(string) ( $result['message'] ?? '' ),
-			$http,
-			array(
-				'post_id'         => $post_id,
-				'has_panels_data' => $result['has_panels_data'] ?? false,
-			),
-		);
-	}
-
-	/**
 	 * `POST /posts/batch-normalize` — lot. Articles SO ignorés silencieusement
 	 * sans `force_siteorigin` (rapport final indique combien).
 	 *
@@ -369,19 +294,4 @@ final class PostsController extends BaseController {
 		);
 	}
 
-	/**
-	 * Mappe un statut terminal PostNormalizer en code d'erreur REST.
-	 *
-	 * @param string $status Statut PostNormalizer (`error_*`, `skipped_siteorigin`, …).
-	 * @return string
-	 */
-	private function status_to_error_code( string $status ): string {
-		return match ( $status ) {
-			PostNormalizer::STATUS_SKIPPED_SO       => 'siteorigin_detected',
-			PostNormalizer::STATUS_ERROR_NOT_FOUND  => 'post_not_found',
-			PostNormalizer::STATUS_ERROR_PERMISSION => 'permission_denied',
-			PostNormalizer::STATUS_ERROR_WRITE      => 'write_failed',
-			default                                  => 'unknown_error',
-		};
-	}
 }

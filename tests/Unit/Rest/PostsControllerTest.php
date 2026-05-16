@@ -135,9 +135,13 @@ final class PostsControllerTest extends TestCase {
 	//  register_routes
 	// =========================================================================
 
-	public function test_register_routes_creates_five_endpoints(): void {
+	public function test_register_routes_creates_three_endpoints(): void {
+		// Post-V0.1 (2026-05-16) : 3 endpoints actifs (post-types, scan,
+		// batch-normalize). Les routes `preview` et `normalize` unitaires ont
+		// été retirées avec leurs handlers — n'étaient consommées que par
+		// PostsPage V0.1 supprimée.
 		$this->make_controller()->register_routes();
-		$this->assertCount( 5, $GLOBALS['son100_htmln_test_rest_routes'] );
+		$this->assertCount( 3, $GLOBALS['son100_htmln_test_rest_routes'] );
 	}
 
 	// =========================================================================
@@ -220,124 +224,6 @@ final class PostsControllerTest extends TestCase {
 		)->scan( $this->make_request( 'GET', array( 'post_type' => array( 'nonexistent' ) ) ) );
 
 		$this->assertSame( 1, $response->get_data()['total'] );
-	}
-
-	// =========================================================================
-	//  GET /posts/<id>/preview
-	// =========================================================================
-
-	public function test_preview_returns_postnormalizer_payload(): void {
-		$payload = array(
-			'status'          => PostNormalizer::STATUS_MODIFIED,
-			'html_before'     => '<p>a</p>',
-			'html_after'      => '<p>b</p>',
-			'has_panels_data' => false,
-		);
-		$normalizer = $this->normalizer_stub( array(
-			'preview' => fn() => $payload,
-		) );
-		$response = $this->make_controller( null, $normalizer )->preview(
-			$this->make_request( 'GET', array( 'id' => 100 ) )
-		);
-		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( '<p>b</p>', $response->get_data()['html_after'] );
-	}
-
-	public function test_preview_returns_404_for_unknown_post(): void {
-		$normalizer = $this->normalizer_stub( array(
-			'preview' => fn() => array(
-				'status'          => PostNormalizer::STATUS_ERROR_NOT_FOUND,
-				'html_before'     => '',
-				'html_after'      => '',
-				'has_panels_data' => false,
-				'message'         => 'introuvable',
-			),
-		) );
-		$response = $this->make_controller( null, $normalizer )->preview(
-			$this->make_request( 'GET', array( 'id' => 999 ) )
-		);
-		$this->assertSame( 404, $response->get_status() );
-		$this->assertSame( 'post_not_found', $response->get_data()['code'] );
-	}
-
-	// =========================================================================
-	//  POST /posts/<id>/normalize
-	// =========================================================================
-
-	public function test_normalize_returns_200_for_modified(): void {
-		$normalizer = $this->normalizer_stub( array(
-			'normalize_post' => fn() => array(
-				'status'          => PostNormalizer::STATUS_MODIFIED,
-				'revision_id'     => 999,
-				'has_panels_data' => false,
-			),
-		) );
-		$response = $this->make_controller( null, $normalizer )->normalize(
-			$this->make_request( 'POST', array( 'id' => 100 ) )
-		);
-		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( PostNormalizer::STATUS_MODIFIED, $response->get_data()['status'] );
-		$this->assertSame( 999, $response->get_data()['revision_id'] );
-	}
-
-	public function test_normalize_returns_200_for_unchanged(): void {
-		$normalizer = $this->normalizer_stub( array(
-			'normalize_post' => fn() => array(
-				'status'          => PostNormalizer::STATUS_UNCHANGED,
-				'has_panels_data' => false,
-			),
-		) );
-		$response = $this->make_controller( null, $normalizer )->normalize(
-			$this->make_request( 'POST', array( 'id' => 100 ) )
-		);
-		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( PostNormalizer::STATUS_UNCHANGED, $response->get_data()['status'] );
-	}
-
-	public function test_normalize_returns_409_for_skipped_siteorigin(): void {
-		$normalizer = $this->normalizer_stub( array(
-			'normalize_post' => fn() => array(
-				'status'          => PostNormalizer::STATUS_SKIPPED_SO,
-				'message'         => 'SO détecté',
-				'has_panels_data' => true,
-			),
-		) );
-		$response = $this->make_controller( null, $normalizer )->normalize(
-			$this->make_request( 'POST', array( 'id' => 100 ) )
-		);
-		$this->assertSame( 409, $response->get_status() );
-		$body = $response->get_data();
-		$this->assertSame( 'siteorigin_detected', $body['code'] );
-		$this->assertTrue( $body['data']['has_panels_data'] );
-	}
-
-	public function test_normalize_returns_404_for_unknown(): void {
-		$normalizer = $this->normalizer_stub( array(
-			'normalize_post' => fn() => array(
-				'status'          => PostNormalizer::STATUS_ERROR_NOT_FOUND,
-				'message'         => 'introuvable',
-				'has_panels_data' => false,
-			),
-		) );
-		$response = $this->make_controller( null, $normalizer )->normalize(
-			$this->make_request( 'POST', array( 'id' => 999 ) )
-		);
-		$this->assertSame( 404, $response->get_status() );
-		$this->assertSame( 'post_not_found', $response->get_data()['code'] );
-	}
-
-	public function test_normalize_passes_force_siteorigin_to_normalizer(): void {
-		$received   = null;
-		$normalizer = $this->normalizer_stub( array(
-			'normalize_post' => function ( $id, $force ) use ( &$received ) {
-				$received = $force;
-				return array( 'status' => PostNormalizer::STATUS_MODIFIED, 'has_panels_data' => false );
-			},
-		) );
-		$this->make_controller( null, $normalizer )->normalize(
-			$this->make_request( 'POST', array( 'id' => 100, 'force_siteorigin' => true ) )
-		);
-		$this->assertTrue( $received );
 	}
 
 	// =========================================================================

@@ -2,13 +2,14 @@
  * TabsHeader — barre des trois onglets de la vue Normaliser (F13).
  *
  * Onglets, dans l'ordre :
- *   1. « À normaliser (N) »      → status `to_improve`
- *   2. « Normalisés (N) »         → status `normal`
- *   3. « Diagnostics obsolètes (N) » → status `stale`
+ *   1. « À normaliser »          → status `to_improve`
+ *   2. « Normalisés »            → status `normal`
+ *   3. « Diagnostics obsolètes » → status `stale`
  *
- * Compteurs N issus de `useDiagnosticsStats` (alimenté depuis le store).
- * En cours de chargement, on affiche `…` à la place du compteur pour
- * signaler explicitement l'attente sans casser la mise en page.
+ * Le compteur de l'onglet actif est affiché à côté de « Par page »
+ * dans `PaginationBar` (cf. évolution UX 2026-05-16). Plus de pastille
+ * de compteur dans les onglets eux-mêmes — moins d'encombrement visuel,
+ * lecture du total à un seul endroit cohérent avec la pagination.
  */
 
 import { __ } from '@wordpress/i18n';
@@ -38,34 +39,12 @@ function getTabs() {
 }
 
 /**
- * Récupère le compteur correspondant à un onglet depuis l'objet stats.
- *
- * @param {?Object}   stats Compteurs ou null.
- * @param {TabStatus} key   Clé d'onglet.
- * @return {?number} Compteur ou null si stats indisponibles.
- */
-function getCount( stats, key ) {
-	if ( ! stats ) {
-		return null;
-	}
-	const value = stats[ key ];
-	return Number.isFinite( value ) ? Number( value ) : 0;
-}
-
-/**
  * @param {Object}                 props
- * @param {?Object}                props.stats       Compteurs F13 ou null si en cours de chargement.
- * @param {boolean}                props.isLoading   Vrai durant le fetch des stats.
  * @param {TabStatus}              props.currentTab  Onglet actif.
  * @param {(t: TabStatus) => void} props.onChangeTab Callback de changement d'onglet.
  * @return {JSX.Element} Barre d'onglets.
  */
-export default function TabsHeader( {
-	stats,
-	isLoading,
-	currentTab,
-	onChangeTab,
-} ) {
+export default function TabsHeader( { currentTab, onChangeTab } ) {
 	const tabs = getTabs();
 
 	return (
@@ -76,9 +55,6 @@ export default function TabsHeader( {
 		>
 			{ tabs.map( ( tab ) => {
 				const isActive = tab.key === currentTab;
-				const count = getCount( stats, tab.key );
-				const display =
-					isLoading && null === count ? '…' : String( count ?? 0 );
 				return (
 					<button
 						key={ tab.key }
@@ -92,15 +68,6 @@ export default function TabsHeader( {
 						onClick={ () => onChangeTab( tab.key ) }
 					>
 						<span className="htmln-tabs__label">{ tab.label }</span>
-						<span
-							className="htmln-tabs__count"
-							aria-label={ __(
-								"Nombre d'articles",
-								'100son-html-normalizer'
-							) }
-						>
-							({ display })
-						</span>
 					</button>
 				);
 			} ) }
