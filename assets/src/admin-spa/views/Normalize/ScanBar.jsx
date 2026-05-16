@@ -13,21 +13,24 @@
  */
 
 import { __, sprintf } from '@wordpress/i18n';
-import { Button, Notice } from '@wordpress/components';
+import { Button, CheckboxControl, Notice } from '@wordpress/components';
 import { useIsReadOnly } from '../../hooks/useSession';
 import ReadOnlyTooltip from '../../components/ReadOnlyTooltip';
 
 /**
  * @param {Object}                                                   props
- * @param {boolean}                                                  props.isScanning        Scan en cours.
- * @param {?{processed: number, total: number}}                      props.progress          Avancement.
- * @param {?string}                                                  props.error             Message d'erreur du dernier scan (ou null).
- * @param {boolean}                                                  props.disabled          Bloque le bouton (ex. pas en cours).
- * @param {number}                                                   props.selectedPostCount Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
- * @param {?{auto_disabled_rules: string[], fully_scanned: boolean}} props.lastFinalize      Résultat du dernier `POST /diagnostics/finalize-scan`. Si une ou plusieurs règles ont été auto-désactivées (état `complete`), on affiche une notice succincte.
- * @param {() => void}                                               props.onScan            Déclenche le scan.
- * @param {() => void}                                               props.onDismissError    Reset l'erreur affichée.
- * @param {() => void}                                               props.onDismissFinalize Reset la notice d'auto-désactivation.
+ * @param {boolean}                                                  props.isScanning                Scan en cours.
+ * @param {?{processed: number, total: number}}                      props.progress                  Avancement.
+ * @param {?string}                                                  props.error                     Message d'erreur du dernier scan (ou null).
+ * @param {boolean}                                                  props.disabled                  Bloque le bouton (ex. pas en cours).
+ * @param {number}                                                   props.selectedPostCount         Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
+ * @param {boolean}                                                  props.hasActiveFilters          Au moins un filtre FiltersBar actif. Pilote le libellé bouton (« Scanner les articles filtrés » vs « Scanner le corpus »).
+ * @param {boolean}                                                  props.excludeNormalized         État de la checkbox « Exclure les articles déjà normalisés ».
+ * @param {(next: boolean) => void}                                  props.onToggleExcludeNormalized Callback de bascule de la checkbox.
+ * @param {?{auto_disabled_rules: string[], fully_scanned: boolean}} props.lastFinalize              Résultat du dernier `POST /diagnostics/finalize-scan`. Si une ou plusieurs règles ont été auto-désactivées (état `complete`), on affiche une notice succincte.
+ * @param {() => void}                                               props.onScan                    Déclenche le scan.
+ * @param {() => void}                                               props.onDismissError            Reset l'erreur affichée.
+ * @param {() => void}                                               props.onDismissFinalize         Reset la notice d'auto-désactivation.
  * @return {JSX.Element} Barre.
  */
 export default function ScanBar( {
@@ -36,6 +39,9 @@ export default function ScanBar( {
 	error,
 	disabled,
 	selectedPostCount = 0,
+	hasActiveFilters = false,
+	excludeNormalized = false,
+	onToggleExcludeNormalized,
 	lastFinalize = null,
 	onScan,
 	onDismissError,
@@ -50,6 +56,7 @@ export default function ScanBar( {
 			: 0;
 
 	// Label du bouton extrait pour éviter un ternaire imbriqué (no-nested-ternary).
+	// Mode sélection > mode filtré > mode corpus complet — priorité descendante.
 	let buttonLabel;
 	if ( isScanning ) {
 		buttonLabel = __( 'Scan en cours…', '100son-html-normalizer' );
@@ -59,8 +66,38 @@ export default function ScanBar( {
 			__( 'Scanner la sélection (%d)', '100son-html-normalizer' ),
 			selectedPostCount
 		);
+	} else if ( hasActiveFilters ) {
+		buttonLabel = __(
+			'Scanner les articles filtrés',
+			'100son-html-normalizer'
+		);
 	} else {
 		buttonLabel = __( 'Scanner le corpus', '100son-html-normalizer' );
+	}
+
+	// Hint descriptif sous le bouton — extrait en variable pour éviter
+	// un ternaire imbriqué dans le JSX. Même priorité que buttonLabel
+	// (sélection > filtres > corpus complet).
+	let hintMessage = '';
+	if ( selectedPostCount > 0 ) {
+		hintMessage = sprintf(
+			// translators: %d = nombre d'articles cochés.
+			__(
+				'Recalcule le diagnostic pour les %d article(s) sélectionné(s) uniquement.',
+				'100son-html-normalizer'
+			),
+			selectedPostCount
+		);
+	} else if ( hasActiveFilters ) {
+		hintMessage = __(
+			'Recalcule le diagnostic uniquement pour les articles correspondant aux filtres actifs (catégorie, période, constructeur, recherche).',
+			'100son-html-normalizer'
+		);
+	} else {
+		hintMessage = __(
+			'Recalcule le diagnostic pour tous les articles publiés (post_type=post). Idempotent.',
+			'100son-html-normalizer'
+		);
 	}
 
 	return (
@@ -101,20 +138,27 @@ export default function ScanBar( {
 
 				{ ! isScanning && (
 					<p className="htmln-scan-bar__hint description">
-						{ selectedPostCount > 0
-							? sprintf(
-									// translators: %d = nombre d'articles cochés.
-									__(
-										'Recalcule le diagnostic pour les %d article(s) sélectionné(s) uniquement.',
-										'100son-html-normalizer'
-									),
-									selectedPostCount
-							  )
-							: __(
-									'Recalcule le diagnostic pour tous les articles publiés (post_type=post). Idempotent.',
-									'100son-html-normalizer'
-							  ) }
+						{ hintMessage }
 					</p>
+				) }
+
+				{ ! isScanning && selectedPostCount === 0 && (
+					<div className="htmln-scan-bar__exclude-normalized">
+						<CheckboxControl
+							label={ __(
+								'Exclure les articles déjà OK',
+								'100son-html-normalizer'
+							) }
+							help={ __(
+								'Saute les articles dont le dernier diagnostic est « OK » (statut normal, non périmé) — utile pour ne re-diagnostiquer que ce qui reste à faire. Les articles jamais scannés ou périmés restent inclus. Cumulable avec les filtres.',
+								'100son-html-normalizer'
+							) }
+							checked={ excludeNormalized }
+							onChange={ onToggleExcludeNormalized }
+							disabled={ disabled || isReadOnly }
+							__nextHasNoMarginBottom
+						/>
+					</div>
 				) }
 			</div>
 

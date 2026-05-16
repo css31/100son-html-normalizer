@@ -753,6 +753,21 @@ if ( ! class_exists( 'Son100_Htmln_Test_Wpdb' ) ) {
 			$this->query_log[] = $sql;
 			return [] === $this->get_var_queue ? null : array_shift( $this->get_var_queue );
 		}
+
+		// Queue dédiée à get_col() — chaque entrée doit être un tableau de valeurs
+		// (typiquement list<int> ou list<string>). Aligne sur la convention WP :
+		// `$wpdb->get_col()` retourne la première colonne en tableau plat.
+		/** @var list<mixed> */
+		public array $get_col_queue = [];
+
+		public function get_col( string $sql ): array {
+			$this->query_log[] = $sql;
+			if ( [] === $this->get_col_queue ) {
+				return [];
+			}
+			$next = array_shift( $this->get_col_queue );
+			return is_array( $next ) ? $next : [];
+		}
 	}
 }
 

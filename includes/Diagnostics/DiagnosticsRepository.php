@@ -138,6 +138,65 @@ class DiagnosticsRepository {
 	}
 
 	/**
+	 * Retourne le sous-ensemble des `$candidate_ids` dont le diagnostic
+	 * persisté a le statut donné. Utilisé par `DiagnosticBatchRunner::start_batch()`
+	 * pour le filtre `exclude_normalized` (= retirer les posts déjà OK).
+	 *
+	 * Articles **jamais diagnostiqués** : absents de la table → absents du
+	 * résultat → **inclus dans le scan** (= non exclus). C'est le comportement
+	 * voulu : on ne sait pas s'ils sont OK, donc on doit les scanner.
+	 *
+	 * `$require_fresh = true` (défaut) filtre `is_stale = 0` : un diagnostic
+	 * périmé (post modifié depuis le dernier scan) ne compte pas comme « OK »
+	 * — l'article doit être re-scanné pour vérifier que le statut est toujours
+	 * `normal` après modification.
+	 *
+	 * Aucune borne dure sur `count($candidate_ids)` — la requête utilise des
+	 * placeholders `%d` préparés, MySQL gère plusieurs milliers de IN(…) sans
+	 * problème. Le scope max attendu reste le corpus (~728 posts sur Ma Maison Mag).
+	 *
+	 * @param list<int> $candidate_ids  Sous-ensemble candidat à filtrer.
+	 * @param string    $status         Un de `STATUS_NORMAL` ou `STATUS_TO_IMPROVE` (autre = liste vide).
+	 * @param bool      $require_fresh  Si vrai (défaut), filtre aussi `is_stale = 0`.
+	 * @return list<int> Sous-ensemble des candidats ayant ce statut.
+	 */
+	public function find_post_ids_with_status(
+		array $candidate_ids,
+		string $status,
+		bool $require_fresh = true
+	): array {
+		if ( array() === $candidate_ids ) {
+			return array();
+		}
+		// Défense en profondeur : status inconnu → liste vide (cohérent avec
+		// `list_paginated()` qui retourne vide sur status invalide).
+		if (
+			DiagnosticRecord::STATUS_NORMAL !== $status
+			&& DiagnosticRecord::STATUS_TO_IMPROVE !== $status
+		) {
+			return array();
+		}
+		$placeholders = implode( ',', array_fill( 0, count( $candidate_ids ), '%d' ) );
+		$sql          = "SELECT post_id FROM `{$this->table}` WHERE post_id IN ({$placeholders}) AND status = %s";
+		if ( $require_fresh ) {
+			$sql .= ' AND is_stale = 0';
+		}
+		$params  = array_merge(
+			array_map( 'intval', $candidate_ids ),
+			array( $status )
+		);
+		$prepared = $this->wpdb->prepare( $sql, ...$params );
+		$rows     = $this->wpdb->get_col( $prepared );
+		$out      = array();
+		foreach ( (array) $rows as $row ) {
+			if ( is_numeric( $row ) ) {
+				$out[] = (int) $row;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Liste paginée unifiée pour `GET /diagnostics` (F13). Filtre par status
 	 * optionnel : `null` retourne tous les diagnostics. Filtres additionnels
 	 * (post-rc3) : `search` / `cat_id` / `year` / `month` / `builder`.
