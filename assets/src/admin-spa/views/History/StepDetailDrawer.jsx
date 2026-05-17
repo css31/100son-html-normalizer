@@ -336,18 +336,13 @@ export default function StepDetailDrawer( {
 						<ProgressBlock progress={ progress } />
 					) }
 
-					<h3 className="htmln-step-detail__heading">
-						{ __( 'Détail par article', '100son-html-normalizer' ) }
-					</h3>
-					<PerArticleResults
-						perArticle={ step.per_article_results }
-						isReadOnly={ isReadOnly }
-						onRollbackArticle={ ( postId ) =>
-							handleOpenRollback( [ postId ] )
-						}
-					/>
-
-					<div className="htmln-step-detail__footer">
+					<div className="htmln-step-detail__list-header">
+						<h3 className="htmln-step-detail__heading">
+							{ __(
+								'Détail par article',
+								'100son-html-normalizer'
+							) }
+						</h3>
 						<ReadOnlyTooltip>
 							<Button
 								variant="primary"
@@ -366,6 +361,16 @@ export default function StepDetailDrawer( {
 								) }
 							</Button>
 						</ReadOnlyTooltip>
+					</div>
+					<PerArticleResults
+						perArticle={ step.per_article_results }
+						isReadOnly={ isReadOnly }
+						onRollbackArticle={ ( postId ) =>
+							handleOpenRollback( [ postId ] )
+						}
+					/>
+
+					<div className="htmln-step-detail__footer">
 						<Button variant="secondary" onClick={ onClose }>
 							{ __( 'Fermer', '100son-html-normalizer' ) }
 						</Button>
