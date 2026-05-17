@@ -8,7 +8,7 @@
  *   - Articles : compteurs synthétiques (total / ✓ / ✗ / ⚠)
  *   - Statut (Terminé / En cours)
  *   - Durée (finished_at − started_at, ou « — » si non finalisé)
- *   - Action : bouton « Voir le détail »
+ *   - Action : bouton « Détail »
  *
  * Composant purement présentation — la vue parente (History) fournit
  * items et callbacks via le hook `useStepsList`.
@@ -134,7 +134,7 @@ function StatusBadge( { step } ) {
  * @param {boolean}                props.isLoading    Vrai durant le fetch.
  * @param {?string}                props.error        Message d'erreur ou null.
  * @param {(p: number) => void}    props.onChangePage Callback changement de page.
- * @param {(uuid: string) => void} props.onViewDetail Callback bouton « Voir le détail ».
+ * @param {(uuid: string) => void} props.onViewDetail Callback bouton « Détail ».
  * @return {JSX.Element} Tableau + pagination.
  */
 export default function StepsTable( {
@@ -337,13 +337,14 @@ export default function StepsTable( {
 								</td>
 								<td>
 									<Button
-										variant="link"
+										variant="secondary"
+										size="small"
 										onClick={ () =>
 											onViewDetail( String( step.uuid ) )
 										}
 									>
 										{ __(
-											'Voir le détail',
+											'Détail',
 											'100son-html-normalizer'
 										) }
 									</Button>
