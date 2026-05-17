@@ -491,7 +491,19 @@ class StepRunner {
 	 *                                                          `revision_id` non-null ssi WP a créé une révision.
 	 */
 	private function write_post_content( int $post_id, string $html_after ): array {
-		$rev_raw     = wp_save_post_revision( $post_id );
+		// `wp_save_post_revision()` déduplique par défaut : si le `post_content`
+		// courant est identique à la dernière révision existante (cas typique
+		// après l'auto-révision créée par n'importe quel `wp_update_post`
+		// précédent — édition admin ou step plugin antérieur), il retourne
+		// `null` au lieu de créer une révision. Notre pivot de rollback
+		// disparaît alors silencieusement et le bouton « Restaurer tout le
+		// lot » reste désactivé même quand le step a réellement modifié les
+		// articles. On force donc la création via le filtre prévu pour ça,
+		// scope-restreint à l'appel (add → call → remove).
+		add_filter( 'wp_save_post_revision_check_for_changes', '__return_false' );
+		$rev_raw = wp_save_post_revision( $post_id );
+		remove_filter( 'wp_save_post_revision_check_for_changes', '__return_false' );
+
 		$revision_id = is_int( $rev_raw ) && $rev_raw > 0 ? $rev_raw : null;
 
 		$updated = wp_update_post(

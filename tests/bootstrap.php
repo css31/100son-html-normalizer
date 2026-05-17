@@ -227,10 +227,108 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
 }
 
 if ( ! function_exists( 'wp_save_post_revision' ) ) {
-	function wp_save_post_revision( int $post_id ): int {
+	$GLOBALS['son100_htmln_test_revision_dedup'] = $GLOBALS['son100_htmln_test_revision_dedup'] ?? [];
+	/**
+	 * Stub — simule la sémantique réelle de WordPress :
+	 *  - retourne `null` si le post est marqué dédupliquable
+	 *    (`$GLOBALS['son100_htmln_test_revision_dedup'][$post_id] = true`),
+	 *    sauf si le filtre `wp_save_post_revision_check_for_changes` a été
+	 *    branché sur `__return_false` (court-circuit du check natif WP) ;
+	 *  - retourne un id de révision incrémenté sinon, et enregistre l'appel
+	 *    dans `Son100_Htmln_Test_Posts_Registry::$revisions_created`.
+	 *
+	 * Le default (pas de flag dedup) reste le comportement historique :
+	 * toujours créer une révision et retourner un int — backward-compat
+	 * avec les tests StepRunner antérieurs au fix rollback.
+	 */
+	function wp_save_post_revision( int $post_id ): ?int {
+		$check_for_changes = function_exists( 'apply_filters' )
+			? (bool) apply_filters( 'wp_save_post_revision_check_for_changes', true, null, null )
+			: true;
+		if (
+			$check_for_changes
+			&& ! empty( $GLOBALS['son100_htmln_test_revision_dedup'][ $post_id ] )
+		) {
+			return null;
+		}
 		$rev_id                                                            = $post_id * 1000 + count( \Son100_Htmln_Test_Posts_Registry::$revisions_created ) + 1;
 		\Son100_Htmln_Test_Posts_Registry::$revisions_created[ $post_id ] = $rev_id;
 		return $rev_id;
+	}
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	$GLOBALS['son100_htmln_test_filters'] = $GLOBALS['son100_htmln_test_filters'] ?? [];
+	/**
+	 * Stub — registre par hook des callbacks branchés. Trié par priorité
+	 * à l'appel via `apply_filters`. Les tests inspectent
+	 * `$GLOBALS['son100_htmln_test_filters'][$hook]` pour vérifier les
+	 * branchements (et leur retrait via `remove_filter`).
+	 */
+	function add_filter( string $hook, callable $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+		$GLOBALS['son100_htmln_test_filters'][ $hook ][] = array(
+			'callback'      => $callback,
+			'priority'      => $priority,
+			'accepted_args' => $accepted_args,
+		);
+		return true;
+	}
+}
+
+if ( ! function_exists( 'remove_filter' ) ) {
+	/**
+	 * Stub — retire le premier callback correspondant (callable + priorité).
+	 * Sémantique alignée sur WordPress : la comparaison est faite via `==`
+	 * pour permettre l'égalité entre callables string (fonctions globales)
+	 * et entre arrays `[obj, method]` (objets identiques).
+	 */
+	function remove_filter( string $hook, callable $callback, int $priority = 10 ): bool {
+		if ( ! isset( $GLOBALS['son100_htmln_test_filters'][ $hook ] ) ) {
+			return false;
+		}
+		foreach ( $GLOBALS['son100_htmln_test_filters'][ $hook ] as $i => $entry ) {
+			if ( $entry['callback'] == $callback && $entry['priority'] === $priority ) { // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison
+				unset( $GLOBALS['son100_htmln_test_filters'][ $hook ][ $i ] );
+				$GLOBALS['son100_htmln_test_filters'][ $hook ] = array_values( $GLOBALS['son100_htmln_test_filters'][ $hook ] );
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	/**
+	 * Stub — applique en chaîne les callbacks enregistrés pour `$hook`,
+	 * triés par priorité croissante. Si aucun callback n'est branché,
+	 * retourne `$value` inchangée — sémantique alignée sur WordPress.
+	 */
+	function apply_filters( string $hook, mixed $value, mixed ...$args ): mixed {
+		if ( empty( $GLOBALS['son100_htmln_test_filters'][ $hook ] ) ) {
+			return $value;
+		}
+		$filters = $GLOBALS['son100_htmln_test_filters'][ $hook ];
+		usort(
+			$filters,
+			static fn( array $a, array $b ): int => $a['priority'] <=> $b['priority']
+		);
+		foreach ( $filters as $entry ) {
+			$slice = array_slice( $args, 0, max( 0, $entry['accepted_args'] - 1 ) );
+			$value = call_user_func_array( $entry['callback'], array_merge( array( $value ), $slice ) );
+		}
+		return $value;
+	}
+}
+
+if ( ! function_exists( '__return_false' ) ) {
+	function __return_false(): bool {
+		return false;
+	}
+}
+
+if ( ! function_exists( '__return_true' ) ) {
+	function __return_true(): bool {
+		return true;
 	}
 }
 

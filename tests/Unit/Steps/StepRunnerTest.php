@@ -358,6 +358,67 @@ final class StepRunnerTest extends TestCase {
 		);
 	}
 
+	public function test_process_article_captures_revision_id_even_when_dedup_would_fire(): void {
+		// Régression fix rollback (2026-05-17) — vérifié empiriquement sur la
+		// sandbox : `wp_save_post_revision()` retournait `null` pour tous les
+		// articles d'un step car la dernière révision était identique au
+		// post (cas typique après auto-révision du wp_update_post précédent).
+		// La SPA en concluait `revision_id = null` → bouton « Restaurer tout
+		// le lot » désactivé malgré des steps qui modifiaient réellement le
+		// contenu. Le fix branche le filtre `…_check_for_changes` à
+		// `__return_false` autour de l'appel.
+		//
+		// Ce test simule la dedup côté stub et vérifie que le contrat
+		// post-fix tient : `revision_id` capturé non-null malgré la dedup.
+		$this->seed_post( 100, '<p>Hello</p>' );
+		$GLOBALS['son100_htmln_test_revision_dedup'][100] = true;
+		$rule   = $this->fake_rule(
+			'R1',
+			static fn( string $h ): string => str_replace( 'Hello', 'Bonjour', $h )
+		);
+		$steps  = $this->steps_stub();
+		$runner = $this->make_runner( $steps, $this->diagnostics_stub(), array( $rule ) );
+
+		$uuid   = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
+		$result = $runner->process_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_SUCCESS, $result->status );
+		$this->assertNotNull(
+			$result->revision_id,
+			'revision_id doit être capturé malgré la dedup WP — sinon rollback cassé'
+		);
+		$this->assertGreaterThan( 0, $result->revision_id );
+
+		// La persistance doit refléter cette capture (la SPA lit cette clé
+		// pour activer le bouton « Restaurer tout le lot »).
+		$entry = $steps->written_results[0]['result'];
+		$this->assertArrayHasKey( 'revision_id', $entry );
+		$this->assertSame( $result->revision_id, $entry['revision_id'] );
+
+		// Reset le flag pour ne pas polluer les tests suivants.
+		unset( $GLOBALS['son100_htmln_test_revision_dedup'][100] );
+	}
+
+	public function test_process_article_removes_check_for_changes_filter_after_call(): void {
+		// Hygiène : le filtre désactivant la dedup est ajouté juste avant
+		// `wp_save_post_revision` et retiré juste après. On ne doit jamais
+		// le laisser branché — sinon toute autre invocation de
+		// `wp_save_post_revision` plus tard dans la requête WP créerait
+		// systématiquement une révision (fuite cross-fonctionnelle).
+		$this->seed_post( 100, '<p>Hello</p>' );
+		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h . ' ' );
+		$runner = $this->make_runner( $this->steps_stub(), $this->diagnostics_stub(), array( $rule ) );
+
+		$uuid = $runner->start_step( array( 100 ), array( 'R1' ), 1 );
+		$runner->process_article( $uuid, 100 );
+
+		$active = $GLOBALS['son100_htmln_test_filters']['wp_save_post_revision_check_for_changes'] ?? array();
+		$this->assertEmpty(
+			$active,
+			'Filtre wp_save_post_revision_check_for_changes laissé branché — fuite cross-fonctionnelle'
+		);
+	}
+
 	public function test_process_article_recalculates_diagnostic_post_write(): void {
 		$this->seed_post( 100, '<p>x</p>' );
 		$rule   = $this->fake_rule( 'R1', static fn( string $h ): string => $h );
