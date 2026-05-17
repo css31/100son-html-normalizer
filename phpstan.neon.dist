@@ -23,3 +23,31 @@ parameters:
     ignoreErrors:
         # Constantes définies dans le fichier principal — connues à l'analyse mais opaques aux stubs.
         - '#Constant SON100_HTMLN_(VERSION|FILE|PATH|URL|MIN_PHP|MIN_WP) not found#'
+
+        # AsciiListRule : closures qui capturent par référence des variables
+        # mutées par le foreach parent (use ( &$run, &$run_tag, &$buffer,
+        # &$buf_tag )). PHPStan analyse le corps de la closure en isolation
+        # et voit les valeurs initiales (null / array()), donc conclut à tort
+        # que les comparaisons sont toujours fausses et que les branches
+        # qui suivent sont mortes. Limitation connue de PHPStan sur les
+        # closures use-by-ref.
+        -
+            message: '#Result of && is always false\.#'
+            path: includes/Core/Rules/AsciiListRule.php
+        -
+            message: '#Strict comparison using !== between (null and null|array\{\} and array\{\}) will always evaluate to false\.#'
+            path: includes/Core/Rules/AsciiListRule.php
+        -
+            message: '#Offset 0 does not exist on array\{\}\.#'
+            path: includes/Core/Rules/AsciiListRule.php
+        -
+            message: '#Empty array passed to foreach\.#'
+            path: includes/Core/Rules/AsciiListRule.php
+
+        # PostNormalizer : après `is_wp_error($x) || 0 === $x`, dans la
+        # branche `then` le type est `WP_Error|0` ; la 2e occurrence de
+        # `is_wp_error()` est donc légitime. PHPStan/stubs WP ne savent pas
+        # garder la branche `0` ouverte et croient à un narrowing total.
+        -
+            message: '#is_wp_error\(WP_Error\) will always evaluate to true\.#'
+            path: includes/Core/Posts/PostNormalizer.php

@@ -101,7 +101,7 @@ class DiagnosticEngine {
 			: DiagnosticRecord::STATUS_NORMAL;
 		$snapshot = $this->metrics->compute( $html );
 
-		$post_modified = trim( (string) ( $post->post_modified ?? '' ) );
+		$post_modified = trim( (string) $post->post_modified );
 		$builder_type  = null !== $this->classifier
 			? $this->classifier->classify( $post->ID )
 			: null;

@@ -133,7 +133,7 @@ final class Activator {
 			'f8_post_types_selection' => array( 'post' ),
 		);
 
-		add_option( 'son100_htmln_settings', $defaults, '', 'no' );
+		add_option( 'son100_htmln_settings', $defaults, '', false );
 	}
 
 	/**
@@ -200,7 +200,7 @@ final class Activator {
 
 		$existing = get_option( 'son100_htmln_presets', false );
 		if ( false === $existing || ! is_array( $existing ) ) {
-			add_option( 'son100_htmln_presets', $defaults, '', 'no' );
+			add_option( 'son100_htmln_presets', $defaults, '', false );
 			return;
 		}
 
@@ -222,6 +222,6 @@ final class Activator {
 		if ( false !== get_option( 'son100_htmln_rules_user', false ) ) {
 			return;
 		}
-		add_option( 'son100_htmln_rules_user', array(), '', 'no' );
+		add_option( 'son100_htmln_rules_user', array(), '', false );
 	}
 }

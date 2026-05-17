@@ -10,7 +10,7 @@
  * Organisation : tout dans un seul fichier pour V1.0 — le découpage en
  * partials viendra si le SCSS dépasse ~500 lignes ou si on introduit des
  * tokens partagés.
- * ---------------------------------------------------------------------------- */
+ * -------------------------------------------------------------------------- */
 
 /* =============================================================================
  *  Variables d'apparence locales (V1.0 — pas un design system, juste des
@@ -32,7 +32,7 @@
 	--htmln-border: #dcdcde;
 	--htmln-border-strong: #c3c4c7;
 	--htmln-bg-subtle: #f6f7f7;
-	--htmln-bg-paper: #ffffff;
+	--htmln-bg-paper: #fff;
 	--htmln-text: #1d2327;
 	--htmln-text-muted: #50575e;
 	--htmln-text-faint: #787c82;
@@ -54,10 +54,9 @@
  * ========================================================================== */
 
 .htmln-spa-root {
-	color: var( --htmln-text );
+	color: var(--htmln-text);
 	font-size: 14px;
 	line-height: 1.5;
-	max-width: 1400px;
 	padding-bottom: 32px;
 }
 
@@ -66,9 +65,9 @@
 }
 
 .htmln-app__view {
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius-lg );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius-lg);
 	padding: 20px 24px;
 }
 
@@ -88,27 +87,27 @@
 }
 
 .htmln-badge--normal {
-	background: rgba( 0, 163, 42, 0.12 );
+	background: rgba(0, 163, 42, 0.12);
 	color: #007a1e;
-	border-color: rgba( 0, 163, 42, 0.3 );
+	border-color: rgba(0, 163, 42, 0.3);
 }
 
 .htmln-badge--to_improve {
-	background: rgba( 219, 166, 23, 0.18 );
+	background: rgba(219, 166, 23, 0.18);
 	color: #8a6a00;
-	border-color: rgba( 219, 166, 23, 0.4 );
+	border-color: rgba(219, 166, 23, 0.4);
 }
 
 .htmln-badge--stale {
-	background: rgba( 100, 105, 112, 0.15 );
-	color: var( --htmln-color-muted );
-	border-color: rgba( 100, 105, 112, 0.35 );
+	background: rgba(100, 105, 112, 0.15);
+	color: var(--htmln-color-muted);
+	border-color: rgba(100, 105, 112, 0.35);
 }
 
 .htmln-badge--confirmed {
-	background: rgba( 138, 70, 240, 0.12 );
-	color: var( --htmln-color-confirmed );
-	border-color: rgba( 138, 70, 240, 0.35 );
+	background: rgba(138, 70, 240, 0.12);
+	color: var(--htmln-color-confirmed);
+	border-color: rgba(138, 70, 240, 0.35);
 }
 
 .htmln-badge__stale,
@@ -129,19 +128,19 @@
 }
 
 .htmln-counter--success {
-	color: var( --htmln-color-success );
+	color: var(--htmln-color-success);
 }
 
 .htmln-counter--refused {
-	color: var( --htmln-color-muted );
+	color: var(--htmln-color-muted);
 }
 
 .htmln-counter--error {
-	color: var( --htmln-color-danger );
+	color: var(--htmln-color-danger);
 }
 
 .htmln-counter--regression {
-	color: var( --htmln-color-confirmed );
+	color: var(--htmln-color-confirmed);
 }
 
 /* =============================================================================
@@ -155,16 +154,16 @@
 .htmln-empty {
 	padding: 32px;
 	text-align: center;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-style: italic;
-	background: var( --htmln-bg-subtle );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border-radius: var(--htmln-radius);
 }
 
 .htmln-table-loading {
 	padding: 32px;
 	text-align: center;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 /* =============================================================================
@@ -188,8 +187,8 @@
 .htmln-uuid {
 	font-family: SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: 12px;
-	color: var( --htmln-text-muted );
-	background: var( --htmln-bg-subtle );
+	color: var(--htmln-text-muted);
+	background: var(--htmln-bg-subtle);
 	padding: 2px 6px;
 	border-radius: 3px;
 }
@@ -210,7 +209,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: var( --htmln-gap );
+	gap: var(--htmln-gap);
 	flex-wrap: wrap;
 	padding: 8px 0;
 	margin: 0;
@@ -220,13 +219,13 @@
 	&--top {
 		margin: 16px 0 8px;
 		padding-bottom: 8px;
-		border-bottom: 1px solid var( --htmln-border );
+		border-bottom: 1px solid var(--htmln-border);
 	}
 
 	&--bottom {
 		margin: 8px 0 0;
 		padding-top: 8px;
-		border-top: 1px solid var( --htmln-border );
+		border-top: 1px solid var(--htmln-border);
 	}
 }
 
@@ -239,7 +238,7 @@
 
 .htmln-pagination__per-page-label {
 	font-size: 13px;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	white-space: nowrap;
 }
 
@@ -264,14 +263,14 @@
  * besoin de `flex: 1 1 auto` ni de `text-align: center`. Les propriétés
  * de couleur/taille restent pour la cohérence visuelle avec « Par page ». */
 .htmln-pagination__count {
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-size: 13px;
 	white-space: nowrap;
 }
 
 /* Tiret cadratin entre « Par page » et le compteur de l'onglet actif. */
 .htmln-pagination__separator {
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-size: 13px;
 	user-select: none;
 }
@@ -295,6 +294,7 @@
 }
 
 .htmln-pagination__page {
+
 	/* Surcharge des paddings des `Button` WP pour obtenir une pastille
 	 * compacte (≈ 32×32 px) qui se lit comme un numéro de page et pas
 	 * comme un bouton longuet. */
@@ -307,12 +307,13 @@
 
 	/* `variant="tertiary"` est sans fond par défaut — on garde, mais
 	 * on souligne au survol pour signaler la cliquabilité. */
-	&:not( .htmln-pagination__page--current ):hover {
-		background: var( --htmln-bg-subtle );
+	&:not(.htmln-pagination__page--current):hover {
+		background: var(--htmln-bg-subtle);
 	}
 }
 
 .htmln-pagination__page--current {
+
 	/* `variant="primary"` colore déjà avec `--wp-admin-theme-color` ;
 	 * on désactive le pointer-events visuel (le `disabled` côté JSX
 	 * empêche le clic, mais on garde l'aspect actif lisible). */
@@ -325,7 +326,7 @@
 	align-items: center;
 	justify-content: center;
 	min-width: 24px;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-size: 14px;
 	line-height: 1;
 	user-select: none;
@@ -351,16 +352,17 @@
 .htmln-normalize__actions {
 	margin: 0 0 16px;
 	padding: 12px 16px;
-	background: var( --htmln-bg-subtle );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	display: flex;
 	align-items: flex-start;
-	gap: var( --htmln-gap-lg );
+	gap: var(--htmln-gap-lg);
 	flex-wrap: wrap;
 }
 
 .htmln-scan-bar {
+
 	/* Plus de panneau propre : c'est `.htmln-normalize__actions` qui
 	 * porte fond/bordure/radius. Cette colonne se contente d'occuper
 	 * la moitié gauche du wrapper. */
@@ -384,14 +386,14 @@
 
 .htmln-scan-bar__count {
 	font-variant-numeric: tabular-nums;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	white-space: nowrap;
 }
 
 .htmln-scan-bar__progress {
 	flex: 1 1 auto;
 	height: 8px;
-	background: var( --htmln-border );
+	background: var(--htmln-border);
 	border-radius: 999px;
 	overflow: hidden;
 	min-width: 120px;
@@ -399,13 +401,13 @@
 
 .htmln-scan-bar__progress-fill {
 	height: 100%;
-	background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	background: var(--wp-admin-theme-color, var(--htmln-color-info));
 	transition: width 0.25s ease;
 }
 
 .htmln-scan-bar__hint {
 	margin: 0;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-size: 12px;
 }
 
@@ -419,9 +421,9 @@
 .htmln-filters-bar {
 	margin: 0 0 16px;
 	padding: 12px 16px;
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 }
 
 .htmln-filters-bar__row {
@@ -440,7 +442,7 @@
 		font-size: 12px;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		margin-bottom: 4px;
 	}
 }
@@ -466,7 +468,7 @@
 	font-size: 12px;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	margin-bottom: 4px;
 	line-height: 1.4;
 }
@@ -483,11 +485,12 @@
 	.htmln-rules-filter__chevron {
 		font-size: 11px;
 		line-height: 1;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 }
 
 .htmln-rules-filter__popover {
+
 	/* Largeur calée sur celle du bouton-toggle (130 px) pour un effet
 	 * « la liste descend du bouton ». `white-space: nowrap` sur les
 	 * libellés des cases (cf. plus bas) garantit que `R10 (766)`
@@ -504,6 +507,7 @@
 	list-style: none;
 	margin: 0;
 	padding: 0;
+
 	/* La barre de défilement appartient à la liste elle-même, pas au
 	 * conteneur popover externe — ainsi l'ascenseur reste **dans** le
 	 * cadre visuel de la liste et est lié à elle sans ambiguïté. */
@@ -516,7 +520,7 @@
 	padding: 6px 12px;
 
 	&:hover {
-		background: var( --htmln-bg-subtle );
+		background: var(--htmln-bg-subtle);
 	}
 
 	/* Désactiver le margin-bottom natif des CheckboxControl pour
@@ -536,7 +540,7 @@
 }
 
 .htmln-rules-filter__footer {
-	border-top: 1px solid var( --htmln-border );
+	border-top: 1px solid var(--htmln-border);
 	margin-top: 6px;
 	padding: 6px 12px 4px;
 	text-align: right;
@@ -560,33 +564,35 @@
 .htmln-builder-badge {
 	display: inline-block;
 	padding: 2px 8px;
-	border-radius: var( --htmln-radius );
+	border-radius: var(--htmln-radius);
 	font-size: 11px;
 	font-weight: 600;
 	line-height: 1.4;
 	white-space: nowrap;
 
 	&--siteorigin {
-		background: var( --htmln-color-danger );
+		background: var(--htmln-color-danger);
 		color: #fff;
 	}
 
 	&--siteorigin-flat {
-		background: var( --htmln-color-warning );
+		background: var(--htmln-color-warning);
 		color: #fff;
 	}
 
 	&--gutenberg {
-		background: var( --htmln-color-success );
+		background: var(--htmln-color-success);
 		color: #fff;
 	}
 
-	/* Gutenberg + fossile `panels_data` (rc4) — orange `var(--htmln-color-warning)`
-	 * pour signaler le passé SO inerte sans dramatiser. Le tooltip
-	 * détaille la situation et propose la commande WP-CLI de nettoyage. */
+	/* Gutenberg + fossile `panels_data` (rc4) — orange
+	 * `var(--htmln-color-warning)` pour signaler le passé SO inerte sans
+	 * dramatiser. Le tooltip détaille la situation et propose la commande
+	 * WP-CLI de nettoyage. */
 	&--gutenberg-fossil {
-		background: var( --htmln-color-warning );
+		background: var(--htmln-color-warning);
 		color: #fff;
+
 		/* Léger soulign pointillé pour rappeler qu'il y a un tooltip
 		 * (cohérence avec les autres éléments « help » de la SPA). */
 		cursor: help;
@@ -594,17 +600,17 @@
 
 	&--other {
 		background: #f0b849;
-		color: var( --htmln-text );
+		color: var(--htmln-text);
 	}
 
 	&--out {
-		background: var( --htmln-color-muted );
+		background: var(--htmln-color-muted);
 		color: #fff;
 	}
 
 	&--unknown {
 		background: transparent;
-		color: var( --htmln-text-faint );
+		color: var(--htmln-text-faint);
 		font-weight: 400;
 		font-style: italic;
 	}
@@ -626,7 +632,7 @@
 	transition: border-bottom-color 0.1s ease;
 
 	&:hover {
-		border-bottom-color: var( --htmln-text-muted );
+		border-bottom-color: var(--htmln-text-muted);
 	}
 }
 
@@ -652,7 +658,7 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	color: var(--wp-admin-theme-color, var(--htmln-color-info));
 	text-decoration: none;
 
 	&:hover {
@@ -702,7 +708,8 @@
 }
 
 /* =============================================================================
- *  Vue Normaliser — barre « Appliquer ce lot » (rc4, dans `.htmln-normalize__actions`)
+ *  Vue Normaliser — barre « Appliquer ce lot »
+ *  (rc4, dans `.htmln-normalize__actions`)
  *
  *  Colonne droite de la section actions. Pas de panneau propre — c'est
  *  le wrapper qui le porte. Layout interne : bouton primaire au-dessus,
@@ -724,17 +731,17 @@
 }
 
 .htmln-normalize__apply-bar-recap {
-	color: var( --htmln-text );
+	color: var(--htmln-text);
 	text-align: right;
 	font-size: 13px;
 	line-height: 1.5;
 
 	strong {
-		color: var( --htmln-text );
+		color: var(--htmln-text);
 	}
 
 	a {
-		color: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+		color: var(--wp-admin-theme-color, var(--htmln-color-info));
 		text-decoration: none;
 
 		&:hover {
@@ -744,7 +751,7 @@
 }
 
 .htmln-normalize__apply-bar-rules {
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-family: SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: 12px;
 }
@@ -756,6 +763,7 @@
  * forcée à 100 % pour s'aligner sur le wrapper flex parent qui aligne
  * les boutons à droite via `align-items: flex-end`. */
 .htmln-normalize__backup-reminder {
+
 	&.components-notice {
 		margin: 0 0 8px;
 		width: 100%;
@@ -775,7 +783,7 @@
 	}
 
 	.description {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		margin: 0;
 	}
 }
@@ -791,16 +799,16 @@
 	gap: 6px 10px;
 	margin-top: 12px;
 	padding: 10px 14px;
-	background: var( --htmln-bg-subtle );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	font-size: 12px;
 	line-height: 1.4;
 }
 
 .htmln-rules__pipeline-caption {
 	font-weight: 600;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	font-size: 11px;
@@ -815,7 +823,7 @@
 }
 
 .htmln-rules__pipeline-phase-label {
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-size: 10px;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
@@ -829,12 +837,12 @@
 }
 
 .htmln-rules__pipeline-arrow {
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-size: 11px;
 }
 
 .htmln-rules__pipeline-phase-sep {
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-weight: 700;
 	font-size: 14px;
 	opacity: 0.5;
@@ -848,8 +856,8 @@
 .htmln-rules__pipeline-pill {
 	display: inline-block;
 	padding: 2px 8px;
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border);
 	border-radius: 12px;
 	font-family: monospace;
 	font-size: 11px;
@@ -860,8 +868,8 @@
 
 	&:hover,
 	&:focus-visible {
-		background: var( --htmln-bg-hover, #f0f0f1 );
-		border-color: var( --htmln-text-muted );
+		background: var(--htmln-bg-hover, #f0f0f1);
+		border-color: var(--htmln-text-muted);
 		outline: none;
 	}
 }
@@ -869,14 +877,17 @@
 /* Flash temporaire appliqué à une RuleCard quand on clique sur sa
  * pastille dans le schéma — repère visuel après le scroll. */
 @keyframes htmln-rule-flash {
+
 	0% {
-		box-shadow: 0 0 0 0 rgba( 0, 124, 186, 0 );
+		box-shadow: 0 0 0 0 rgba(0, 124, 186, 0);
 	}
+
 	30% {
-		box-shadow: 0 0 0 4px rgba( 0, 124, 186, 0.35 );
+		box-shadow: 0 0 0 4px rgba(0, 124, 186, 0.35);
 	}
+
 	100% {
-		box-shadow: 0 0 0 0 rgba( 0, 124, 186, 0 );
+		box-shadow: 0 0 0 0 rgba(0, 124, 186, 0);
 	}
 }
 
@@ -888,11 +899,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: var( --htmln-gap );
+	gap: var(--htmln-gap);
 	padding: 12px 16px;
-	background: var( --htmln-bg-subtle );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	margin-bottom: 20px;
 	flex-wrap: wrap;
 }
@@ -907,16 +918,17 @@
 }
 
 .htmln-rules__list {
+
 	/* Layout 3 colonnes en grand écran, dégradation responsive vers 2 puis
 	 * 1 colonne. `align-items: stretch` (défaut CSS Grid) garantit que
 	 * toutes les cards d'une même rangée prennent la hauteur de la plus
 	 * grande — alignement visuel des bordures inférieures. */
 	display: grid;
-	grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 16px;
 
 	@media ( max-width: 1400px ) {
-		grid-template-columns: repeat( 2, minmax( 0, 1fr ) );
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	@media ( max-width: 900px ) {
@@ -925,16 +937,16 @@
 }
 
 .htmln-rule {
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius-lg );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius-lg);
 	padding: 16px 18px;
 	transition: opacity 0.15s ease;
 	min-width: 0;
 
 	&--disabled {
 		opacity: 0.55;
-		background: var( --htmln-bg-subtle );
+		background: var(--htmln-bg-subtle);
 	}
 
 	/* R7 (Listes ASCII) embarque le plus de paramètres (seuil + 5
@@ -953,7 +965,7 @@
 	 *
 	 * En 1 col responsive (≤ 900 px), tout retombe en pile verticale.
 	 */
-	&[ data-rule-id="R7" ] {
+	&[data-rule-id="R7"] {
 		grid-column: span 2;
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -982,7 +994,7 @@
 				font-size: 12px;
 				text-transform: uppercase;
 				letter-spacing: 0.04em;
-				color: var( --htmln-text-muted );
+				color: var(--htmln-text-muted);
 				padding: 0 6px;
 			}
 		}
@@ -1008,7 +1020,10 @@
 	}
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle plus haut dans le fichier (.htmln-rule[data-rule-id="R7"]). */
 .htmln-rule__header {
+
 	/* Titre + actions empilés verticalement (en colonne étroite ~340 px,
 	 * tenter les côte-à-côte serait illisible). Le bloc actions interne
 	 * est lui-même horizontal — case à cocher et toggle sur la même
@@ -1029,10 +1044,10 @@
 }
 
 .htmln-rule__code {
-	background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	background: var(--wp-admin-theme-color, var(--htmln-color-info));
 	color: #fff;
 	padding: 4px 10px;
-	border-radius: var( --htmln-radius );
+	border-radius: var(--htmln-radius);
 	font-family: SFMono-Regular, Menlo, Consolas, monospace;
 	font-weight: 600;
 	font-size: 13px;
@@ -1046,13 +1061,14 @@
 
 	code {
 		font-size: 13px;
-		background: var( --htmln-bg-subtle );
+		background: var(--htmln-bg-subtle);
 		padding: 1px 5px;
 		border-radius: 3px;
 	}
 }
 
 .htmln-rule__actions {
+
 	/* Case à cocher (« Dans le lot ») et toggle (« Activée ») sur la
 	 * même ligne — libellés compacts qui tiennent en flex row sans
 	 * passer à la ligne, même en card étroite. */
@@ -1067,6 +1083,8 @@
 		margin-bottom: 0;
 	}
 
+	/* stylelint-disable-next-line no-descending-specificity -- aligne les
+	   trois étiquettes avec/sans précédence du toggle WP. */
 	.components-base-control__label,
 	.components-checkbox-control__label,
 	.components-toggle-control .components-form-toggle + label,
@@ -1077,6 +1095,7 @@
 }
 
 .htmln-rule__threshold-row {
+
 	/* Input numérique compact (75 px max) avec le texte explicatif côté
 	 * droit, aligné sur le haut du contrôle — économise la hauteur
 	 * verticale dans une card 3-colonnes. */
@@ -1102,7 +1121,7 @@
 	padding-top: 22px; /* aligne le haut du texte avec le haut de l'input (offset label TextControl) */
 	font-size: 12px;
 	line-height: 1.4;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 /* Bandeau d'état d'application (R-card) — affiché entre le header
@@ -1112,19 +1131,19 @@
 	padding: 8px 12px;
 	font-size: 12px;
 	line-height: 1.5;
-	border-radius: var( --htmln-radius );
+	border-radius: var(--htmln-radius);
 	border: 1px solid transparent;
 
 	&--complete {
-		background: rgb( 16 185 129 / 8% );
-		border-color: rgb( 16 185 129 / 30% );
-		color: rgb( 6 95 70 );
+		background: rgb(16 185 129 / 8%);
+		border-color: rgb(16 185 129 / 30%);
+		color: rgb(6 95 70);
 	}
 
 	&--unused {
-		background: var( --htmln-bg-subtle );
-		border-color: var( --htmln-border );
-		color: var( --htmln-text-muted );
+		background: var(--htmln-bg-subtle);
+		border-color: var(--htmln-border);
+		color: var(--htmln-text-muted);
 	}
 }
 
@@ -1135,6 +1154,7 @@
 }
 
 .htmln-rule__completion-override {
+
 	/* Bouton « Réactiver pour cette session » : style link discret. */
 	font-size: 11px !important;
 	text-decoration: underline;
@@ -1147,40 +1167,44 @@
 /* Card en état « verrouillée » : un peu plus discrète que la version
  * --disabled (qui correspond au toggle off). */
 .htmln-rule--locked {
-	background: linear-gradient(
-		0deg,
-		rgb( 16 185 129 / 3% ),
-		rgb( 16 185 129 / 3% )
-	), var( --htmln-bg-paper );
+	background:
+		linear-gradient(0deg, rgb(16 185 129 / 3%), rgb(16 185 129 / 3%)),
+		var(--htmln-bg-paper);
 
 	.htmln-rule__code {
 		opacity: 0.75;
 	}
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle plus haut (.htmln-rule[data-rule-id="R7"]). */
 .htmln-rule__description {
-	color: var( --htmln-text );
+	color: var(--htmln-text);
 	margin: 0 0 16px;
 
 	code {
-		background: var( --htmln-bg-subtle );
+		background: var(--htmln-bg-subtle);
 		padding: 1px 5px;
 		border-radius: 3px;
 		font-size: 12px;
 	}
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle plus haut (.htmln-rule[data-rule-id="R7"]). */
 .htmln-rule__params {
-	background: var( --htmln-bg-subtle );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	padding: 14px 18px;
 	margin: 0 0 16px;
 
+	/* stylelint-disable-next-line no-descending-specificity -- override
+	   contextuelle de R7 plus haut. */
 	legend {
 		font-weight: 600;
 		font-size: 13px;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		padding: 0 6px;
@@ -1201,7 +1225,10 @@
 	font-size: 13px;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle plus haut (.htmln-rule[data-rule-id="R7"]). */
 .htmln-rule__example {
+
 	/* En colonne étroite (3 colonnes), Avant/Après s'empilent toujours
 	 * verticalement (plutôt que 2 colonnes côte à côte) pour préserver la
 	 * lisibilité des fragments HTML. */
@@ -1211,15 +1238,16 @@
 }
 
 .htmln-rule__example-col {
+
 	/* Reproduit le pattern fieldset/legend : le titre `h4` est positionné
 	 * absolument SUR le top border (centré verticalement dessus via
 	 * `translateY(-50%)`), avec un fond opaque qui masque la portion
 	 * de border située derrière le texte. Le contenu `<pre>` démarre
 	 * dans le padding normal du box. */
 	position: relative;
-	background: var( --htmln-bg-subtle );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	padding: 14px 14px 12px;
 	min-width: 0;
 
@@ -1227,16 +1255,16 @@
 		position: absolute;
 		top: 0;
 		left: 12px;
-		transform: translateY( -50% );
+		transform: translateY(-50%);
 		margin: 0;
 		padding: 0 6px;
-		background: var( --htmln-bg-paper );
+		background: var(--htmln-bg-paper);
 		font-size: 12px;
 		font-weight: 600;
 		line-height: 1;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 
 	pre {
@@ -1246,7 +1274,7 @@
 		line-height: 1.5;
 		white-space: pre-wrap;
 		word-break: break-word;
-		color: var( --htmln-text );
+		color: var(--htmln-text);
 	}
 }
 
@@ -1254,7 +1282,7 @@
  * que le masque blanc du `h4` reste cohérent avec le fond visible
  * derrière `example-col`, on bascule sur la même couleur. */
 .htmln-rule--disabled .htmln-rule__example-col h4 {
-	background: var( --htmln-bg-subtle );
+	background: var(--htmln-bg-subtle);
 }
 
 /* =============================================================================
@@ -1270,7 +1298,7 @@
 	}
 
 	.description {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		margin: 0;
 		max-width: 80ch;
 	}
@@ -1289,7 +1317,7 @@
 
 	dt {
 		font-weight: 600;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 
 	dd {
@@ -1303,13 +1331,26 @@
 
 .htmln-step-detail__heading {
 	font-size: 16px;
+	margin: 0;
+}
+
+/* En-tête de la liste « Détail par article » — titre à gauche, action
+ * principale « Restaurer tout le lot » à droite. Placement haut (au-dessus
+ * de la liste) pour rester visible quand la liste devient longue : sur un
+ * step de 600 articles, l'utilisateur n'a plus à scroller jusqu'en bas
+ * pour déclencher le rollback global. */
+.htmln-step-detail__list-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
 	margin: 0 0 12px;
 }
 
 .htmln-step-detail__footer {
 	margin-top: 20px;
 	padding-top: 16px;
-	border-top: 1px solid var( --htmln-border );
+	border-top: 1px solid var(--htmln-border);
 	display: flex;
 	justify-content: flex-end;
 	gap: 8px;
@@ -1320,7 +1361,7 @@
 }
 
 .htmln-per-article-table__no-rollback {
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-size: 13px;
 	cursor: help;
 }
@@ -1342,7 +1383,7 @@
 	align-items: center;
 	gap: 8px;
 	padding: 24px 0;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 .htmln-rollback-modal__actions {
@@ -1351,7 +1392,7 @@
 	details {
 		margin-bottom: 8px;
 		padding: 8px 12px;
-		background: var( --htmln-surface-muted );
+		background: var(--htmln-surface-muted);
 		border-radius: 4px;
 	}
 
@@ -1374,7 +1415,7 @@
 	}
 
 	small {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 
 	code {
@@ -1385,7 +1426,7 @@
 .htmln-rollback-modal__footer {
 	margin-top: 20px;
 	padding-top: 16px;
-	border-top: 1px solid var( --htmln-border );
+	border-top: 1px solid var(--htmln-border);
 	display: flex;
 	justify-content: flex-end;
 	gap: 8px;
@@ -1396,8 +1437,8 @@
 
 	code {
 		font-size: 12px;
-		color: var( --htmln-color-danger );
-		background: rgba( 214, 54, 56, 0.08 );
+		color: var(--htmln-color-danger);
+		background: rgba(214, 54, 56, 0.08);
 		padding: 2px 6px;
 		border-radius: 3px;
 	}
@@ -1407,7 +1448,7 @@
 	margin: 0;
 	padding-left: 16px;
 	font-size: 13px;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 /* =============================================================================
@@ -1430,7 +1471,7 @@
 	}
 
 	.description {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		margin: 0;
 	}
 }
@@ -1454,17 +1495,21 @@
 	}
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle .htmln-settings__columns > .htmln-settings__group plus haut. */
 .htmln-settings__group {
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	padding: 16px 20px;
 	margin: 0 0 16px;
 
+	/* stylelint-disable-next-line no-descending-specificity -- selector
+	   plus spécifique défini plus haut sur R7 params legend. */
 	legend {
 		font-weight: 600;
 		font-size: 13px;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		padding: 0 6px;
@@ -1475,8 +1520,9 @@
 	margin-bottom: 10px;
 
 	&--invalid {
+
 		.components-text-control__input {
-			border-color: var( --htmln-color-danger );
+			border-color: var(--htmln-color-danger);
 		}
 	}
 }
@@ -1512,6 +1558,8 @@
 	display: contents;
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- selector plus
+   spécifique défini plus haut pour le toggle des règles. */
 .htmln-settings__field--narrow .components-base-control__field > label {
 	grid-column: 1 / -1;
 	grid-row: 1;
@@ -1529,7 +1577,7 @@
 	margin: 0;
 	align-self: center;
 	font-size: 12px;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 .htmln-settings__actions {
@@ -1549,7 +1597,7 @@
 .htmln-settings__section {
 	margin-top: 32px;
 	padding-top: 24px;
-	border-top: 1px solid var( --htmln-border );
+	border-top: 1px solid var(--htmln-border);
 }
 
 /* Fieldset « Domaines externes » : deux rangées empilées. La rangée du
@@ -1609,7 +1657,7 @@
 			margin: 0;
 			align-self: center;
 			font-size: 12px;
-			color: var( --htmln-text-muted );
+			color: var(--htmln-text-muted);
 			white-space: nowrap;
 		}
 	}
@@ -1648,7 +1696,7 @@
 			margin: 0;
 			align-self: center;
 			font-size: 12px;
-			color: var( --htmln-text-muted );
+			color: var(--htmln-text-muted);
 		}
 	}
 }
@@ -1687,7 +1735,8 @@
 	}
 }
 
-/* Coupable identifié dans `node_modules/@wordpress/components/build-style/style.css` :
+/* Coupable identifié dans
+ * `node_modules/@wordpress/components/build-style/style.css` :
  *
  *   .components-modal__header-heading-container { flex-grow: 1; }
  *
@@ -1717,7 +1766,7 @@
 	gap: 10px;
 	font-size: 13px;
 	font-weight: 400;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	flex-shrink: 0;
 
 	/* Tiret cadratin entre le titre et le 1er item de métadonnées. Posé en
@@ -1736,10 +1785,11 @@
 
 /* Séparateur « · » discret entre chaque item, sauf devant le premier. */
 .htmln-diff-modal__header-meta-item + .htmln-diff-modal__header-meta-item {
+
 	&::before {
 		content: "·";
 		margin-right: 10px;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 }
 
@@ -1756,6 +1806,7 @@
  * permet ensuite à `margin-top: auto` sur le `view-toggle` d'aligner les
  * boutons sur le bas du tableau. `flex-wrap: wrap` pour replier verticale-
  * ment sur écran étroit ou modale rétrécie. */
+
 /* Rangée métriques : grille 2 colonnes (1fr/1fr) identique à `__pane-cols`
  * en dessous, pour que le tableau « Règles appliquées » (2ᵉ enfant) ait
  * son bord gauche aligné précisément sur celui du pane « Après ».
@@ -1787,6 +1838,7 @@
 }
 
 .htmln-diff-modal__metrics-aside {
+
 	/* `flex: 0 1 auto` (et non `1 1 280px` avant l'ajout de la 3e colonne) :
 	 * la colonne aside ne s'étire plus pour remplir tout l'espace dispo
 	 * entre la table métriques et la table « Règles appliquées ». Sans ce
@@ -1797,6 +1849,7 @@
 	min-width: 240px;
 	display: flex;
 	flex-direction: column;
+
 	/* `align-items: flex-start` (et non `stretch` par défaut) pour que la
 	 * phrase summary, la notice et la barre des boutons « Code source /
 	 * Rendu HTML » prennent chacune la largeur de leur contenu au lieu de
@@ -1865,7 +1918,7 @@
 	margin: 0;
 	font-size: 13px;
 	font-weight: 600;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 }
@@ -1876,9 +1929,9 @@
 	width: auto;
 	border-collapse: collapse;
 	font-size: 13px;
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border-strong );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border-strong);
+	border-radius: var(--htmln-radius);
 	overflow: hidden;
 
 	th,
@@ -1894,14 +1947,14 @@
 	th {
 		font-family: SFMono-Regular, Menlo, Consolas, monospace;
 		font-weight: 600;
-		color: var( --htmln-color-info );
+		color: var(--htmln-color-info);
 		white-space: nowrap;
-		border-right: 1px solid var( --htmln-border );
+		border-right: 1px solid var(--htmln-border);
 	}
 
 	tr + tr th,
 	tr + tr td {
-		border-top: 1px solid var( --htmln-border );
+		border-top: 1px solid var(--htmln-border);
 	}
 
 	/* 1ʳᵉ colonne : checkbox de désactivation locale de la règle. Largeur
@@ -1913,7 +1966,7 @@
 		width: 28px;
 		padding: 4px 6px;
 		vertical-align: middle;
-		border-right: 1px solid var( --htmln-border );
+		border-right: 1px solid var(--htmln-border);
 
 		.components-base-control,
 		.components-checkbox-control,
@@ -1922,7 +1975,7 @@
 			padding: 0;
 		}
 
-		input[type='checkbox'] {
+		input[type="checkbox"] {
 			margin: 0;
 		}
 	}
@@ -1954,10 +2007,10 @@
 		text-align: right;
 		font-family: SFMono-Regular, Menlo, Consolas, monospace;
 		font-variant-numeric: tabular-nums;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		padding-left: 16px;
 		white-space: nowrap;
-		border-left: 1px solid var( --htmln-border );
+		border-left: 1px solid var(--htmln-border);
 	}
 }
 
@@ -1972,6 +2025,8 @@
  * rangée du bas les contrôles de vue (Code source / Rendu HTML + scroll
  * lock). Séparation sémantique qui aère l'UI quand le statut du calcul
  * est visible. */
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle plus haut (.htmln-diff-modal__metrics-aside ...). */
 .htmln-diff-modal__view-toggle {
 	display: flex;
 	flex-direction: column;
@@ -2001,7 +2056,7 @@
 	align-items: center;
 	gap: 6px;
 	font-size: 12px;
-	color: var( --htmln-text-muted, #757575 );
+	color: var(--htmln-text-muted, #757575);
 	font-style: italic;
 }
 
@@ -2015,7 +2070,7 @@
  * pour comparer les temps d'un article à l'autre. Couleur verte de la
  * palette success WP-Admin (cohérent avec le badge OK des diagnostics). */
 .htmln-diff-modal__worker-status--done {
-	color: var( --htmln-color-success, #00a32a );
+	color: var(--htmln-color-success, #00a32a);
 	font-style: normal;
 }
 
@@ -2051,15 +2106,16 @@
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: 16px;
+
 	/* Le rendu HTML iframe n'a pas de max-height interne ; on en donne
 	 * une au pane pour qu'il occupe l'espace disponible utilement. */
-	height: calc( 100vh - 280px );
+	height: calc(100vh - 280px);
 	min-height: 320px;
 }
 
 .htmln-diff-modal__col {
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
@@ -2072,16 +2128,17 @@
 .htmln-diff-modal__col-title {
 	margin: 0;
 	padding: 10px 14px;
-	border-bottom: 1px solid var( --htmln-border );
+	border-bottom: 1px solid var(--htmln-border);
 	font-size: 14px;
 	font-weight: 600;
 	line-height: 1.3;
-	color: var( --htmln-text );
+	color: var(--htmln-text);
 }
 
 /* Colonne « Avant » : fond gris admin WP (#f6f7f7) — neutralité,
  * « état actuel ». */
 .htmln-diff-modal__col--before {
+
 	.htmln-diff-modal__col-title {
 		background: #f6f7f7;
 	}
@@ -2108,6 +2165,8 @@
 	}
 }
 
+/* stylelint-disable-next-line no-descending-specificity -- overrides
+   contextuelles plus haut (.htmln-diff-modal__col--before/--after). */
 .htmln-diff-modal__code {
 	margin: 0;
 	overflow: auto;
@@ -2147,37 +2206,39 @@
 	 *  - entities     : orange `#dba617` (= `--htmln-color-warning`)
 	 */
 	.token.tag {
-		color: var( --htmln-color-info );
+		color: var(--htmln-color-info);
 	}
 
+	/* stylelint-disable-next-line no-descending-specificity -- regroupe les
+	   deux variantes pour appliquer la même couleur de ponctuation. */
 	.token.tag .token.punctuation,
 	.token.punctuation {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 
 	.token.attr-name {
-		color: var( --htmln-color-confirmed );
+		color: var(--htmln-color-confirmed);
 	}
 
 	.token.attr-value,
 	.token.attr-value .token.punctuation {
-		color: var( --htmln-color-success );
+		color: var(--htmln-color-success);
 	}
 
 	.token.attr-value .token.punctuation.attr-equals {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 
 	.token.comment,
 	.token.prolog,
 	.token.doctype,
 	.token.cdata {
-		color: var( --htmln-text-faint );
+		color: var(--htmln-text-faint);
 		font-style: italic;
 	}
 
 	.token.entity {
-		color: var( --htmln-color-warning );
+		color: var(--htmln-color-warning);
 		cursor: help;
 	}
 
@@ -2197,11 +2258,13 @@
 	}
 
 	mark.htmln-diff-removed {
+
 		/* Jaune stabylo classique. */
 		background: #fff59d;
 	}
 
 	mark.htmln-diff-added {
+
 		/* Vert tendre pour le panneau Après — complémentaire visuelle
 		 * du jaune (ajout vs suppression). */
 		background: #c8e6c9;
@@ -2218,31 +2281,32 @@
 .htmln-diff-modal__loading {
 	padding: 32px;
 	text-align: center;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 .htmln-diff-modal__warnings {
 	margin: 16px 0 0;
 	padding: 8px 12px;
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius );
-	background: var( --htmln-bg-subtle );
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius);
+	background: var(--htmln-bg-subtle);
 
 	summary {
 		cursor: pointer;
 		font-weight: 600;
-		color: var( --htmln-text );
+		color: var(--htmln-text);
 	}
 
 	ul {
 		margin: 8px 0 0;
 		padding-left: 20px;
 		font-size: 13px;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 	}
 }
 
 .htmln-regression-modal {
+
 	.components-modal__content {
 		max-width: 720px;
 	}
@@ -2268,7 +2332,7 @@
 .htmln-regression-modal__hint {
 	margin-top: 12px;
 	font-size: 12px;
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-style: italic;
 }
 
@@ -2290,33 +2354,37 @@
 /* Phrase résumée — « ✓ Aucune perte » (succès) ou « ⚠ Perte de … »
  * (avertissement). Couleur de fond subtile (~10 % opacity de la
  * couleur sémantique), bordure latérale plus marquée pour l'accent. */
+/* stylelint-disable-next-line no-descending-specificity -- override
+   contextuelle plus haut (.htmln-diff-modal__metrics-aside ...). */
 .htmln-metrics-diff__summary {
 	margin: 0 0 12px;
 	padding: 10px 14px;
-	border-radius: var( --htmln-radius );
+	border-radius: var(--htmln-radius);
 	font-size: 14px;
 	font-weight: 500;
 	line-height: 1.4;
 }
 
 .htmln-metrics-diff__summary--ok {
-	background: rgba( 0, 163, 42, 0.08 ); /* var(--htmln-color-success) layer */
-	border-left: 3px solid var( --htmln-color-success );
-	color: var( --htmln-text );
+	background: rgba(0, 163, 42, 0.08); /* var(--htmln-color-success) layer */
+	border-left: 3px solid var(--htmln-color-success);
+	color: var(--htmln-text);
 }
 
 .htmln-metrics-diff__summary--warning {
-	background: rgba( 212, 70, 0, 0.08 ); /* var(--htmln-color-danger) layer */
-	border-left: 3px solid var( --htmln-color-danger );
-	color: var( --htmln-text );
+	background: rgba(212, 70, 0, 0.08); /* var(--htmln-color-danger) layer */
+	border-left: 3px solid var(--htmln-color-danger);
+	color: var(--htmln-text);
 }
 
-/* Tableau métriques — la **double-classe** `.htmln-metrics-diff.htmln-metrics-diff`
+/* Tableau métriques — la **double-classe**
+ * `.htmln-metrics-diff.htmln-metrics-diff`
  * sert à augmenter la spécificité (0,2,0) sans recourir à `!important`, ce
  * qui permet de battre des règles WP-core ou components qui ciblent
  * `<table>` ou les `<td>` à l'intérieur des modales. Le HTML rendu porte
  * la classe une seule fois — le doublement n'est que côté CSS. */
 .htmln-metrics-diff.htmln-metrics-diff {
+
 	/* `width: auto` (et plus `100%`) : le tableau se contracte sur le
 	 * contenu, évitant que la colonne « Métrique » n'absorbe tout
 	 * l'espace dispo et n'éloigne les valeurs numériques. La largeur
@@ -2325,26 +2393,33 @@
 	max-width: 640px;
 	border-collapse: collapse;
 	font-size: 13px;
-	background: var( --htmln-bg-paper );
+	background: var(--htmln-bg-paper);
+
 	/* Bordure encadrante (rc4) — `--htmln-border-strong` (#c3c4c7, gris
 	 * admin WP) au lieu de la variante claire pour bien matérialiser le
 	 * cadre. Radius pour cohérence avec les autres panneaux. */
-	border: 1px solid var( --htmln-border-strong );
-	border-radius: var( --htmln-radius );
+	border: 1px solid var(--htmln-border-strong);
+	border-radius: var(--htmln-radius);
 	overflow: hidden;
 
+	/* stylelint-disable no-descending-specificity -- table avec overrides
+	   ciblées (thead/tbody, :last-child, nth-child) qui suivent l'ordre
+	   visuel du DOM (head → body → modifiers de fin). Ré-ordonner casserait
+	   la lisibilité et la cascade attendue. */
 	th,
 	td {
+
 		/* Compactage (rc4) : padding réduit de 7×12 à 4×10 pour resserrer
 		 * la lecture verticale. */
 		padding: 4px 10px;
 		text-align: left;
+
 		/* Quadrillage : bordure inter-cellules horizontale + verticale. La
 		 * dernière colonne supprime sa bordure droite via le sélecteur
 		 * `:last-child` plus bas (le `overflow: hidden` du wrapper masquerait
 		 * sinon, mais on est propre). */
-		border-bottom: 1px solid var( --htmln-border );
-		border-right: 1px solid var( --htmln-border );
+		border-bottom: 1px solid var(--htmln-border);
+		border-right: 1px solid var(--htmln-border);
 	}
 
 	th:last-child,
@@ -2353,30 +2428,31 @@
 	}
 
 	thead th {
+
 		/* En-tête nettement différencié des rangs zébrés (rc4 — request UX)
 		 * pour éviter que le gris du header se confonde avec le gris de la
 		 * 1ère rangée. Fond `#dcdcde` (= `--htmln-border`, plus marqué que
 		 * le `#f0f0f1` du zebra) + bordure inférieure double-épaisseur. */
 		background: #dcdcde;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		font-weight: 600;
 		font-size: 12px;
 		padding-top: 6px;
 		padding-bottom: 6px;
-		border-bottom: 2px solid var( --htmln-border-strong );
+		border-bottom: 2px solid var(--htmln-border-strong);
 	}
 
 	tbody th {
 		font-weight: 500;
-		color: var( --htmln-text );
+		color: var(--htmln-text);
 	}
 
 	/* Zebra striping (rc4) — `#f0f0f1` sur les rangées **paires** du body
 	 * (2e, 4e, …). La 1ère rangée reste sur fond blanc pour ne pas se
 	 * confondre avec le fond gris de l'en-tête (séparation visuelle nette
 	 * head ↔ premier rang du body). */
-	tbody tr:nth-child( even ) th,
-	tbody tr:nth-child( even ) td {
+	tbody tr:nth-child(even) th,
+	tbody tr:nth-child(even) td {
 		background: #f0f0f1;
 	}
 
@@ -2388,6 +2464,7 @@
 	td {
 		font-variant-numeric: tabular-nums;
 	}
+	/* stylelint-enable no-descending-specificity */
 }
 
 /* Cellules numériques — alignées à droite + tabular-nums pour que les
@@ -2403,15 +2480,15 @@
 }
 
 .htmln-metrics-diff__delta--loss {
-	color: var( --htmln-color-danger );
+	color: var(--htmln-color-danger);
 }
 
 .htmln-metrics-diff__delta--gain {
-	color: var( --htmln-color-success );
+	color: var(--htmln-color-success);
 }
 
 .htmln-metrics-diff__delta--neutral {
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-weight: 400;
 }
 
@@ -2429,7 +2506,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: var( --htmln-gap );
+	gap: var(--htmln-gap);
 	flex-wrap: wrap;
 	margin: 12px 0;
 
@@ -2441,7 +2518,7 @@
 .htmln-step-banner__progress {
 	flex: 1 1 200px;
 	height: 8px;
-	background: var( --htmln-border );
+	background: var(--htmln-border);
 	border-radius: 999px;
 	overflow: hidden;
 	min-width: 200px;
@@ -2449,7 +2526,7 @@
 
 .htmln-step-banner__progress-fill {
 	height: 100%;
-	background: var( --wp-admin-theme-color, var( --htmln-color-info ) );
+	background: var(--wp-admin-theme-color, var(--htmln-color-info));
 	transition: width 0.25s ease;
 }
 
@@ -2457,7 +2534,7 @@
 	flex-basis: 100%;
 	margin: 8px 0 0;
 	font-size: 12px;
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-style: italic;
 }
 
@@ -2465,7 +2542,7 @@
 	flex-basis: 100%;
 	margin: 8px 0 0;
 	font-size: 12px;
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-style: italic;
 }
 
@@ -2477,32 +2554,32 @@
 	display: flex;
 	gap: 4px;
 	margin-bottom: 16px;
-	border-bottom: 1px solid var( --htmln-border );
+	border-bottom: 1px solid var(--htmln-border);
 
 	button {
 		background: transparent;
 		border: 1px solid transparent;
 		border-bottom: none;
-		border-radius: var( --htmln-radius ) var( --htmln-radius ) 0 0;
+		border-radius: var(--htmln-radius) var(--htmln-radius) 0 0;
 		padding: 8px 16px;
 		font-size: 14px;
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		cursor: pointer;
 		margin-bottom: -1px;
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
 
-		&[aria-selected='true'] {
-			background: var( --htmln-bg-paper );
-			border-color: var( --htmln-border );
-			color: var( --htmln-text );
+		&[aria-selected="true"] {
+			background: var(--htmln-bg-paper);
+			border-color: var(--htmln-border);
+			color: var(--htmln-text);
 			font-weight: 600;
 		}
 
-		&:hover:not( [aria-selected='true'] ) {
-			color: var( --htmln-text );
-			background: var( --htmln-bg-subtle );
+		&:hover:not([aria-selected="true"]) {
+			color: var(--htmln-text);
+			background: var(--htmln-bg-subtle);
 		}
 	}
 }
@@ -2525,12 +2602,12 @@
 	}
 
 	.description {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		margin: 0;
 		max-width: 80ch;
 
 		code {
-			background: var( --htmln-bg-subtle );
+			background: var(--htmln-bg-subtle);
 			padding: 1px 5px;
 			border-radius: 3px;
 			font-size: 12px;
@@ -2546,10 +2623,10 @@
 	/* Conteneur global de l'éditeur — combine la barre fixe et le canevas
 	 * dans un même cadre. Donne un cadre visuel cohérent et permet de
 	 * styler la barre comme un header de mini-éditeur. */
-	border: 1px solid var( --htmln-border );
-	border-radius: var( --htmln-radius-lg );
+	border: 1px solid var(--htmln-border);
+	border-radius: var(--htmln-radius-lg);
 	overflow: hidden;
-	background: var( --htmln-bg-paper );
+	background: var(--htmln-bg-paper);
 }
 
 /* `<BlockTools>` rend un wrapper `<div>` anonyme (toujours premier enfant
@@ -2566,9 +2643,12 @@
 .htmln-notes__editor--booting {
 	padding: 32px;
 	text-align: center;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 	font-style: italic;
 }
+
+/* stylelint-disable max-line-length -- ASCII tree diagram below mirrors
+   long WP component class names; wrapping would harm readability. */
 
 /* =============================================================================
  *  Barre d'éditeur Notes — header persistant avec inserter + toolbar fixe
@@ -2597,14 +2677,15 @@
  *  porteurs de toolbar groups, avec `!important` car la cascade WP a une
  *  spécificité parfois supérieure à nos sélecteurs encapsulés.
  * ========================================================================== */
+/* stylelint-enable max-line-length */
 
 .htmln-notes__editor-bar {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	padding: 8px 12px;
-	background: var( --htmln-bg-subtle );
-	border-bottom: 1px solid var( --htmln-border );
+	background: var(--htmln-bg-subtle);
+	border-bottom: 1px solid var(--htmln-border);
 	min-height: 48px;
 	flex-wrap: wrap;
 	position: sticky;
@@ -2654,7 +2735,7 @@
 	 * groupe block-controls (block-switcher + block-mover). C'est ce
 	 * wrapper qui casse le flex parent en passant à display:block —
 	 * on le force à se comporter comme un flex container row. */
-	.block-editor-block-toolbar > div:not( [class] ) {
+	.block-editor-block-toolbar > div:not([class]) {
 		display: flex !important;
 		flex-direction: row !important;
 		align-items: center;
@@ -2681,7 +2762,7 @@
 }
 
 .htmln-notes__canvas {
-	background: var( --htmln-bg-paper );
+	background: var(--htmln-bg-paper);
 	padding: 24px 32px;
 	min-height: 320px;
 
@@ -2704,7 +2785,7 @@
 	/* Filet : sans wp-edit-blocks chargé, on garde au moins un placeholder
 	 * lisible pour le bloc paragraphe au lieu d'un texte invisible. */
 	[data-rich-text-placeholder]::after {
-		color: var( --htmln-text-faint );
+		color: var(--htmln-text-faint);
 	}
 }
 
@@ -2729,7 +2810,11 @@
  *  stable face aux changements internes de @wordpress/block-editor.
  * ========================================================================== */
 
+/* stylelint-disable-next-line no-duplicate-selectors -- bloc dédié au
+   masquage des popovers Gutenberg ; séparé du bloc d'apparence pour
+   garder le contexte explicatif au-dessus. */
 .htmln-notes__editor {
+
 	/* Le popover lui-même (conteneur flottant) + les variantes spécifiques
 	 * inbetween (entre blocs) et inserter-indicator (la ligne de drop). */
 	.block-editor-block-popover__inbetween,
@@ -2751,12 +2836,12 @@
 	gap: 8px;
 	flex-wrap: wrap;
 	padding: 12px 16px;
-	background: var( --htmln-bg-subtle );
-	border-top: 1px solid var( --htmln-border );
+	background: var(--htmln-bg-subtle);
+	border-top: 1px solid var(--htmln-border);
 }
 
 .htmln-notes__dirty-hint {
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-style: italic;
 	margin-left: auto; /* pousse l'indicateur à droite, loin des boutons */
 }
@@ -2764,7 +2849,7 @@
 .htmln-notes--loading {
 	padding: 32px;
 	text-align: center;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 /* =============================================================================
@@ -2778,6 +2863,52 @@
 
 .htmln-session-gate--pending {
 	min-height: 200px;
+}
+
+/* Bandeau d'avertissement SiteOrigin Page Builder (cf. SiteOriginWarning).
+ * Deux niveaux de sévérité, alignés sur la sémantique WP-Admin :
+ *  - `--active`    : rouge (#d63638, `--htmln-color-error`) → risque immédiat ;
+ *  - `--installed` : orange (`--htmln-color-warning`) → risque latent.
+ * Position : entre le header et la barre d'onglets, pleine largeur. */
+.htmln-so-warning {
+	margin: 4px 0 12px;
+	padding: 12px 16px;
+	border-left: 4px solid transparent;
+	border-radius: var(--htmln-radius);
+	background: var(--htmln-bg-paper);
+	box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+
+	&--active {
+		border-left-color: var(--htmln-color-error, #d63638);
+		background: #fcf0f1;
+	}
+
+	&--installed {
+		border-left-color: var(--htmln-color-warning, #dba617);
+		background: #fcf9e8;
+	}
+}
+
+.htmln-so-warning__title {
+	display: block;
+	margin-bottom: 4px;
+	font-size: 14px;
+}
+
+.htmln-so-warning__body {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.5;
+
+	/* stylelint-disable-next-line no-descending-specificity -- selector
+	   `code` plus spécifique défini en aval pour les descriptions d'autres
+	   composants (htmln-notes header) ; pattern symétrique acceptable. */
+	code {
+		padding: 0 4px;
+		border-radius: 3px;
+		background: rgb(0 0 0 / 5%);
+		font-size: 12px;
+	}
 }
 
 /* Header SPA : mince bandeau au-dessus de la barre d'onglets pour la
@@ -2802,6 +2933,7 @@
 }
 
 .htmln-session-mode__takeover {
+
 	/* Bouton compact pour ne pas alourdir le header. La taille `small` de
 	 * @wordpress/components est déjà appliquée — ce sélecteur sert juste
 	 * de hook pour d'éventuels overrides futurs. */
@@ -2862,25 +2994,25 @@
 .htmln-session-lock__card {
 	max-width: 560px;
 	width: 100%;
-	background: var( --htmln-bg-paper );
-	border: 1px solid var( --htmln-border );
-	border-left: 4px solid var( --htmln-color-warning );
-	border-radius: var( --htmln-radius-lg );
+	background: var(--htmln-bg-paper);
+	border: 1px solid var(--htmln-border);
+	border-left: 4px solid var(--htmln-color-warning);
+	border-radius: var(--htmln-radius-lg);
 	padding: 28px 32px;
-	box-shadow: 0 1px 2px rgba( 0, 0, 0, 0.04 );
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .htmln-session-lock__title {
 	margin: 0 0 16px;
 	font-size: 20px;
 	line-height: 1.3;
-	color: var( --htmln-text );
+	color: var(--htmln-text);
 }
 
 .htmln-session-lock__intro {
 	margin: 0 0 16px;
 	font-size: 15px;
-	color: var( --htmln-text );
+	color: var(--htmln-text);
 }
 
 .htmln-session-lock__meta {
@@ -2889,18 +3021,18 @@
 	gap: 4px 16px;
 	margin: 0 0 20px;
 	padding: 12px 16px;
-	background: var( --htmln-bg-subtle );
-	border-radius: var( --htmln-radius );
+	background: var(--htmln-bg-subtle);
+	border-radius: var(--htmln-radius);
 	font-size: 13px;
 
 	dt {
-		color: var( --htmln-text-muted );
+		color: var(--htmln-text-muted);
 		font-weight: 500;
 	}
 
 	dd {
 		margin: 0;
-		color: var( --htmln-text );
+		color: var(--htmln-text);
 		font-variant-numeric: tabular-nums;
 	}
 }
@@ -2908,7 +3040,7 @@
 .htmln-session-lock__explain {
 	margin: 0 0 20px;
 	font-size: 13px;
-	color: var( --htmln-text-muted );
+	color: var(--htmln-text-muted);
 }
 
 .htmln-session-lock__error {
@@ -2924,6 +3056,6 @@
 .htmln-session-lock__warning {
 	margin: 0;
 	font-size: 12px;
-	color: var( --htmln-text-faint );
+	color: var(--htmln-text-faint);
 	font-style: italic;
 }

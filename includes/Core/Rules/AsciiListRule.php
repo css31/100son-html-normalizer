@@ -84,25 +84,6 @@ final class AsciiListRule implements RuleInterface {
 	);
 
 	/**
-	 * Balises inline porteuses de sens (preservees).
-	 */
-	private const SEMANTIC_INLINE_TAGS = array(
-		'strong',
-		'em',
-		'b',
-		'i',
-		'a',
-		'code',
-		'q',
-		'cite',
-		'mark',
-		'sub',
-		'sup',
-		'abbr',
-		'time',
-	);
-
-	/**
 	 * Conteneurs de presentation (desenrobes si vides d'attributs semantiques).
 	 */
 	private const CONTAINER_TAGS = array( 'span', 'font' );

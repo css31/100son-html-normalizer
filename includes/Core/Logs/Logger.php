@@ -105,7 +105,7 @@ final class Logger {
 			return array( 0, '' );
 		}
 		$user = wp_get_current_user();
-		if ( ! $user || ! isset( $user->ID ) ) {
+		if ( ! $user ) {
 			return array( 0, '' );
 		}
 		return array( (int) $user->ID, (string) ( $user->user_login ?? '' ) );
