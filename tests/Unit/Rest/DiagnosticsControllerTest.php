@@ -133,7 +133,8 @@ final class DiagnosticsControllerTest extends TestCase {
 					'R3'  => 0, 'R4'  => 0, 'R8'  => 0, 'R13' => 0,
 					'R14' => 0, 'R6'  => 0, 'R7'  => 0, 'R5'  => 0,
 					'R15' => 0, 'R16' => 0, 'R9'  => 0, 'R12' => 0,
-					'R11' => 0, 'R10' => 0, 'R1'  => 0, 'R2'  => 0,
+					'R11' => 0, 'R10' => 0, 'R17' => 0, 'R1'  => 0,
+					'R2'  => 0,
 				);
 			}
 			/**
@@ -508,7 +509,7 @@ final class DiagnosticsControllerTest extends TestCase {
 		$this->assertArrayHasKey( 'applicable_rules', $data );
 		$this->assertIsArray( $data['applicable_rules'] );
 		// Toutes les clés PresetRegistry::PRESETS présentes pour UX stable.
-		foreach ( array( 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16' ) as $rid ) {
+		foreach ( array( 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16', 'R17' ) as $rid ) {
 			$this->assertArrayHasKey( $rid, $data['applicable_rules'] );
 		}
 	}

@@ -85,6 +85,7 @@ export const ALL_RULE_IDS = [
 	'R14',
 	'R15',
 	'R16',
+	'R17',
 ];
 
 /**

@@ -1,7 +1,7 @@
 /**
  * Rules — vue racine de l'onglet « Règles » (post-rc1).
  *
- * Liste les 16 règles R1-R16 avec, pour chacune :
+ * Liste les 17 règles R1-R17 avec, pour chacune :
  *  - un **toggle « Activée »** (BDD, persisté via REST). Depuis 2026-05-16,
  *    ce toggle est le **seul** contrôle : il pilote à la fois l'évaluation
  *    par le scan ET l'application au prochain « Appliquer ce lot ». La
@@ -23,7 +23,7 @@
  */
 
 import { __, sprintf } from '@wordpress/i18n';
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, Fragment } from '@wordpress/element';
 import {
 	Button,
 	CheckboxControl,
@@ -37,9 +37,35 @@ import { ALL_RULE_IDS } from '../store';
 import { usePresets } from '../hooks/usePresets';
 import {
 	getRuleLabel,
+	getRuleTooltip,
 	compareRuleIdsByDisplayOrder,
 } from '../utils/ruleLabels';
 import { formatLocalDateTime } from '../utils/datetime';
+
+/**
+ * Schéma de l'ordre d'exécution du pipeline, groupé par phases
+ * sémantiques. Doit rester aligné sur `PresetRegistry::PRESETS`
+ * côté PHP :
+ *   R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R15 → R16
+ *      → R9 → R12 → R11 → R10 → R17 → R1 → R2
+ *
+ * Les phases sont une grille de lecture purement UI — le backend
+ * ne les connaît pas. Elles regroupent les règles par intention
+ * (parasites, chapô, images…) pour expliquer le « pourquoi » de
+ * l'ordre. Si l'ordre PHP change, mettre à jour ce tableau.
+ *
+ * @type {Array<{ label: string, rules: string[] }>}
+ */
+const PIPELINE_PHASES = [
+	{ label: 'Parasites', rules: [ 'R3', 'R4' ] },
+	{ label: 'Sémantique', rules: [ 'R8' ] },
+	{ label: 'Chapô', rules: [ 'R13', 'R14' ] },
+	{ label: 'Styles & listes', rules: [ 'R6', 'R7', 'R5' ] },
+	{ label: 'Inline & préfixes', rules: [ 'R15', 'R16' ] },
+	{ label: 'Images', rules: [ 'R9', 'R12', 'R11', 'R10' ] },
+	{ label: 'Hiérarchie', rules: [ 'R17' ] },
+	{ label: 'Cleanup', rules: [ 'R1', 'R2' ] },
+];
 
 /**
  * Exemples statiques par règle pour l'encart « Avant / Après ».
@@ -111,6 +137,10 @@ const RULE_EXAMPLES = {
 	R16: {
 		before: '<h2>1. Pourquoi bioclimatique ?</h2>\n<h2>• Spécialiste de la terrasse</h2>\n<h3>— Sous-titre</h3>',
 		after: '<h2>Pourquoi bioclimatique ?</h2>\n<h2>Spécialiste de la terrasse</h2>\n<h3>Sous-titre</h3>',
+	},
+	R17: {
+		before: '<p class="chapo">Chapô démoté par R13.</p>\n<h3>Premier sous-titre</h3>\n<p>Texte.</p>\n<h3>Deuxième sous-titre</h3>',
+		after: '<p class="chapo">Chapô démoté par R13.</p>\n<h2>Premier sous-titre</h2>\n<p>Texte.</p>\n<h2>Deuxième sous-titre</h2>',
 	},
 };
 
@@ -216,10 +246,11 @@ export default function Rules() {
 				<h2>{ __( 'Règles', '100son-html-normalizer' ) }</h2>
 				<p className="description">
 					{ __(
-						"Les 16 règles du pipeline de normalisation. Le toggle « Activée » détermine si la règle est évaluée par le scan ET appliquée au prochain « Appliquer ce lot ». Les paramètres et l'état activé sont persistés en base.",
+						"Les 17 règles du pipeline de normalisation. Le toggle « Activée » détermine si la règle est évaluée par le scan ET appliquée au prochain « Appliquer ce lot ». Les paramètres et l'état activé sont persistés en base.",
 						'100son-html-normalizer'
 					) }
 				</p>
+				<PipelineSchema phases={ PIPELINE_PHASES } />
 			</header>
 
 			{ error && (
@@ -269,9 +300,10 @@ export default function Rules() {
 			</div>
 
 			<div className="htmln-rules__list">
-				{ /* Tri d'affichage : pas l'ordre du pipeline
-				 *   (`R3 → R4 → R8 → R13 → R14 → R6 → R7 → R5 → R9 → R12 → R11 → R10 → R1 → R2`)
-				 *   mais l'ordre naturel R1..R14. Cf.
+				{ /* Tri d'affichage : pas l'ordre du pipeline (visible
+				 *   dans le schéma `<PipelineSchema />` au-dessus), mais
+				 *   l'ordre naturel R1..R17 pour faciliter la recherche
+				 *   d'une règle par son numéro. Cf.
 				 *   `utils/ruleLabels.RULE_DISPLAY_ORDER`. */ }
 				{ [ ...( presets ?? [] ) ]
 					.sort( ( a, b ) =>
@@ -818,5 +850,93 @@ function RuleExample( { example } ) {
 				</pre>
 			</div>
 		</div>
+	);
+}
+
+/**
+ * Schéma compact de l'ordre d'exécution du pipeline.
+ *
+ * Rend les phases côte à côte (wrap CSS), chaque phase porte son
+ * label sémantique et la suite des règles séparées par des flèches.
+ * Une flèche fine sépare également les phases. Cliquer sur une
+ * pastille R-id fait défiler la liste vers la `RuleCard`
+ * correspondante (sélecteur `[data-rule-id="…"]`) et applique un
+ * highlight bref via la classe `htmln-rule--flash`.
+ *
+ * @param {Object}                                    props
+ * @param {Array<{ label: string, rules: string[] }>} props.phases
+ * @return {JSX.Element} Schéma rendu.
+ */
+function PipelineSchema( { phases } ) {
+	const handlePillClick = useCallback( ( ruleId ) => {
+		if ( 'undefined' === typeof document ) {
+			return;
+		}
+		const card = document.querySelector( `[data-rule-id="${ ruleId }"]` );
+		if ( ! card ) {
+			return;
+		}
+		card.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+		card.classList.add( 'htmln-rule--flash' );
+		// 1200 ms = durée de l'animation CSS — voir keyframes
+		// `htmln-rule-flash` dans main.scss.
+		window.setTimeout( () => {
+			card.classList.remove( 'htmln-rule--flash' );
+		}, 1200 );
+	}, [] );
+
+	return (
+		<nav
+			className="htmln-rules__pipeline"
+			aria-label={ __(
+				"Ordre d'exécution du pipeline",
+				'100son-html-normalizer'
+			) }
+		>
+			<span className="htmln-rules__pipeline-caption">
+				{ __( "Ordre d'exécution :", '100son-html-normalizer' ) }
+			</span>
+			{ phases.map( ( phase, phaseIndex ) => (
+				<Fragment key={ phase.label }>
+					{ phaseIndex > 0 && (
+						<span
+							className="htmln-rules__pipeline-phase-sep"
+							aria-hidden="true"
+						>
+							{ '»' /* » */ }
+						</span>
+					) }
+					<div className="htmln-rules__pipeline-phase">
+						<span className="htmln-rules__pipeline-phase-label">
+							{ phase.label }
+						</span>
+						<div className="htmln-rules__pipeline-rules">
+							{ phase.rules.map( ( ruleId, ruleIndex ) => (
+								<Fragment key={ ruleId }>
+									{ ruleIndex > 0 && (
+										<span
+											className="htmln-rules__pipeline-arrow"
+											aria-hidden="true"
+										>
+											{ '→' /* → */ }
+										</span>
+									) }
+									<button
+										type="button"
+										className="htmln-rules__pipeline-pill"
+										title={ getRuleTooltip( ruleId ) }
+										onClick={ () =>
+											handlePillClick( ruleId )
+										}
+									>
+										{ ruleId }
+									</button>
+								</Fragment>
+							) ) }
+						</div>
+					</div>
+				</Fragment>
+			) ) }
+		</nav>
 	);
 }

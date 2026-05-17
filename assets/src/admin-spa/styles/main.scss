@@ -780,6 +780,110 @@
 	}
 }
 
+/* Schéma de l'ordre d'exécution du pipeline — affiché en tête de
+ * l'onglet Règles. Une grille flex qui wrap : chaque phase porte
+ * son label sémantique et la suite de pastilles R-id séparées par
+ * des flèches. Cliquer sur une pastille scrolle vers la card. */
+.htmln-rules__pipeline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+	margin-top: 12px;
+	padding: 10px 14px;
+	background: var( --htmln-bg-subtle );
+	border: 1px solid var( --htmln-border );
+	border-radius: var( --htmln-radius );
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.htmln-rules__pipeline-caption {
+	font-weight: 600;
+	color: var( --htmln-text-muted );
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-size: 11px;
+	margin-right: 4px;
+}
+
+.htmln-rules__pipeline-phase {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+
+.htmln-rules__pipeline-phase-label {
+	color: var( --htmln-text-muted );
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding-left: 2px;
+}
+
+.htmln-rules__pipeline-rules {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.htmln-rules__pipeline-arrow {
+	color: var( --htmln-text-muted );
+	font-size: 11px;
+}
+
+.htmln-rules__pipeline-phase-sep {
+	color: var( --htmln-text-muted );
+	font-weight: 700;
+	font-size: 14px;
+	opacity: 0.5;
+	padding: 0 2px;
+	align-self: end;
+	margin-bottom: 2px;
+}
+
+/* Pastille cliquable d'une règle dans le schéma. Reset des styles
+ * `<button>` natifs puis pill compact. */
+.htmln-rules__pipeline-pill {
+	display: inline-block;
+	padding: 2px 8px;
+	background: var( --htmln-bg-paper );
+	border: 1px solid var( --htmln-border );
+	border-radius: 12px;
+	font-family: monospace;
+	font-size: 11px;
+	font-weight: 600;
+	color: inherit;
+	cursor: pointer;
+	transition: background 0.12s ease, border-color 0.12s ease;
+
+	&:hover,
+	&:focus-visible {
+		background: var( --htmln-bg-hover, #f0f0f1 );
+		border-color: var( --htmln-text-muted );
+		outline: none;
+	}
+}
+
+/* Flash temporaire appliqué à une RuleCard quand on clique sur sa
+ * pastille dans le schéma — repère visuel après le scroll. */
+@keyframes htmln-rule-flash {
+	0% {
+		box-shadow: 0 0 0 0 rgba( 0, 124, 186, 0 );
+	}
+	30% {
+		box-shadow: 0 0 0 4px rgba( 0, 124, 186, 0.35 );
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba( 0, 124, 186, 0 );
+	}
+}
+
+.htmln-rule--flash {
+	animation: htmln-rule-flash 1.2s ease-out;
+}
+
 .htmln-rules__toolbar {
 	display: flex;
 	align-items: center;

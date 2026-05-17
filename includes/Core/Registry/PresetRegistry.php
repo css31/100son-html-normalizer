@@ -22,6 +22,7 @@ use Cent_Son\Html_Normalizer\Core\Rules\FirstParagraphChapoRule;
 use Cent_Son\Html_Normalizer\Core\Rules\H2ChapoToParagraphRule;
 use Cent_Son\Html_Normalizer\Core\Rules\HeadingCaptionToFigcaptionRule;
 use Cent_Son\Html_Normalizer\Core\Rules\HeadingMixedToFigureRule;
+use Cent_Son\Html_Normalizer\Core\Rules\HeadingPromotionRule;
 use Cent_Son\Html_Normalizer\Core\Rules\MergeAdjacentInlineTagsRule;
 use Cent_Son\Html_Normalizer\Core\Rules\PinterestArtifactsRule;
 use Cent_Son\Html_Normalizer\Core\Rules\StripHeadingPrefixRule;
@@ -90,9 +91,18 @@ class PresetRegistry {
 	 * heading (« 1. », « 2) », « • », « – »). Placée entre R15 et R9
 	 * pour que R11/R12/R9 voient des h4 propres.
 	 *
+	 * R17 (post-v1.0.0) promeut en cascade les `<h3>`–`<h6>` quand le
+	 * fragment ne contient aucun `<h2>`. Cas typique : un article SO
+	 * dont le chapô-h2 vient d'être démoté en `<p class="chapo">` par
+	 * R13, laissant une hiérarchie qui commence à h3 — défaut sémantique
+	 * (~22 articles MMM-2 dont 374). Placée entre R10 et R1 : toutes
+	 * les règles qui inspectent un niveau précis (R9, R11, R12, R10)
+	 * ont déjà tourné, R13/R14 ont libéré la condition « aucun h2 »,
+	 * et le cleanup final R1/R2 reste en aval.
+	 *
 	 * @var list<string>
 	 */
-	public const PRESETS = array( 'R3', 'R4', 'R8', 'R13', 'R14', 'R6', 'R7', 'R5', 'R15', 'R16', 'R9', 'R12', 'R11', 'R10', 'R1', 'R2' );
+	public const PRESETS = array( 'R3', 'R4', 'R8', 'R13', 'R14', 'R6', 'R7', 'R5', 'R15', 'R16', 'R9', 'R12', 'R11', 'R10', 'R17', 'R1', 'R2' );
 
 	/**
 	 * Repository de configuration des presets.
@@ -256,6 +266,11 @@ class PresetRegistry {
 				'description' => __( 'Retire les préfixes typographiques placés en tête d\'un <code>&lt;h1&gt;</code>–<code>&lt;h6&gt;</code> : <strong>numéros d\'ordre</strong> (« 1. », « 23) », « 5° » — 1 à 2 chiffres + ponctuation + espace) et <strong>puces / tirets</strong> (<code>•</code>, <code>‣</code>, <code>►</code>, <code>▸</code>, <code>*</code>, <code>-</code>, <code>–</code>, <code>—</code>). Convention sémantique : un heading porte un titre, pas une marque de liste — la numérotation appartient soit à une <code>&lt;ol&gt;</code>, soit au thème via <code>counter-reset</code> + <code>::before</code>. Walk DOM : trouve le préfixe même s\'il est emballé dans un inline (<code>&lt;h2&gt;&lt;strong&gt;1.&lt;/strong&gt; Texte&lt;/h2&gt;</code> → <code>&lt;h2&gt;&lt;strong&gt;&lt;/strong&gt; Texte&lt;/h2&gt;</code>, wrapper vide laissé pour cleanup ultérieur). Audit corpus MMM-2 : 5 articles concernés (4 numérotés : 1065, 2013, 3552, 3787 ; 1 avec puces : 892).', '100son-html-normalizer' ),
 				'has_options' => false,
 			),
+			'R17' => array(
+				'label'       => __( 'Promotion h3 → h2 (cascade sans h2)', '100son-html-normalizer' ),
+				'description' => __( 'Promeut d\'un cran les titres <code>&lt;h3&gt;</code>–<code>&lt;h6&gt;</code> lorsque le fragment ne contient <strong>aucun</strong> <code>&lt;h2&gt;</code>. Cascade : <code>&lt;h6&gt;</code> → <code>&lt;h5&gt;</code>, <code>&lt;h5&gt;</code> → <code>&lt;h4&gt;</code>, <code>&lt;h4&gt;</code> → <code>&lt;h3&gt;</code>, <code>&lt;h3&gt;</code> → <code>&lt;h2&gt;</code>. Les attributs (<code>id</code>, <code>class</code>, <code>style</code>…) et le contenu interne sont préservés — seule la balise change. Cas typique : article SiteOrigin dont le chapô-<code>&lt;h2&gt;</code> vient d\'être démoté en <code>&lt;p class="chapo"&gt;</code> par R13, laissant une hiérarchie qui commence à <code>&lt;h3&gt;</code> — défaut sémantique HTML5. Skipped si au moins un <code>&lt;h2&gt;</code> est présent (les vrais sous-titres de section sont préservés). Audit corpus MMM-2 : 22 articles concernés (374, 491, 515, 677, 714, 802, 812, 823, 836, 847, 881, 948, 1238, 1291, 5474, 5795, 5837, 5851, 5854, 5866, 6110, 6150).', '100son-html-normalizer' ),
+				'has_options' => false,
+			),
 		);
 	}
 
@@ -332,6 +347,9 @@ class PresetRegistry {
 
 			case 'R16':
 				return new StripHeadingPrefixRule();
+
+			case 'R17':
+				return new HeadingPromotionRule();
 
 			default:
 				return null;

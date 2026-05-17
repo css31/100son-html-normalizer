@@ -49,7 +49,7 @@ final class PresetsController extends BaseController {
 	 *
 	 * @var list<string>
 	 */
-	private const KNOWN_IDS = array( 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16' );
+	private const KNOWN_IDS = array( 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15', 'R16', 'R17' );
 
 	/**
 	 * Defaults par règle. Source de vérité dupliquée depuis
@@ -95,6 +95,7 @@ final class PresetsController extends BaseController {
 		'R14' => array(),
 		'R15' => array(),
 		'R16' => array(),
+		'R17' => array(),
 	);
 
 	/**
@@ -126,11 +127,11 @@ final class PresetsController extends BaseController {
 			'permission_callback' => $cap,
 		) );
 
-		// Regex `R(?:1[0-6]|[1-9])` : matche R1..R16 et **rien d'autre**. On
+		// Regex `R(?:1[0-7]|[1-9])` : matche R1..R17 et **rien d'autre**. On
 		// préfère l'alternation explicite à `R\d+` pour ne pas accepter des
-		// Rxx encore inexistants (R17, R18…) et garantir le 404 propre via
+		// Rxx encore inexistants (R18, R19…) et garantir le 404 propre via
 		// la regex elle-même.
-		register_rest_route( $ns, '/presets/(?P<id>R(?:1[0-6]|[1-9]))', array(
+		register_rest_route( $ns, '/presets/(?P<id>R(?:1[0-7]|[1-9]))', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'update_preset' ),
 			'permission_callback' => $can_write,

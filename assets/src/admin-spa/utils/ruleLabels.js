@@ -63,6 +63,7 @@ export const RULE_TOOLTIPS = {
 	R14: 'Marquage chapô (1er p + crédits)',
 	R15: 'Fusion balises inline en double',
 	R16: 'Préfixes de titre (numéros, puces)',
+	R17: 'Promotion h3 → h2 (cascade sans h2)',
 };
 
 /**
@@ -91,6 +92,7 @@ export const RULE_DISPLAY_ORDER = {
 	R14: 14,
 	R15: 15,
 	R16: 16,
+	R17: 17,
 };
 
 /**

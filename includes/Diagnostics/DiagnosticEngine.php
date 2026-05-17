@@ -64,14 +64,35 @@ class DiagnosticEngine {
 		$matching_rules = array();
 		$total_matches  = 0;
 
+		// Cascade fusionnée : on traverse les règles dans l'ordre canonique
+		// du pipeline et, **à chaque étape**, on compte les occurrences sur
+		// l'état HTML courant AVANT d'appliquer la règle. Sans cette cascade,
+		// les règles dépendantes d'un effet amont sont invisibles dans le
+		// scan — typiquement R17 (promote h3→h2 si 0 h2) qui voit toujours
+		// le chapô-h2 brut avant que R13 ne le démote ; côté R14 le 1er p
+		// significatif a déjà été marqué chapô par R13, etc. Symétrique de
+		// `Rest\DiffController::compute_diff()` qui a fait ce même fix le
+		// 2026-05-14 pour les counts affichés dans la modale Diff. Les
+		// exceptions `apply()` sont silenced (état précédent conservé) —
+		// même contrat défensif que `Pipeline::run()`.
+		$current = $html;
+		$context = array( 'post_id' => $post->ID );
 		foreach ( $rules as $rule ) {
-			$count = $rule->countMatches( $html );
+			$count = $rule->countMatches( $current, $context );
 			if ( $count > 0 ) {
 				$matching_rules[] = array(
 					'rule_id'     => $rule->id(),
 					'occurrences' => $count,
 				);
 				$total_matches += $count;
+			}
+			try {
+				$result = $rule->apply( $current, $context );
+				if ( is_string( $result ) ) {
+					$current = $result;
+				}
+			} catch ( \Throwable $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+				// On continue avec la sortie précédente intacte.
 			}
 		}
 

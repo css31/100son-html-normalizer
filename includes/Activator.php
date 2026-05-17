@@ -195,6 +195,7 @@ final class Activator {
 			'R14' => array( 'enabled' => true ),
 			'R15' => array( 'enabled' => true ),
 			'R16' => array( 'enabled' => true ),
+			'R17' => array( 'enabled' => true ),
 		);
 
 		$existing = get_option( 'son100_htmln_presets', false );
