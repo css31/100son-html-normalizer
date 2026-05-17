@@ -5,6 +5,108 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### R17 (`HeadingPromotionRule`) + schéma du pipeline + fix cascade `DiagnosticEngine` (2026-05-17)
+
+Nouvelle règle **R17** qui promeut `<h3>`–`<h6>` d'un cran lorsque le fragment ne contient aucun `<h2>`. Cible 22 articles SiteOrigin du corpus MMM-2 (374, 491, 5866, 6150…) dont le chapô-h2 est démoté en `<p class="chapo">` par R13, laissant la hiérarchie commencer à `<h3>`. Cascade ascendante (`<h3>` → `<h2>` d'abord) pour garantir une promotion d'exactement un cran. Position pipeline : entre R10 et R1.
+
+**Fix collatéral** — `DiagnosticEngine::diagnose()` traverse désormais les règles en cascade (`countMatches` → `apply` à chaque étape), symétrique de ce que `Rest\DiffController::compute_diff()` fait depuis 2026-05-14. Sans ça, R17 (et toute règle dépendante d'un effet amont) voyait toujours le HTML brut et retournait 0 dans le scan. Effets visibles : R17 remonte (9 occ. sur 374, 13 sur 6150), R14 disparaît des articles à chapô-h2 (R13 a déjà démoté → 1er `<p>` déjà chapô), R1/R2 montent (paragraphes/titres vides produits par R9/R11/R12 maintenant visibles). **Les diagnostics persistés avant ce commit sont obsolètes — recalculés au prochain scan complet.**
+
+**Onglet Règles** — schéma compact en en-tête montrant l'ordre d'exécution canonique, regroupé en 8 phases sémantiques (Parasites, Sémantique, Chapô, Styles & listes, Inline & préfixes, Images, Hiérarchie, Cleanup). Pastilles cliquables qui font défiler vers la `RuleCard` correspondante avec animation flash. Source de vérité côté front : constante `PIPELINE_PHASES` dans `Rules.jsx`, à maintenir alignée sur `PresetRegistry::PRESETS`.
+
+**Câblage R17** :
+- Backend : `HeadingPromotionRule.php` + `PresetRegistry` (PRESETS + metadata + build_rule) + `Activator` (seed enabled) + `PresetsController` (KNOWN_IDS + DEFAULTS + regex route REST `R(?:1[0-7]|[1-9])`).
+- Frontend : `utils/ruleLabels.js` (TOOLTIPS + DISPLAY_ORDER), `store/index.js` (ALL_RULE_IDS), `Rules.jsx` (RULE_EXAMPLES + composant `PipelineSchema`).
+
+**Tests** : nouveau `HeadingPromotionRuleTest` (23 tests couvrant déclenchement, no-op, cascade ascendante, idempotence, préservation attributs, fixture article 374). 3 tests existants mis à jour pour la 17e règle (Activator / PresetsController / DiagnosticsController).
+
+**Validation** : 1046 PHPUnit verts (2061 assertions), PHPStan baseline inchangée (14), lint:js 0.
+
+### Rollback d'un lot via les révisions WP capturées (2026-05-16)
+
+Permet de restaurer le contenu antérieur d'un step — entier ou par article — depuis l'onglet Historique, en s'appuyant sur la révision créée juste avant chaque écriture par `StepRunner`. Pattern dry-run + exécution avec détection cascade pour avertir l'admin que les steps postérieurs sur les mêmes articles seront aussi perdus.
+
+**Backend**
+- `StepRunner::write_post_content()` capture désormais l'ID de la révision et le remonte vers `ArticleResult::success()` ;
+- `ArticleResult.revision_id` sérialisé dans `per_article_results`, décodé par `StepRecord` (rejette ≤ 0 → les anciens steps pré-feature restent skippables) ;
+- `StepsRepository::find_subsequent_steps_for_post()` pour la cascade ;
+- `Steps/RollbackService` (nouveau) avec raisons de skip explicites : `no_result`, `not_success`, `revision_not_captured`, `revision_purged`, `revision_parent_mismatch` ;
+- `POST /steps/<uuid>/rollback` (`permission_check_locked`) avec body `{ post_ids?, dry_run? }` ;
+- `wp htmln steps rollback <uuid> [--post-id=ID,…] [--dry-run]`.
+
+**Frontend**
+- `api.steps.rollback()` ;
+- `RollbackConfirmModal` : phase 1 plan + cascade, phase 2 exécution + résultat. Synthèse des skips par raison pour ne pas saturer l'écran sur les gros lots ;
+- `StepDetailDrawer` : bouton « Restaurer tout le lot » dans le footer + bouton « Restaurer » par ligne (uniquement `success` + `revision_id` capturé). `ReadOnlyTooltip` pour le mode session secondaire ;
+- Refetch du parent post-rollback.
+
+**Tests** : +17 (1023 total verts), couvrent les 5 raisons de skip, dry-run, filtre `post_ids`, cascade (success only), erreur `wp_restore`. Stubs `wp_restore_post_revision` + `post_parent` ajoutés au bootstrap. PHPStan baseline inchangée.
+
+### Modale Diff — bouton « Actuel » à côté de Site 1 / Site 2 (2026-05-16)
+
+Ouvre l'article sur le site courant (celui qui héberge l'extension) via le permalien WP natif du payload REST. Placé en premier de la rangée pour cohérence visuelle : **Actuel → Site 1 → Site 2**.
+
+### « Tout activer » ne ressuscite plus les règles auto-désactivées (2026-05-16)
+
+Une règle dont le corpus est épuisé (`completion_state = 'complete'` + `auto_disabled_at`) est désactivée par le backend après scan. Le bulk « Tout activer » court-circuitait ce garde-fou et la réactivait, relançant du travail déjà accompli. Désormais il les saute ; pour les remettre en jeu, passer par « Réactiver pour cette session » dans la carte de la règle. Bouton « Tout activer » désactivé visuellement dès que `enabledCount + autoDisabledCount === totalCount`.
+
+### Périmètre du scan + UI onglets + rappel sauvegarde + ménage REST + fusion « Activée » (2026-05-16)
+
+Cinq sujets indépendants livrés en série (`d0085a7`).
+
+**Périmètre du scan (Normaliser)** — `POST /diagnostics/run` accepte deux paramètres optionnels rétro-compatibles : `filters` (search/cat_id/year/month/builder, alignés sur `DiagnosticsRepository::list_paginated`) et `exclude_normalized` (bool) qui retire les articles dont le dernier scan est `status = 'normal'` ET non périmé. Frontend : libellé bouton dynamique (« Scanner le corpus » / « Scanner les articles filtrés »), case « Exclure les articles déjà OK » dans `ScanBar`.
+
+**Compteur des onglets fusionné dans la barre « Par page »** — les 3 onglets `TabsHeader` (À normaliser / Normalisés / Diagnostics obsolètes) n'affichent plus de pastille de compteur. Le total de l'onglet actif est rendu à droite du `SelectControl` « Par page » via un tiret cadratin (—). Un seul lieu de lecture cohérent avec la pagination.
+
+**Bandeau « sauvegarde recommandée »** — apparaît au-dessus du bouton « Appliquer ce lot » dès `selectedPostCount >= LARGE_LOT_THRESHOLD = 10`. `Notice` WP avertissement non bloquant non dismissible : (a) rappelle que WP crée une révision avant chaque modification (filet natif), (b) recommande une sauvegarde externe (UpdraftPlus, BackWPup, snapshot hébergeur, `mysqldump`). Pas de case à cocher, pas de blocage — purement informatif.
+
+**Suppression des 2 routes REST orphelines V0.1** — `GET /posts/<id>/preview` + `POST /posts/<id>/normalize` retirés (consommés uniquement par les pages V0.1 supprimées le 2026-05-16). La normalisation unitaire passe désormais exclusivement par F14 (`POST /steps/run`), le diff par `POST /posts/<id>/diff`. Ménage induit dans `PostsController` (constantes orphelines révélées par PHPStan).
+
+**Fusion « Activée » / « Dans le lot »** — décision UX : un seul drapeau par règle. Le toggle « Activée » pilote désormais l'évaluation par le scan ET l'application au prochain « Appliquer ce lot ». La case « Dans le lot » + son state `selectedRules` localStorage ont été supprimés du store (clé `htmln-spa.selectedRules` retirée). Les bulk buttons « Tout cocher / décocher » deviennent « Tout activer / Tout désactiver » via `Promise.all(presets.map(p => save(p.id, { enabled })))`. Backend inchangé : le frontend envoie `applicableRules = presets.filter(p => p.enabled)`.
+
+Validation : 1006 PHPUnit verts (1980 assertions), PHPStan 14 erreurs = baseline pré-existante, lint:js clean.
+
+### Fix `exclude_normalized` via statut diagnostic 'normal' (et non type Gutenberg) (2026-05-16)
+
+Corrige l'interprétation introduite dans `3bafb23`. La version initiale utilisait `BuilderClassifier::TYPE_GUTENBERG` comme critère, ce qui était faux :
+
+- un article Gutenberg avec des règles qui matchent encore (statut `to_improve`) était **incorrectement exclu** du re-scan ;
+- un article SiteOrigin avec un scan déjà OK (statut `normal`) était **incorrectement inclus** dans le re-scan.
+
+La sémantique « normalisé » correspond au **statut diagnostic**, pas au type de constructeur. La case à cocher signifie désormais : « Exclure les articles dont le dernier scan est déjà OK (statut `normal` + non périmé) ». Articles jamais diagnostiqués → inclus dans le scan (pas de preuve d'OK = à scanner).
+
+**Backend** : `DiagnosticsRepository::find_post_ids_with_status()` (nouveau) — SQL `IN (...) AND status = 'normal' AND is_stale = 0`. `DiagnosticBatchRunner::start_batch()` appelle le repo + `array_diff` au lieu de la classification PHP via `BuilderClassifier`. Le filtre `builder` (cumulable, séparé) garde son usage classifier intact.
+
+**Frontend** : `ScanBar.jsx` — libellé « Exclure les articles déjà normalisés (Gutenberg) » → « Exclure les articles déjà OK ».
+
+### Verrou single-user + retrait définitif V0.1 + fixes sélection/timezone (2026-05-16)
+
+Salve post-rc4 regroupant 4 sujets cohérents.
+
+**Verrou single-user (Plan C — lecture seule en option)**
+- `Session/SessionLock` : verrou option WP `son100_htmln_active_session`, TTL 5 min, header `X-Htmln-Session-Id`, méthode `guard()` pour `permission_callback` ;
+- `Rest/SessionController` : 4 routes `/session/*` (status, acquire, heartbeat, release) ;
+- `Rest/BaseController` : `permission_check_locked()` + setter `set_session_lock()` injecté par `RestServiceProvider` ;
+- 16 routes mutatives (Steps / Diagnostics / Posts / Diff / Presets / Settings / Notes) basculent sur `permission_check_locked` ;
+- SPA : `SessionGate` wrap `App` (acquire au mount, heartbeat 60 s, release via `sendBeacon` au unload), `SessionLockScreen` avec choix Forcer / Lecture seule, `SessionModeBadge` (« Session principale / secondaire » + bouton « Prendre la main »). Mode secondaire désactive 5 boutons mutatifs majeurs via `useIsReadOnly` + `ReadOnlyTooltip`. Toast non bloquant pour les 409 restants ;
+- 40 tests `SessionLock` (acquire / heartbeat / release / guard / expiration).
+
+**Retrait définitif des pages V0.1**
+- Supprime `PresetsPage` / `TesterPage` / `PostsPage` / `LogsPage` (-2520 lignes) ;
+- `Plugin.php` : retire instanciations + imports `Logger` / `LogRepository` / `NotesRepository` devenus orphelins ;
+- `Menu.php` : constructeur 5 → 1 paramètre, garde uniquement le top-level `SpaPage` + alias rétro-compat `?page=100son-html-normalizer-spa` ;
+- PHPStan baseline -8 erreurs (toutes celles de `PostsPage`).
+
+**Fix sélection règles**
+- Store : action `removeSelectedRules` + reducer correspondant ;
+- `usePresets` : dispatch `removeSelectedRules` après chaque fetch pour synchroniser la sélection « Dans le lot » avec les règles auto-désactivées par le backend ;
+- `Normalize.jsx` : appelle `usePresets` pour garantir le sync même sans visite de l'onglet Règles + `useMemo applicableRules` pour le filtre défensif final dans le payload `POST /steps/run`.
+
+**Fix timezone affichage dates UTC**
+- Nouveau `utils/datetime.js` : `parseUtcDatetime` + `formatLocalDateTime`, force le suffixe `Z` sur les strings MySQL `gmdate()` avant `new Date()` ;
+- 4 affichages bruts corrigés : `ArticlesTable` (`diagnosed_at`), `StepsTable` (`started_at`), `StepDetailDrawer` (`started_at` + `finished_at`). `Rules.jsx` migré sur le helper pour cohérence.
+
+Validation : 1006 PHPUnit verts (+ 40 nouveaux SessionLock), PHPStan 14 vs 22 baseline (-8 V0.1), lint:js clean.
+
 ### Persistance localStorage de la sélection de règles
 
 Le store `htmln/spa.selectedRules` était jusqu'ici purement mémoire — au rechargement de la page, toutes les règles redevenaient cochées par défaut, balayant le travail de filtrage de l'utilisateur. Désormais persisté dans `localStorage` (clé `htmln-spa.selectedRules`) :
