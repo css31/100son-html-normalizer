@@ -622,6 +622,17 @@ if ( ! function_exists( 'is_admin' ) ) {
 	}
 }
 
+if ( ! function_exists( 'is_plugin_active' ) ) {
+	$GLOBALS['son100_htmln_test_active_plugins'] = $GLOBALS['son100_htmln_test_active_plugins'] ?? [];
+	/**
+	 * Stub : consulte un registre global d'extensions actives, alimenté par
+	 * les tests via `$GLOBALS['son100_htmln_test_active_plugins'][$file] = true`.
+	 */
+	function is_plugin_active( string $plugin_file ): bool {
+		return ! empty( $GLOBALS['son100_htmln_test_active_plugins'][ $plugin_file ] );
+	}
+}
+
 if ( ! function_exists( 'rest_url' ) ) {
 	function rest_url( string $path = '' ): string {
 		return 'http://example.test/wp-json/' . ltrim( $path, '/' );

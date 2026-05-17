@@ -32,6 +32,7 @@ import Rules from './views/Rules';
 import Settings from './views/Settings';
 import Notes from './views/Notes';
 import SessionModeBadge from './components/SessionModeBadge';
+import SiteOriginWarning from './components/SiteOriginWarning';
 
 /**
  * Identifiants de routes (utilisés dans le hash et dans le state local).
@@ -110,6 +111,7 @@ export default function App() {
 			<div className="htmln-app__header">
 				<SessionModeBadge />
 			</div>
+			<SiteOriginWarning />
 			<nav
 				className="nav-tab-wrapper htmln-app__tabs"
 				aria-label={ __(

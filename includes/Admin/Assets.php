@@ -100,6 +100,19 @@ final class Assets {
 			true
 		);
 
+		// Expose l'état SiteOrigin Page Builder au front (window.htmlnEnv).
+		// La SPA affiche un avertissement contextualisé quand SO est actif
+		// (risque immédiat de double-rendu via `panels_data`) ou installé
+		// mais inactif (risque latent de réactivation pendant la migration).
+		// Pas d'autre information sensible ici — `wp_localize_script`
+		// suffit, pas besoin d'un endpoint REST dédié.
+		$environment = new SiteOriginEnvironment();
+		wp_localize_script(
+			self::SCRIPT_HANDLE,
+			'htmlnEnv',
+			$environment->to_array()
+		);
+
 		// Localisation des chaînes JS (cf. cahier §11.27 + §13).
 		// Le dossier `languages/` peut ne pas exister encore (Phase 6.7) —
 		// `wp_set_script_translations` est tolérant.
