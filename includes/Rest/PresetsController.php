@@ -195,12 +195,18 @@ final class PresetsController extends BaseController {
 			);
 		}
 
-		$config = $this->settings->get_preset_config( $id );
+		$config              = $this->settings->get_preset_config( $id );
+		$old_enabled         = isset( $config['enabled'] ) ? (bool) $config['enabled'] : true;
+		$enabled_transitions = false;
 
 		// Mise à jour de `enabled` si fourni.
 		$enabled_param = $request->get_param( 'enabled' );
 		if ( null !== $enabled_param ) {
-			$config['enabled'] = (bool) $enabled_param;
+			$new_enabled = (bool) $enabled_param;
+			if ( $new_enabled !== $old_enabled ) {
+				$enabled_transitions = true;
+			}
+			$config['enabled'] = $new_enabled;
 		}
 
 		// Mise à jour des paramètres si fournis. Les params absents ou
@@ -215,6 +221,20 @@ final class PresetsController extends BaseController {
 
 		$this->settings->set_preset_config( $id, $config );
 
+		// Invalidation des diagnostics quand le set de règles activées change
+		// (livré 2026-05-18). Les `matching_rules` persistés sont calculés
+		// avec un set précis ; toggler une règle modifie ce set et rend tous
+		// les diagnostics obsolètes — l'utilisateur doit rescanner. On bascule
+		// donc `is_stale = 1` sur tout le corpus pour rendre cette obsolescence
+		// visible (onglets « À normaliser » / « Normalisés » se vident, onglet
+		// « Diagnostics obsolètes » se remplit). Les changements de params
+		// d'une règle n'invalident PAS — ils sont supposés plus fins et
+		// l'utilisateur rescanne explicitement si besoin.
+		$stale_count = 0;
+		if ( $enabled_transitions && null !== $this->diagnostics ) {
+			$stale_count = $this->diagnostics->mark_all_stale();
+		}
+
 		$metadata = $this->registry->get_all_presets_metadata();
 		$meta     = $metadata[ $id ] ?? array(
 			'label'       => $id,
@@ -222,7 +242,8 @@ final class PresetsController extends BaseController {
 			'has_options' => false,
 		);
 		return $this->respond( array(
-			'preset' => $this->preset_to_array( $id, $meta, $config ),
+			'preset'                  => $this->preset_to_array( $id, $meta, $config ),
+			'diagnostics_invalidated' => $stale_count,
 		) );
 	}
 

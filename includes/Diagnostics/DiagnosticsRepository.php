@@ -639,6 +639,26 @@ class DiagnosticsRepository {
 	}
 
 	/**
+	 * Marque is_stale = 1 sur **tous** les diagnostics du corpus. Utilisé
+	 * lorsque le set de règles activées change (toggle « Activée » dans
+	 * l'onglet Règles) — les `matching_rules` persistés ne reflètent plus
+	 * la config courante et doivent être recalculés au prochain scan.
+	 *
+	 * Les diagnostics déjà périmés ne sont pas re-touchés (UPDATE filtré
+	 * sur `is_stale = 0`) — évite de modifier inutilement des lignes et
+	 * permet à `$wpdb::query()` de retourner un count significatif des
+	 * articles fraîchement invalidés.
+	 *
+	 * @return int Nombre de diagnostics nouvellement marqués (≥ 0).
+	 */
+	public function mark_all_stale(): int {
+		$result = $this->wpdb->query(
+			"UPDATE `{$this->table}` SET is_stale = 1 WHERE is_stale = 0"
+		);
+		return is_int( $result ) ? $result : 0;
+	}
+
+	/**
 	 * Supprime le diagnostic d'un article (utile lors d'un trash/delete WP).
 	 *
 	 * @param int $post_id Identifiant de l'article.

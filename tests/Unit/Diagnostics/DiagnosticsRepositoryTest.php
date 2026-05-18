@@ -120,6 +120,24 @@ final class DiagnosticsRepositoryTest extends TestCase {
 		$this->assertFalse( $this->repo->mark_stale_for_post( 9999 ) );
 	}
 
+	public function test_mark_all_stale_runs_filtered_update_and_returns_count(): void {
+		$this->wpdb->query_return = 327;
+		$this->assertSame( 327, $this->repo->mark_all_stale() );
+		$this->assertNotEmpty( $this->wpdb->query_log );
+		$last = $this->wpdb->query_log[ count( $this->wpdb->query_log ) - 1 ];
+		// Le filtre `WHERE is_stale = 0` évite de re-toucher les diagnostics
+		// déjà périmés et fait que le count retourné = articles fraîchement
+		// invalidés (sémantique utile pour le payload REST).
+		$this->assertStringContainsString( 'UPDATE', $last );
+		$this->assertStringContainsString( 'is_stale = 1', $last );
+		$this->assertStringContainsString( 'is_stale = 0', $last );
+	}
+
+	public function test_mark_all_stale_returns_zero_when_no_rows_affected(): void {
+		$this->wpdb->query_return = 0;
+		$this->assertSame( 0, $this->repo->mark_all_stale() );
+	}
+
 	public function test_delete_for_post_uses_prepared_query(): void {
 		$this->wpdb->query_return = 1;
 		$this->assertTrue( $this->repo->delete_for_post( 42 ) );

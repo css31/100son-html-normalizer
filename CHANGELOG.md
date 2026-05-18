@@ -5,6 +5,22 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Auto-invalidation des diagnostics au toggle d'une règle (2026-05-18)
+
+**Avant** : le toggle « Activée » d'une règle dans l'onglet Règles modifiait uniquement l'option WP `son100_htmln_presets`. La table `son100_htmln_diagnostics` restait inchangée, avec ses `matching_rules` figés calculés sur un autre set de règles. Conséquence : après activation d'une règle supplémentaire, l'onglet « À normaliser » continuait d'afficher les seuls articles du dernier scan, sans intégrer les nouvelles règles activées — comportement perçu comme un bug du filtre (cf. cas R14 seul scanné, puis activation globale).
+
+**Après** : toute transition `enabled` ON↔OFF d'une règle déclenche `DiagnosticsRepository::mark_all_stale()` qui bascule tous les diagnostics `is_stale = 1`. Effet visible côté SPA : les onglets « À normaliser » et « Normalisés » se vident (filtre SQL `is_stale = 0`), l'onglet « Diagnostics obsolètes » se peuple. L'utilisateur comprend qu'il doit rescanner pour rafraîchir avec le set de règles courant.
+
+**Périmètre** : la transition `enabled` invalide ; un changement de paramètres seul (ex. seuil R5, mappings R8…) n'invalide pas — l'utilisateur rescanne explicitement s'il veut intégrer le changement.
+
+**Implémentation** :
+- `DiagnosticsRepository::mark_all_stale(): int` — UPDATE filtré sur `is_stale = 0` (évite de re-toucher les diagnostics déjà périmés et retourne un count utile).
+- `PresetsController::update_preset()` compare l'ancien `enabled` à la nouvelle valeur, déclenche `mark_all_stale()` uniquement si transition (no-op idempotent si même valeur).
+- Réponse REST `POST /presets/<id>` ajoute un champ `diagnostics_invalidated` (count d'articles fraîchement invalidés) — base pour une éventuelle notice SPA future.
+- `DiagnosticsRepository` injectée optionnelle dans `PresetsController` (déjà câblée dans `Plugin.php`) ; si nulle (rétro-compat 2-arg), l'invalidation est silencieusement skippée.
+
+**Tests** : 6 PHPUnit neufs (2 sur `mark_all_stale` côté repo + 4 sur le hook controller : transition, no-op même valeur, params-only, repo absent). 1078 PHPUnit verts, PHPStan `[OK] No errors`.
+
 ### Onglet Normaliser — scission du bandeau Scan/Apply en deux cards (2026-05-18)
 
 Le panneau unique qui englobait `ScanBar` (« Scanner le corpus ») et `ApplyStepBar` (« Appliquer ce lot ») est scindé en deux cards distinctes (`htmln-normalize__action-card--scan` et `--apply`), chacune avec son propre fond / bordure / radius. Le wrapper `htmln-normalize__actions` redevient un simple layout container `flex-wrap` — côte à côte sur grand écran, empilées sur petit. Chaque card a un `aria-label` qui annonce son rôle aux technologies d'assistance.

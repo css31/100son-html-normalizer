@@ -10,9 +10,11 @@ declare( strict_types=1 );
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Rest;
 
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
 use Cent_Son\Html_Normalizer\Rest\PresetsController;
 use Cent_Son\Html_Normalizer\Settings\SettingsRepository;
 use PHPUnit\Framework\TestCase;
+use Son100_Htmln_Test_Wpdb;
 use WP_REST_Request;
 
 final class PresetsControllerTest extends TestCase {
@@ -234,6 +236,85 @@ final class PresetsControllerTest extends TestCase {
 		$presets = get_option( 'son100_htmln_presets', array() );
 		$this->assertTrue( $presets['R6']['enabled'] );
 		$this->assertFalse( $presets['R6']['keep_text_align'] );
+	}
+
+	// =========================================================================
+	//  Auto-invalidation des diagnostics au toggle enabled (2026-05-18)
+	// =========================================================================
+
+	public function test_toggle_enabled_transition_marks_all_diagnostics_stale(): void {
+		// Pré-condition : R1 actuellement enabled=true (defaut). Désactiver
+		// → transition ON→OFF → mark_all_stale doit être appelé.
+		$diag    = $this->stub_diagnostics();
+		$request = new WP_REST_Request();
+		$request->set_param( 'id', 'R1' );
+		$request->set_param( 'enabled', false );
+
+		$response = $this->controller_with_diagnostics( $diag )->update_preset( $request );
+
+		$this->assertSame( 1, $diag->mark_all_stale_calls );
+		$this->assertSame( 42, $response->get_data()['diagnostics_invalidated'] );
+	}
+
+	public function test_toggle_enabled_noop_does_not_invalidate(): void {
+		// Pré-condition : R1 enabled=true. Le payload ré-écrit enabled=true
+		// (même valeur) → pas de transition → pas d'invalidation.
+		$diag    = $this->stub_diagnostics();
+		$request = new WP_REST_Request();
+		$request->set_param( 'id', 'R1' );
+		$request->set_param( 'enabled', true );
+
+		$response = $this->controller_with_diagnostics( $diag )->update_preset( $request );
+
+		$this->assertSame( 0, $diag->mark_all_stale_calls );
+		$this->assertSame( 0, $response->get_data()['diagnostics_invalidated'] );
+	}
+
+	public function test_params_only_update_does_not_invalidate_diagnostics(): void {
+		// Changer un param sans toucher au toggle enabled ne déclenche pas
+		// l'invalidation — règle de design 2026-05-18 (l'utilisateur rescanne
+		// explicitement si un changement de params doit invalider).
+		$diag    = $this->stub_diagnostics();
+		$request = new WP_REST_Request();
+		$request->set_param( 'id', 'R5' );
+		$request->set_param( 'params', array( 'threshold' => 4 ) );
+
+		$response = $this->controller_with_diagnostics( $diag )->update_preset( $request );
+
+		$this->assertSame( 0, $diag->mark_all_stale_calls );
+		$this->assertSame( 0, $response->get_data()['diagnostics_invalidated'] );
+	}
+
+	public function test_no_diagnostics_repository_keeps_invalidation_a_noop(): void {
+		// Si l'instanciateur (Plugin.php) n'a pas câblé le repository
+		// diagnostics (rétro-compat 2-arg), l'invalidation est silencieusement
+		// skippée — la réponse est correcte et `diagnostics_invalidated` = 0.
+		$request = new WP_REST_Request();
+		$request->set_param( 'id', 'R1' );
+		$request->set_param( 'enabled', false );
+
+		$response = $this->controller()->update_preset( $request );
+		$this->assertSame( 0, $response->get_data()['diagnostics_invalidated'] );
+	}
+
+	/**
+	 * Stub `DiagnosticsRepository` qui compte les appels à mark_all_stale
+	 * et retourne 42 fictivement.
+	 */
+	private function stub_diagnostics(): DiagnosticsRepository {
+		return new class( new Son100_Htmln_Test_Wpdb() ) extends DiagnosticsRepository {
+			public int $mark_all_stale_calls = 0;
+			public function mark_all_stale(): int {
+				++$this->mark_all_stale_calls;
+				return 42;
+			}
+		};
+	}
+
+	private function controller_with_diagnostics( DiagnosticsRepository $diag ): PresetsController {
+		$settings = new SettingsRepository();
+		$registry = new PresetRegistry( $settings );
+		return new PresetsController( $settings, $registry, null, $diag );
 	}
 
 	// =========================================================================
