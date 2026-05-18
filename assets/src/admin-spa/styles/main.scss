@@ -872,6 +872,37 @@
 		border-color: var(--htmln-text-muted);
 		outline: none;
 	}
+
+	/* État `--full` : règle activée et appliquée à tout son
+	 * périmètre (0 article du corpus ne mentionne plus la règle dans
+	 * matching_rules). Vert atténué pour rester lisible dans une
+	 * succession dense de pastilles côte à côte. */
+	&--full {
+		background: rgba(0, 163, 42, 0.12);
+		border-color: var(--htmln-color-success);
+		color: var(--htmln-color-success);
+
+		&:hover,
+		&:focus-visible {
+			background: rgba(0, 163, 42, 0.22);
+			border-color: var(--htmln-color-success);
+		}
+	}
+
+	/* État `--partial` : règle activée mais ≥ 1 article reste à
+	 * traiter. Orange atténué cohérent avec les autres usages
+	 * `--htmln-color-warning` dans la SPA. */
+	&--partial {
+		background: rgba(219, 166, 23, 0.16);
+		border-color: var(--htmln-color-warning);
+		color: #8a5a00;
+
+		&:hover,
+		&:focus-visible {
+			background: rgba(219, 166, 23, 0.28);
+			border-color: var(--htmln-color-warning);
+		}
+	}
 }
 
 /* Flash temporaire appliqué à une RuleCard quand on clique sur sa

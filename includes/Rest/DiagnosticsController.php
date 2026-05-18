@@ -19,6 +19,7 @@ use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticBatchRunner;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticRecord;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticsRepository;
+use Cent_Son\Html_Normalizer\Steps\RuleCoverageService;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -89,6 +90,7 @@ final class DiagnosticsController extends BaseController {
 		private readonly DiagnosticsRepository $repo,
 		private readonly ?BuilderClassifier $classifier = null,
 		private readonly ?RuleAutoDisabler $auto_disabler = null,
+		private readonly ?RuleCoverageService $rule_coverage = null,
 	) {}
 
 	/**
@@ -262,12 +264,21 @@ final class DiagnosticsController extends BaseController {
 		$builders         = $this->repo->count_by_builder();
 		$categories       = $this->fetch_categories_with_counts();
 		$applicable_rules = $this->repo->count_by_applicable_rule();
+		// Couverture historique (alimente le code couleur du PipelineSchema
+		// dans l'onglet Règles : vert = full, orange = partial, gris = none).
+		// Service injecté optionnellement — pour le contrat REST historique
+		// (anciens callers + tests qui instancient avec 2-4 args), si null
+		// on retourne `[]` plutôt que d'omettre la clé.
+		$rule_coverage = null !== $this->rule_coverage
+			? $this->rule_coverage->compute()
+			: array();
 
 		return $this->respond( array(
 			'years'            => $years,
 			'categories'       => $categories,
 			'builders'         => $builders,
 			'applicable_rules' => $applicable_rules,
+			'rule_coverage'    => $rule_coverage,
 		) );
 	}
 

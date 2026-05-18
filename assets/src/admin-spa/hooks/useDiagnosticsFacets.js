@@ -19,7 +19,8 @@ import * as api from '../api';
  * @property {number[]}                                         years            Années disponibles (DESC).
  * @property {Array<{id: number, name: string, count: number}>} categories       Catégories WP avec count.
  * @property {Object<string, number>}                           builders         Map type → count.
- * @property {Object<string, number>}                           applicable_rules Map rule_id → count d'articles concernés.
+ * @property {Object<string, number>}                           applicable_rules Map rule_id → count d'articles concernés (état diagnostic courant).
+ * @property {Object<string, string>}                           rule_coverage    Map rule_id → 'full'|'partial'|'none' (couverture historique : agrégation des steps `success` vs périmètre éligible).
  */
 
 /**
@@ -35,6 +36,7 @@ const EMPTY = Object.freeze( {
 	categories: [],
 	builders: {},
 	applicable_rules: {},
+	rule_coverage: {},
 } );
 
 /**
@@ -66,6 +68,11 @@ export function useDiagnosticsFacets() {
 					result.applicable_rules &&
 					typeof result.applicable_rules === 'object'
 						? result.applicable_rules
+						: {},
+				rule_coverage:
+					result.rule_coverage &&
+					typeof result.rule_coverage === 'object'
+						? result.rule_coverage
 						: {},
 			} );
 		} catch ( err ) {

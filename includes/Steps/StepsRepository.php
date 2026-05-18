@@ -138,6 +138,23 @@ class StepsRepository {
 	}
 
 	/**
+	 * Liste **tous** les pas terminés (`finished_at IS NOT NULL`), sans
+	 * pagination. Utilisé par `RuleCoverageService` pour agréger la
+	 * couverture historique de chaque règle (post_ids effectivement
+	 * traités avec succès depuis le démarrage de l'extension).
+	 *
+	 * Volume attendu sur MMM-2 : quelques dizaines de pas — la requête
+	 * full-scan reste acceptable. Si le volume gonfle, ce service
+	 * devra basculer sur un agrégat persistant ou un cache transient.
+	 *
+	 * @return list<StepRecord>
+	 */
+	public function list_all_finished(): array {
+		$sql = "SELECT * FROM `{$this->table}` WHERE finished_at IS NOT NULL ORDER BY started_at DESC";
+		return $this->fetch_records( $sql );
+	}
+
+	/**
 	 * Date (`finished_at`) la plus récente d'un pas FINI ayant appliqué
 	 * la règle `$rule_id`. Retourne `null` si la règle n'a jamais été
 	 * appliquée (ou si aucun pas la concernant n'est terminé).

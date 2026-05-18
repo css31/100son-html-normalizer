@@ -277,10 +277,15 @@ class PresetRegistry {
 	/**
 	 * Instancie une regle preset selon sa configuration utilisateur.
 	 *
+	 * Public depuis 2026-05-18 — consommé par `RuleCoverageService` qui a
+	 * besoin d'introspecter chaque règle de `PRESETS` (y compris désactivées)
+	 * via `instanceof BuilderScopedRule` pour calculer le périmètre éligible
+	 * à chaque rule_id.
+	 *
 	 * @param string $preset_id Identifiant.
 	 * @return RuleInterface|null
 	 */
-	private function build_rule( string $preset_id ): ?RuleInterface {
+	public function build_rule( string $preset_id ): ?RuleInterface {
 		$config = $this->settings->get_preset_config( $preset_id );
 
 		switch ( $preset_id ) {

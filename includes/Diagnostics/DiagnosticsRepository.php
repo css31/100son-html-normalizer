@@ -448,6 +448,34 @@ class DiagnosticsRepository {
 	}
 
 	/**
+	 * Liste tous les articles diagnostiqués avec leur `builder_type` —
+	 * map `post_id => builder_type`. Sert au calcul du périmètre éligible
+	 * d'une règle dans `RuleCoverageService`, qui doit exclure les types
+	 * « out » et les types listés par `BuilderScopedRule::excluded_builder_types()`.
+	 *
+	 * Les records avec `builder_type IS NULL` (avant le backfill 2.1.0)
+	 * sont ignorés — ils sortent du périmètre tant qu'un rescan ne les
+	 * a pas reclassés.
+	 *
+	 * @return array<int, string> Map post_id → builder_type (jamais null).
+	 */
+	public function list_post_id_by_builder_type(): array {
+		$sql  = "SELECT post_id, builder_type FROM `{$this->table}` WHERE builder_type IS NOT NULL";
+		$rows = $this->wpdb->get_results( $sql, 'ARRAY_A' );
+		$out  = array();
+		if ( ! is_array( $rows ) ) {
+			return $out;
+		}
+		foreach ( $rows as $row ) {
+			if ( ! isset( $row['post_id'], $row['builder_type'] ) ) {
+				continue;
+			}
+			$out[ (int) $row['post_id'] ] = (string) $row['builder_type'];
+		}
+		return $out;
+	}
+
+	/**
 	 * Comptage d'articles diagnostiqués par règle applicable (clé du JSON
 	 * `matching_rules`). Sert au populate du dropdown « Règles » du filtre
 	 * SPA avec compteur « (N) » par règle.
@@ -503,6 +531,58 @@ class DiagnosticsRepository {
 				if ( isset( $out[ $rid ] ) ) {
 					$out[ $rid ]++;
 				}
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Liste, pour chaque règle, l'ensemble des `post_id` qui ont cette règle
+	 * dans leur `matching_rules` (article où la règle aurait encore quelque
+	 * chose à appliquer). Utilisé par `RuleCoverageService` pour qualifier
+	 * la couverture : un article éligible n'ayant PAS la règle dans
+	 * `matching_rules` est considéré comme « couvert implicitement » (rien
+	 * à transformer), même s'il n'a jamais été traversé par un step.
+	 *
+	 * Pattern identique à `count_by_applicable_rule()` : un seul SELECT
+	 * plein, agrégation PHP. Volume ≤ ~1000 rows typique.
+	 *
+	 * @return array<string, array<int, true>> Map rule_id → set<post_id>
+	 *                                          (array keys pour dédoublonnage).
+	 *                                          Toutes les clés PRESETS présentes.
+	 */
+	public function list_post_ids_by_applicable_rule(): array {
+		$out = array();
+		foreach ( PresetRegistry::PRESETS as $rule_id ) {
+			$out[ $rule_id ] = array();
+		}
+
+		$sql  = "SELECT post_id, matching_rules FROM `{$this->table}` WHERE matching_rules IS NOT NULL AND matching_rules != ''";
+		$rows = $this->wpdb->get_results( $sql, 'ARRAY_A' );
+		if ( ! is_array( $rows ) ) {
+			return $out;
+		}
+
+		foreach ( $rows as $row ) {
+			$post_id = isset( $row['post_id'] ) ? (int) $row['post_id'] : 0;
+			$json    = isset( $row['matching_rules'] ) ? (string) $row['matching_rules'] : '';
+			if ( 0 === $post_id || '' === $json ) {
+				continue;
+			}
+			$decoded = json_decode( $json, true );
+			if ( ! is_array( $decoded ) ) {
+				continue;
+			}
+			foreach ( $decoded as $entry ) {
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+				$rid = isset( $entry['rule_id'] ) ? (string) $entry['rule_id'] : '';
+				if ( '' === $rid || ! isset( $out[ $rid ] ) ) {
+					continue;
+				}
+				$out[ $rid ][ $post_id ] = true;
 			}
 		}
 

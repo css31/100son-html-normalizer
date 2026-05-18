@@ -5,6 +5,29 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Onglet Règles — code couleur de la couverture historique sur les pastilles (2026-05-18)
+
+Les pastilles du schéma « Ordre d'exécution » prennent désormais une couleur indicative de la couverture historique de chaque règle sur le corpus diagnostiqué :
+
+- **Vert** : règle qui a été appliquée à au moins un article avec succès **et** aucun article éligible non-touché n'a encore la règle dans son `matching_rules` — autrement dit, plus rien à transformer dans le périmètre.
+- **Orange** : règle appliquée à au moins un article mais ≥ 1 article éligible a encore la règle dans son `matching_rules` (reste à traiter).
+- **Gris** : règle jamais appliquée avec succès, ou couverture pas encore chargée.
+
+**Périmètre éligible d'une règle** : articles diagnostiqués hors `'out'` (override manuel hors-périmètre) ; pour les règles `BuilderScopedRule` (R6, R14), on exclut en plus les types listés dans `excluded_builder_types()` — R6 et R14 ne sont jamais évaluées comme manquantes sur les articles Gutenberg.
+
+**Implémentation backend** :
+- Nouveau service `Steps\RuleCoverageService::compute()` qui agrège les `per_article_results.status === 'success'` × `applied_rules` de tous les steps finalisés, croisé avec `matching_rules` courants et `builder_type` du corpus.
+- Nouvelles méthodes `StepsRepository::list_all_finished()`, `DiagnosticsRepository::list_post_id_by_builder_type()` et `DiagnosticsRepository::list_post_ids_by_applicable_rule()`.
+- `PresetRegistry::build_rule()` rendue publique (consommée par `RuleCoverageService` pour le `instanceof BuilderScopedRule`).
+- `DiagnosticsController::get_facets()` expose un champ `rule_coverage` au payload de `GET /diagnostics/facets` (5e argument optionnel injecté via `Plugin.php`).
+
+**Implémentation frontend** :
+- `useDiagnosticsFacets` accepte et stocke `rule_coverage`.
+- `PipelineSchema` consomme `ruleCoverage` (props simplifiées — n'a plus besoin de `presets`). Le clic-vers-cartouche + l'animation flash, livrés en 2026-05-17 avec R17, restent inchangés.
+- CSS : modifiers `.htmln-rules__pipeline-pill--full` (vert, `--htmln-color-success`) et `--partial` (orange, `--htmln-color-warning`) ; gris par défaut.
+
+**Tests** : 9 PHPUnit sur `RuleCoverageService` (corpus vide, full, partial via `matching_rules`, exclusion `'out'` et `BuilderScopedRule`, status non-success ignorés, multi-règles dans un même step). 1072 PHPUnit verts au total, PHPStan `[OK] No errors`.
+
 ### R14 — paragraphes de crédit marqués `class="credit"` (2026-05-18)
 
 Les paragraphes secondaires « crédit » (signatures éditoriales et photo : « LA RÉDACTION », « PHOTOS Cyrille Martin », noms isolés…) reçoivent désormais leur propre classe `credit` plutôt que `chapo`. Permet une typographie distincte côté thème (taille, casse, italiques) sans confondre standfirst et crédit.

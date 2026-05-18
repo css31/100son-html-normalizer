@@ -240,6 +240,11 @@ final class Plugin {
 					$diag_repo,
 					new StepsRepository(),
 				),
+				new \Cent_Son\Html_Normalizer\Steps\RuleCoverageService(
+					new StepsRepository(),
+					$diag_repo,
+					$preset_registry,
+				),
 			),
 			new PostsController( $settings, $post_normalizer, $so_detector ),
 			new DiffController( $preset_registry, $metrics, new BuilderClassifier() ),

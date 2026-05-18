@@ -35,6 +35,7 @@ import {
 } from '@wordpress/components';
 import { ALL_RULE_IDS } from '../store';
 import { usePresets } from '../hooks/usePresets';
+import { useDiagnosticsFacets } from '../hooks/useDiagnosticsFacets';
 import {
 	getRuleLabel,
 	getRuleTooltip,
@@ -128,7 +129,7 @@ const RULE_EXAMPLES = {
 	},
 	R14: {
 		before: "<p>Une famille s'est lancée dans la rénovation écologique de sa maison.</p>\n<p>LA RÉDACTION</p>\n<p>PHOTOS Cyrille Martin</p>\n<p>Premier paragraphe du corps.</p>",
-		after: '<p class="chapo">Une famille s\'est lancée dans la rénovation écologique de sa maison.</p>\n<p class="chapo">LA RÉDACTION</p>\n<p class="chapo">PHOTOS Cyrille Martin</p>\n<p>Premier paragraphe du corps.</p>',
+		after: '<p class="chapo">Une famille s\'est lancée dans la rénovation écologique de sa maison.</p>\n<p class="credit">LA RÉDACTION</p>\n<p class="credit">PHOTOS Cyrille Martin</p>\n<p>Premier paragraphe du corps.</p>',
 	},
 	R15: {
 		before: '<p><em>Première moitié</em> <em>deuxième moitié</em> du texte.</p>\n<p><span style="font-size:14pt">A</span><span style="font-size:14pt">B</span></p>',
@@ -149,6 +150,14 @@ const RULE_EXAMPLES = {
  */
 export default function Rules() {
 	const { presets, isLoading, isSaving, error, save } = usePresets();
+	// `rule_coverage` (map rule_id → 'full'|'partial'|'none') alimente
+	// le code couleur des pastilles du PipelineSchema : vert/orange/gris.
+	// Calculée côté backend par `RuleCoverageService` à partir de
+	// l'historique des steps `success` vs périmètre éligible. Le hook
+	// fetch les facets une fois au mount — pas de re-fetch automatique
+	// après chaque step pour V1.0 (acceptable : recharger la page met
+	// le tableau de bord à jour).
+	const { facets: diagnosticsFacets } = useDiagnosticsFacets();
 
 	const handleToggleEnabled = useCallback(
 		( id, checked ) => save( id, { enabled: checked } ).catch( () => {} ),
@@ -250,7 +259,10 @@ export default function Rules() {
 						'100son-html-normalizer'
 					) }
 				</p>
-				<PipelineSchema phases={ PIPELINE_PHASES } />
+				<PipelineSchema
+					phases={ PIPELINE_PHASES }
+					ruleCoverage={ diagnosticsFacets.rule_coverage }
+				/>
 			</header>
 
 			{ error && (
@@ -863,11 +875,24 @@ function RuleExample( { example } ) {
  * correspondante (sélecteur `[data-rule-id="…"]`) et applique un
  * highlight bref via la classe `htmln-rule--flash`.
  *
+ * Code couleur des pastilles (sémantique « couverture historique »
+ * depuis 2026-05-18) — basé sur la map `rule_coverage` calculée par
+ * `RuleCoverageService` côté backend (steps `success` × périmètre
+ * éligible, en tenant compte des exclusions `BuilderScopedRule`) :
+ *  - **Vert** (`--full`)    : tous les articles éligibles ont reçu la
+ *                              règle dans un step `success`.
+ *  - **Orange** (`--partial`) : ≥ 1 article touché mais le périmètre
+ *                                éligible n'est pas couvert intégralement.
+ *  - **Gris** (pas de modifier) : règle jamais appliquée avec succès
+ *                                  (`'none'`) OU couverture pas encore
+ *                                  chargée par `useDiagnosticsFacets`.
+ *
  * @param {Object}                                    props
  * @param {Array<{ label: string, rules: string[] }>} props.phases
+ * @param {Object<string, string>}                    [props.ruleCoverage] Map rule_id → 'full'|'partial'|'none'.
  * @return {JSX.Element} Schéma rendu.
  */
-function PipelineSchema( { phases } ) {
+function PipelineSchema( { phases, ruleCoverage = {} } ) {
 	const handlePillClick = useCallback( ( ruleId ) => {
 		if ( 'undefined' === typeof document ) {
 			return;
@@ -884,6 +909,37 @@ function PipelineSchema( { phases } ) {
 			card.classList.remove( 'htmln-rule--flash' );
 		}, 1200 );
 	}, [] );
+
+	const buildPillProps = ( ruleId ) => {
+		const baseClass = 'htmln-rules__pipeline-pill';
+		const baseTooltip = getRuleTooltip( ruleId );
+
+		// `rule_coverage` est `{}` tant que `useDiagnosticsFacets` n'a
+		// pas répondu — on reste neutre (gris) pour éviter un flash
+		// vert massif au mount.
+		const coverage = ruleCoverage && ruleCoverage[ ruleId ];
+
+		if ( 'full' === coverage ) {
+			return {
+				className: `${ baseClass } ${ baseClass }--full`,
+				title: `${ baseTooltip } — ${ __(
+					'appliquée à tout le corpus.',
+					'100son-html-normalizer'
+				) }`,
+			};
+		}
+		if ( 'partial' === coverage ) {
+			return {
+				className: `${ baseClass } ${ baseClass }--partial`,
+				title: `${ baseTooltip } — ${ __(
+					'appliquée partiellement (reste des articles à traiter).',
+					'100son-html-normalizer'
+				) }`,
+			};
+		}
+		// `'none'` ou couverture non chargée : pastille neutre.
+		return { className: baseClass, title: baseTooltip };
+	};
 
 	return (
 		<nav
@@ -921,16 +977,24 @@ function PipelineSchema( { phases } ) {
 											{ '→' /* → */ }
 										</span>
 									) }
-									<button
-										type="button"
-										className="htmln-rules__pipeline-pill"
-										title={ getRuleTooltip( ruleId ) }
-										onClick={ () =>
-											handlePillClick( ruleId )
-										}
-									>
-										{ ruleId }
-									</button>
+									{ ( () => {
+										const pillProps =
+											buildPillProps( ruleId );
+										return (
+											<button
+												type="button"
+												className={
+													pillProps.className
+												}
+												title={ pillProps.title }
+												onClick={ () =>
+													handlePillClick( ruleId )
+												}
+											>
+												{ ruleId }
+											</button>
+										);
+									} )() }
 								</Fragment>
 							) ) }
 						</div>
