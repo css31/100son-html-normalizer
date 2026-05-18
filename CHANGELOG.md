@@ -5,6 +5,14 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Onglet Normaliser — case « Exclure » inversée en « Inclure les articles normalisés (OK) » (2026-05-18)
+
+La case à cocher de la barre de scan passe de « Exclure les articles déjà OK » (décochée par défaut, scan exhaustif) à « **Inclure les articles normalisés (OK)** » (**décochée par défaut**). Sémantique inversée mais surtout **changement de comportement par défaut** : le scan ne re-diagnostique plus systématiquement les articles déjà passés en succès. Pour les inclure à nouveau (par ex. après modification éditoriale massive), cocher la case.
+
+Les articles jamais scannés ou marqués stale restent toujours inclus quoi qu'il arrive — la case ne joue que sur les articles dont le dernier diagnostic est « OK » (statut `normal`, non périmé).
+
+**Implémentation** : state local `excludeNormalized` → `includeOk` dans `Normalize.jsx` (init `false`). La conversion vers la sémantique API (`exclude_normalized = !includeOk`) se fait au call-site de `startScan`. Hook `useScanBatch` et API `/diagnostics/run` inchangés — la frontière backend conserve la sémantique `exclude_normalized` historique.
+
 ### Onglet Règles — code couleur de la couverture historique sur les pastilles (2026-05-18)
 
 Les pastilles du schéma « Ordre d'exécution » prennent désormais une couleur indicative de la couverture historique de chaque règle sur le corpus diagnostiqué :

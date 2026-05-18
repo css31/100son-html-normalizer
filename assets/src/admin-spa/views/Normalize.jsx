@@ -112,12 +112,16 @@ export default function Normalize() {
 	);
 
 	// Scope du scan — post-rc4. Trois axes cumulables :
-	//   - sélection d'articles (cochés dans le tableau) : priorité 1, court-circuite filtres + exclude_normalized.
+	//   - sélection d'articles (cochés dans le tableau) : priorité 1, court-circuite filtres + include_ok.
 	//   - filtres FiltersBar actifs (cat/year/month/builder/search) : si présents, scope le scan complet.
-	//   - exclude_normalized (checkbox) : retire les articles classés Gutenberg.
+	//   - `includeOk` (checkbox) : sémantique UI inversée — cochée = inclure
+	//     les articles OK ; décochée (par défaut, depuis 2026-05-18) = les
+	//     exclure du scan, ce qui envoie `exclude_normalized = true` au
+	//     backend (= retire les articles classés Gutenberg du scope, focus
+	//     sur ce qui reste à diagnostiquer en phase de migration).
 	// `hasActiveFilters` détecte au moins un filtre non-trivial pour piloter
 	// le libellé bouton de ScanBar (« Scanner les articles filtrés » vs « Scanner le corpus »).
-	const [ excludeNormalized, setExcludeNormalized ] = useState( false );
+	const [ includeOk, setIncludeOk ] = useState( false );
 	const hasActiveFilters = useMemo( () => {
 		if ( ! filters || 'object' !== typeof filters ) {
 			return false;
@@ -327,13 +331,15 @@ export default function Normalize() {
 					disabled={ isRunning }
 					selectedPostCount={ selectedPostIds.size }
 					hasActiveFilters={ hasActiveFilters }
-					excludeNormalized={ excludeNormalized }
-					onToggleExcludeNormalized={ setExcludeNormalized }
+					includeOk={ includeOk }
+					onToggleIncludeOk={ setIncludeOk }
 					lastFinalize={ scanLastFinalize }
 					onScan={ () => {
 						// Trois modes mutuellement exclusifs :
-						//   - sélection (cochés) : `filters` + `excludeNormalized` ignorés serveur-side (mode chunk direct).
-						//   - filtres + exclude_normalized : scope du scan complet via `/run`.
+						//   - sélection (cochés) : `filters` + include_ok ignorés serveur-side (mode chunk direct).
+						//   - filtres + include_ok : scope du scan complet via `/run`. La case
+						//     UI « Inclure les articles OK » est inversée par rapport à
+						//     l'API : décochée → `exclude_normalized = true`.
 						//   - corpus complet : aucun param de scope.
 						const hasSelection = selectedPostIds.size > 0;
 						const postIds = hasSelection
@@ -342,7 +348,7 @@ export default function Normalize() {
 						const runFilters = hasSelection ? {} : filters;
 						const runExcludeNormalized = hasSelection
 							? false
-							: excludeNormalized;
+							: ! includeOk;
 						startScan( postIds, runFilters, runExcludeNormalized );
 					} }
 					onDismissError={ dismissScanError }

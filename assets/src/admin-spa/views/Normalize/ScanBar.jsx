@@ -19,18 +19,18 @@ import ReadOnlyTooltip from '../../components/ReadOnlyTooltip';
 
 /**
  * @param {Object}                                                   props
- * @param {boolean}                                                  props.isScanning                Scan en cours.
- * @param {?{processed: number, total: number}}                      props.progress                  Avancement.
- * @param {?string}                                                  props.error                     Message d'erreur du dernier scan (ou null).
- * @param {boolean}                                                  props.disabled                  Bloque le bouton (ex. pas en cours).
- * @param {number}                                                   props.selectedPostCount         Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
- * @param {boolean}                                                  props.hasActiveFilters          Au moins un filtre FiltersBar actif. Pilote le libellé bouton (« Scanner les articles filtrés » vs « Scanner le corpus »).
- * @param {boolean}                                                  props.excludeNormalized         État de la checkbox « Exclure les articles déjà normalisés ».
- * @param {(next: boolean) => void}                                  props.onToggleExcludeNormalized Callback de bascule de la checkbox.
- * @param {?{auto_disabled_rules: string[], fully_scanned: boolean}} props.lastFinalize              Résultat du dernier `POST /diagnostics/finalize-scan`. Si une ou plusieurs règles ont été auto-désactivées (état `complete`), on affiche une notice succincte.
- * @param {() => void}                                               props.onScan                    Déclenche le scan.
- * @param {() => void}                                               props.onDismissError            Reset l'erreur affichée.
- * @param {() => void}                                               props.onDismissFinalize         Reset la notice d'auto-désactivation.
+ * @param {boolean}                                                  props.isScanning        Scan en cours.
+ * @param {?{processed: number, total: number}}                      props.progress          Avancement.
+ * @param {?string}                                                  props.error             Message d'erreur du dernier scan (ou null).
+ * @param {boolean}                                                  props.disabled          Bloque le bouton (ex. pas en cours).
+ * @param {number}                                                   props.selectedPostCount Nombre d'articles cochés (>=0). Post-rc4 : pilote le label et le mode du scan (sélection vs complet).
+ * @param {boolean}                                                  props.hasActiveFilters  Au moins un filtre FiltersBar actif. Pilote le libellé bouton (« Scanner les articles filtrés » vs « Scanner le corpus »).
+ * @param {boolean}                                                  props.includeOk         État de la checkbox « Inclure les articles OK ». Décochée par défaut (les articles OK sont sautés) ; cochée = on les inclut. Sémantique UI inversée par rapport à l'API serveur — c'est `Normalize.jsx` qui convertit en `exclude_normalized` (= `!includeOk`) au moment d'appeler `startScan`.
+ * @param {(next: boolean) => void}                                  props.onToggleIncludeOk Callback de bascule de la checkbox.
+ * @param {?{auto_disabled_rules: string[], fully_scanned: boolean}} props.lastFinalize      Résultat du dernier `POST /diagnostics/finalize-scan`. Si une ou plusieurs règles ont été auto-désactivées (état `complete`), on affiche une notice succincte.
+ * @param {() => void}                                               props.onScan            Déclenche le scan.
+ * @param {() => void}                                               props.onDismissError    Reset l'erreur affichée.
+ * @param {() => void}                                               props.onDismissFinalize Reset la notice d'auto-désactivation.
  * @return {JSX.Element} Barre.
  */
 export default function ScanBar( {
@@ -40,8 +40,8 @@ export default function ScanBar( {
 	disabled,
 	selectedPostCount = 0,
 	hasActiveFilters = false,
-	excludeNormalized = false,
-	onToggleExcludeNormalized,
+	includeOk = false,
+	onToggleIncludeOk,
 	lastFinalize = null,
 	onScan,
 	onDismissError,
@@ -146,15 +146,15 @@ export default function ScanBar( {
 					<div className="htmln-scan-bar__exclude-normalized">
 						<CheckboxControl
 							label={ __(
-								'Exclure les articles déjà OK',
+								'Inclure les articles normalisés (OK)',
 								'100son-html-normalizer'
 							) }
 							help={ __(
-								'Saute les articles dont le dernier diagnostic est « OK » (statut normal, non périmé) — utile pour ne re-diagnostiquer que ce qui reste à faire. Les articles jamais scannés ou périmés restent inclus. Cumulable avec les filtres.',
+								'Décochée (par défaut) : les articles dont le dernier diagnostic est « OK » (statut normal, non périmé) sont sautés — on ne re-diagnostique que ce qui reste à faire. Cochée : on les inclut dans le scan. Les articles jamais scannés ou périmés restent toujours inclus. Cumulable avec les filtres.',
 								'100son-html-normalizer'
 							) }
-							checked={ excludeNormalized }
-							onChange={ onToggleExcludeNormalized }
+							checked={ includeOk }
+							onChange={ onToggleIncludeOk }
 							disabled={ disabled || isReadOnly }
 							__nextHasNoMarginBottom
 						/>
