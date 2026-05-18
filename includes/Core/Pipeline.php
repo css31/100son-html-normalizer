@@ -13,6 +13,7 @@ namespace Cent_Son\Html_Normalizer\Core;
 
 defined( 'ABSPATH' ) || exit;
 
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 
 /**
@@ -27,6 +28,13 @@ final class Pipeline {
 	 * d'exception lancee par une regle, elle est attrapee : la regle est
 	 * "skip" et l'exception loggee dans le tableau $warnings (passe-plat).
 	 *
+	 * Si `$context['builder_type']` est fourni (typiquement injecte par
+	 * `StepRunner::process_article()` apres classification par
+	 * `BuilderClassifier`), les regles implementant `BuilderScopedRule`
+	 * dont la liste `excluded_builder_types()` contient ce type sont
+	 * silencieusement skippees (pas de warning, pas d'ecriture). Voir
+	 * l'interface pour la motivation (Gutenberg invariants).
+	 *
 	 * @param list<RuleInterface>  $rules    Regles a appliquer (dans l'ordre).
 	 * @param string               $html     HTML d'entree.
 	 * @param array<string, mixed> $context  Contexte d'appel (transmis a chaque regle).
@@ -34,8 +42,14 @@ final class Pipeline {
 	 * @return string HTML normalise.
 	 */
 	public function run( array $rules, string $html, array $context = array(), array &$warnings = array() ): string {
+		$builder_type = isset( $context['builder_type'] ) && is_string( $context['builder_type'] )
+			? $context['builder_type']
+			: null;
 		$current = $html;
 		foreach ( $rules as $rule ) {
+			if ( null !== $builder_type && self::is_excluded_for_builder( $rule, $builder_type ) ) {
+				continue;
+			}
 			try {
 				$result = $rule->apply( $current, $context );
 				// Garde-fou : une regle DOIT retourner une string.
@@ -96,5 +110,24 @@ final class Pipeline {
 			return $html;
 		}
 		return $this->run( $subset, $html, $context, $warnings );
+	}
+
+	/**
+	 * Indique si une regle doit etre ecartee pour le `builder_type` cible.
+	 *
+	 * Source de verite : `BuilderScopedRule::excluded_builder_types()`. Les
+	 * regles n'implementant pas l'interface s'appliquent partout (retour
+	 * `false`).
+	 *
+	 * @param RuleInterface $rule         Regle a tester.
+	 * @param string        $builder_type Type d'article (constante
+	 *                                    `BuilderClassifier::TYPE_*`).
+	 * @return bool
+	 */
+	private static function is_excluded_for_builder( RuleInterface $rule, string $builder_type ): bool {
+		if ( ! $rule instanceof BuilderScopedRule ) {
+			return false;
+		}
+		return in_array( $builder_type, $rule->excluded_builder_types(), true );
 	}
 }

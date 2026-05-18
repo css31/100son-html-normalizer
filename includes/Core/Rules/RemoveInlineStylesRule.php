@@ -40,13 +40,21 @@ namespace Cent_Son\Html_Normalizer\Core\Rules;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use DOMElement;
 use DOMXPath;
 
 /**
  * Preset R6 : suppression des styles inline.
+ *
+ * Exclue de `gutenberg` (cf. `BuilderScopedRule`) : la valeur de
+ * `style="..."` sur un `<p>`, `<h2>`, `<img>` issu de l'editeur de blocs
+ * est strictement coherente avec le JSON des `<!-- wp:* ... -->`
+ * environnants et les classes utilitaires (`is-resized`, `has-text-align-*`).
+ * Retirer ces declarations en aveugle desynchronise les trois fois et
+ * declenche un "contenu invalide" a la reouverture du bloc dans l'editeur.
  */
-final class RemoveInlineStylesRule implements RuleInterface {
+final class RemoveInlineStylesRule implements RuleInterface, BuilderScopedRule {
 
 	/**
 	 * Conserver les declarations text-align.
@@ -76,6 +84,13 @@ final class RemoveInlineStylesRule implements RuleInterface {
 	 */
 	public function label(): string {
 		return __( 'Styles inline', '100son-html-normalizer' );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function excluded_builder_types(): array {
+		return array( BuilderClassifier::TYPE_GUTENBERG );
 	}
 
 	/**

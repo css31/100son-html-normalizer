@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use WP_Post;
 
@@ -61,6 +62,12 @@ class DiagnosticEngine {
 		$html  = (string) $post->post_content;
 		$rules = $this->registry->get_enabled_rules();
 
+		// Classification en amont — sert à la fois au filtrage `BuilderScopedRule`
+		// (R6, R14 ignorées sur Gutenberg) et au record final.
+		$builder_type = null !== $this->classifier
+			? $this->classifier->classify( $post->ID )
+			: null;
+
 		$matching_rules = array();
 		$total_matches  = 0;
 
@@ -77,7 +84,17 @@ class DiagnosticEngine {
 		// même contrat défensif que `Pipeline::run()`.
 		$current = $html;
 		$context = array( 'post_id' => $post->ID );
+		if ( null !== $builder_type ) {
+			$context['builder_type'] = $builder_type;
+		}
 		foreach ( $rules as $rule ) {
+			if ( null !== $builder_type
+				&& $rule instanceof BuilderScopedRule
+				&& in_array( $builder_type, $rule->excluded_builder_types(), true )
+			) {
+				// Règle hors-scope pour ce constructeur : ni count ni apply.
+				continue;
+			}
 			$count = $rule->countMatches( $current, $context );
 			if ( $count > 0 ) {
 				$matching_rules[] = array(
@@ -102,9 +119,6 @@ class DiagnosticEngine {
 		$snapshot = $this->metrics->compute( $html );
 
 		$post_modified = trim( (string) $post->post_modified );
-		$builder_type  = null !== $this->classifier
-			? $this->classifier->classify( $post->ID )
-			: null;
 
 		return new DiagnosticRecord(
 			id: null,

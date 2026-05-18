@@ -36,8 +36,14 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Classifie un article selon son constructeur (SiteOrigin, Gutenberg, etc.).
+ *
+ * Non-final : permet aux tests unitaires de fournir un stub stateless de
+ * `classify()` sans dépendre d'un environnement WP complet (les fonctions
+ * `get_post_meta`, `get_post_field`, `has_blocks` ne sont pas stubbées dans
+ * le bootstrap PHPUnit). Aucun comportement métier ne s'appuie sur le
+ * `final` ; la classe reste stateless et thread-safe.
  */
-final class BuilderClassifier {
+class BuilderClassifier {
 
 	/**
 	 * Constantes des 5 types — strings stables côté SQL (colonne

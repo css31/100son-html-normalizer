@@ -14,6 +14,7 @@ namespace Cent_Son\Html_Normalizer\Steps;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Pipeline;
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
 use Cent_Son\Html_Normalizer\Core\Rules\LossyRule;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
@@ -72,14 +73,20 @@ use WP_Post;
 class StepRunner {
 
 	/**
-	 * @param StepsRepository       $steps       Persistance des pas.
-	 * @param DiagnosticsRepository $diagnostics Persistance des diagnostics (recalcul post-pas).
-	 * @param PresetRegistry        $registry    Source des règles activées.
-	 * @param Pipeline              $pipeline    Moteur d'application (run + applySubset).
-	 * @param MetricsCalculator     $metrics     Calculateur des 7 métriques γ.
-	 * @param RegressionDetector    $regression  Comparateur avant/après vs seuils.
-	 * @param DiagnosticEngine      $engine      Recalcul diagnostic post-écriture.
-	 * @param SettingsRepository    $settings    Source des seuils γ (relus à chaud).
+	 * @param StepsRepository        $steps       Persistance des pas.
+	 * @param DiagnosticsRepository  $diagnostics Persistance des diagnostics (recalcul post-pas).
+	 * @param PresetRegistry         $registry    Source des règles activées.
+	 * @param Pipeline               $pipeline    Moteur d'application (run + applySubset).
+	 * @param MetricsCalculator      $metrics     Calculateur des 7 métriques γ.
+	 * @param RegressionDetector     $regression  Comparateur avant/après vs seuils.
+	 * @param DiagnosticEngine       $engine      Recalcul diagnostic post-écriture.
+	 * @param SettingsRepository     $settings    Source des seuils γ (relus à chaud).
+	 * @param BuilderClassifier|null $classifier  Classification constructeur — injectée dans
+	 *                                            `$context['builder_type']` pour permettre au
+	 *                                            Pipeline de skipper les règles `BuilderScopedRule`
+	 *                                            (R6/R14 sur les articles Gutenberg). Nullable
+	 *                                            pour rétro-compat avec les tests existants qui
+	 *                                            construisent StepRunner avec 8 arguments.
 	 */
 	public function __construct(
 		private readonly StepsRepository $steps,
@@ -90,6 +97,7 @@ class StepRunner {
 		private readonly RegressionDetector $regression,
 		private readonly DiagnosticEngine $engine,
 		private readonly SettingsRepository $settings,
+		private readonly ?BuilderClassifier $classifier = null,
 	) {}
 
 	/**
@@ -150,16 +158,20 @@ class StepRunner {
 		// 4. Application du sous-ensemble — try/catch global pour ne jamais propager
 		// une exception au caller REST/CLI (cf. §13 : le filtre htmln/normalize doit
 		// toujours retourner une string ; même esprit côté StepRunner).
+		$context = array(
+			'post_id'   => $post_id,
+			'step_uuid' => $uuid,
+		);
+		if ( null !== $this->classifier ) {
+			$context['builder_type'] = $this->classifier->classify( $post_id );
+		}
 		try {
 			$warnings   = array();
 			$html_after = $this->pipeline->applySubset(
 				$this->registry->get_enabled_rules(),
 				$step->applied_rules,
 				$html_before,
-				array(
-					'post_id'   => $post_id,
-					'step_uuid' => $uuid,
-				),
+				$context,
 				$warnings
 			);
 		} catch ( \Throwable $e ) {
@@ -272,17 +284,21 @@ class StepRunner {
 		$html_before = (string) $post->post_content;
 		$before      = $this->metrics->compute( $html_before );
 
+		$context = array(
+			'post_id'   => $post_id,
+			'step_uuid' => $uuid,
+			'mode'      => 'confirm',
+		);
+		if ( null !== $this->classifier ) {
+			$context['builder_type'] = $this->classifier->classify( $post_id );
+		}
 		try {
 			$warnings   = array();
 			$html_after = $this->pipeline->applySubset(
 				$this->registry->get_enabled_rules(),
 				$step->applied_rules,
 				$html_before,
-				array(
-					'post_id'   => $post_id,
-					'step_uuid' => $uuid,
-					'mode'      => 'confirm',
-				),
+				$context,
 				$warnings
 			);
 		} catch ( \Throwable $e ) {

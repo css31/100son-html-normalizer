@@ -5,6 +5,29 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Scope par constructeur — R6 et R14 exclues des articles Gutenberg (2026-05-18)
+
+Les règles **R6** (`RemoveInlineStylesRule`) et **R14** (`FirstParagraphChapoRule`) ne s'appliquent plus aux articles classifiés `gutenberg` par `BuilderClassifier`. Motivation : sur du contenu Gutenberg natif, retirer les `style="..."` désynchronise les attributs JSON sérialisés dans les commentaires `<!-- wp:* {...} -->` (R6), et ajouter `class="chapo"` à un `<p>` issu d'un bloc `core/paragraph` casse l'invariant `className` (R14) — les deux produisent "contenu invalide" à la réouverture du bloc dans l'éditeur.
+
+**Mécanisme** — Nouvelle interface optionnelle `Core\Rules\BuilderScopedRule` (sur le modèle de `LossyRule`) avec une seule méthode `excluded_builder_types(): list<string>`. Les règles qui ne l'implémentent pas s'appliquent partout (comportement préservé). Le filtrage est piloté par `$context['builder_type']` injecté en amont :
+- `DiagnosticEngine::diagnose()` calcule maintenant le `builder_type` en tête de méthode et l'injecte dans le contexte de cascade ;
+- `Pipeline::run()` (et donc `applySubset()`) lit `$context['builder_type']` et skip les règles `BuilderScopedRule` exclues — silencieusement, sans warning ;
+- `Rest\DiffController::compute_diff()` applique la même garde dans sa cascade locale, pour que la preview reflète exactement ce que `StepRunner` écrirait ;
+- `Steps\StepRunner` reçoit un `BuilderClassifier` optionnel via DI et injecte `builder_type` dans le contexte transmis au Pipeline (process_article + confirm_article).
+
+**Effets visibles côté SPA** — Les articles Gutenberg :
+- voient R6/R14 disparaître de `matching_rules` dans le diagnostic (statut potentiellement `to_improve` → `normal` selon les autres règles) ;
+- ne peuvent plus déclencher R6/R14 via "Voir le diff" (modale annonçant `unchanged` sur ces deux règles seules) ;
+- voient l'écriture skippée si une étape mélange ces règles dans son sous-ensemble (les autres règles du subset s'appliquent normalement).
+
+**Diagnostics persistés** — Les articles Gutenberg historiquement classés `to_improve` à cause de R6/R14 seront reclassés au prochain scan complet.
+
+**Léger relâchement** — `BuilderClassifier` n'est plus `final` (était `final`, devient simple `class`) pour permettre aux tests unitaires de fournir un stub stateless de `classify()` sans dépendre du runtime WP complet. Aucun comportement métier ne s'appuie sur le `final` ; la classe reste stateless.
+
+**Tests** — 9 nouveaux tests : 2 sur les contrats R6/R14, 1 sur `Pipeline::run` (skip silencieux selon `builder_type`), 3 sur `DiagnosticEngine` (skip cascade, application sur type non-exclu, propagation du `builder_type` dans le contexte), 2 sur `StepRunner` (skip + propagation contexte), 1 sur `DiffController` (preview cohérente).
+
+**Validation** — 1061 PHPUnit verts (2098 assertions), PHPStan `[OK] No errors`, PHPCS delta = 0 erreur nouvelle sur les fichiers modifiés.
+
 ### R17 (`HeadingPromotionRule`) + schéma du pipeline + fix cascade `DiagnosticEngine` (2026-05-17)
 
 Nouvelle règle **R17** qui promeut `<h3>`–`<h6>` d'un cran lorsque le fragment ne contient aucun `<h2>`. Cible 22 articles SiteOrigin du corpus MMM-2 (374, 491, 5866, 6150…) dont le chapô-h2 est démoté en `<p class="chapo">` par R13, laissant la hiérarchie commencer à `<h3>`. Cascade ascendante (`<h3>` → `<h2>` d'abord) pour garantir une promotion d'exactement un cran. Position pipeline : entre R10 et R1.

@@ -10,7 +10,9 @@ declare( strict_types=1 );
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Steps;
 
 use Cent_Son\Html_Normalizer\Core\Pipeline;
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticRecord;
@@ -225,7 +227,8 @@ final class StepRunnerTest extends TestCase {
 	private function make_runner(
 		StepsRepository $steps,
 		DiagnosticsRepository $diagnostics,
-		array $rules
+		array $rules,
+		?BuilderClassifier $classifier = null
 	): StepRunner {
 		return new StepRunner(
 			$steps,
@@ -234,8 +237,9 @@ final class StepRunnerTest extends TestCase {
 			new Pipeline(),
 			new MetricsCalculator(),
 			new RegressionDetector(),
-			new DiagnosticEngine( $this->registry_stub( $rules ), new MetricsCalculator() ),
+			new DiagnosticEngine( $this->registry_stub( $rules ), new MetricsCalculator(), $classifier ),
 			new SettingsRepository(),
+			$classifier,
 		);
 	}
 
@@ -731,6 +735,75 @@ final class StepRunnerTest extends TestCase {
 			Son100_Htmln_Test_Posts_Registry::$posts[100]->post_content,
 			'HTML inchangé puisque la règle a été skip'
 		);
+	}
+
+	public function test_process_article_skips_builder_scoped_rule_on_gutenberg(): void {
+		// Article classe Gutenberg + regle BuilderScopedRule excluant Gutenberg :
+		// la regle ne doit ni s'executer ni modifier le post_content.
+		$this->seed_post( 100, '<p>Original</p>' );
+		$gutenberg_classifier = new class() extends BuilderClassifier {
+			public function classify( int $post_id ): string {
+				return BuilderClassifier::TYPE_GUTENBERG;
+			}
+		};
+		$destructive_scoped = new class() implements RuleInterface, BuilderScopedRule {
+			public function id(): string { return 'P_SCOPED'; }
+			public function label(): string { return 'P_SCOPED'; }
+			public function apply( string $html, array $context = array() ): string {
+				return '<p>CASSE</p>';
+			}
+			public function countMatches( string $html, array $context = array() ): int { return 1; }
+			public function excluded_builder_types(): array {
+				return array( BuilderClassifier::TYPE_GUTENBERG );
+			}
+		};
+		$runner = $this->make_runner(
+			$this->steps_stub(),
+			$this->diagnostics_stub(),
+			array( $destructive_scoped ),
+			$gutenberg_classifier,
+		);
+		$uuid   = $runner->start_step( array( 100 ), array( 'P_SCOPED' ), 1 );
+		$result = $runner->process_article( $uuid, 100 );
+
+		$this->assertSame( ArticleResult::STATUS_SUCCESS, $result->status );
+		$this->assertSame(
+			'<p>Original</p>',
+			Son100_Htmln_Test_Posts_Registry::$posts[100]->post_content,
+			'La regle BuilderScopedRule exclue ne doit pas modifier le contenu'
+		);
+	}
+
+	public function test_process_article_passes_builder_type_in_context(): void {
+		// Verifie que StepRunner injecte builder_type dans le context transmis
+		// au Pipeline (via une fake-rule spy non-scopee).
+		$this->seed_post( 100, '<p>x</p>' );
+		$received = null;
+		$spy_rule = new class( $received ) implements RuleInterface {
+			public function __construct( public ?string &$received ) {}
+			public function id(): string { return 'P_SPY'; }
+			public function label(): string { return 'P_SPY'; }
+			public function apply( string $html, array $context = array() ): string {
+				$this->received = $context['builder_type'] ?? null;
+				return $html;
+			}
+			public function countMatches( string $html, array $context = array() ): int { return 0; }
+		};
+		$siteorigin_classifier = new class() extends BuilderClassifier {
+			public function classify( int $post_id ): string {
+				return BuilderClassifier::TYPE_SITEORIGIN;
+			}
+		};
+		$runner = $this->make_runner(
+			$this->steps_stub(),
+			$this->diagnostics_stub(),
+			array( $spy_rule ),
+			$siteorigin_classifier,
+		);
+		$uuid = $runner->start_step( array( 100 ), array( 'P_SPY' ), 1 );
+		$runner->process_article( $uuid, 100 );
+
+		$this->assertSame( BuilderClassifier::TYPE_SITEORIGIN, $received );
 	}
 
 	// =========================================================================

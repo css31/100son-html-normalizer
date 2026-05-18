@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Rules;
 
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RemoveInlineStylesRule;
 use Cent_Son\Html_Normalizer\Tests\Unit\HtmlAssertions;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +23,12 @@ final class RemoveInlineStylesRuleTest extends TestCase {
 		$rule = new RemoveInlineStylesRule();
 		$this->assertSame( 'R6', $rule->id() );
 		$this->assertNotEmpty( $rule->label() );
+	}
+
+	public function test_is_builder_scoped_and_excludes_gutenberg(): void {
+		$rule = new RemoveInlineStylesRule();
+		$this->assertInstanceOf( BuilderScopedRule::class, $rule );
+		$this->assertSame( array( BuilderClassifier::TYPE_GUTENBERG ), $rule->excluded_builder_types() );
 	}
 
 	// ====== Mode keep_text_align = true (defaut) ====== //

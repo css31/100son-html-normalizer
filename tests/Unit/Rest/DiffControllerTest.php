@@ -11,6 +11,7 @@ namespace Cent_Son\Html_Normalizer\Tests\Unit\Rest;
 
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use Cent_Son\Html_Normalizer\Rest\DiffController;
@@ -425,5 +426,36 @@ final class DiffControllerTest extends TestCase {
 		$body = $response->get_data();
 		$this->assertCount( 1, $body['applied_rules'] );
 		$this->assertSame( 'R1', $body['applied_rules'][0]['rule_id'] );
+	}
+
+	public function test_compute_diff_skips_builder_scoped_rule_on_gutenberg(): void {
+		// Une règle BuilderScopedRule excluant Gutenberg doit être absente de
+		// `applied_rules` ET ne pas modifier `html_after` quand l'article est
+		// classifié `gutenberg`. Symétrique de StepRunner — sinon la modale
+		// Diff annoncerait des modifications que StepRunner refuserait
+		// ensuite d'écrire.
+		$this->seed_post( 100, '<!-- wp:paragraph --><p style="color:red">x</p><!-- /wp:paragraph -->' );
+		$scoped = new class() implements RuleInterface, BuilderScopedRule {
+			public function id(): string { return 'P_SCOPED'; }
+			public function label(): string { return 'P_SCOPED'; }
+			public function apply( string $html, array $context = array() ): string {
+				return '<p>CASSE</p>';
+			}
+			public function countMatches( string $html, array $context = array() ): int {
+				return 1;
+			}
+			public function excluded_builder_types(): array {
+				return array( BuilderClassifier::TYPE_GUTENBERG );
+			}
+		};
+
+		$response = $this->make_controller( array( $scoped ) )->compute_diff(
+			$this->make_request( array( 'id' => 100, 'rule_ids' => array( 'P_SCOPED' ) ) )
+		);
+
+		$body = $response->get_data();
+		$this->assertSame( 'gutenberg', $body['builder_type'] );
+		$this->assertSame( array(), $body['applied_rules'], 'Règle scopée ne doit pas apparaître' );
+		$this->assertTrue( $body['unchanged'], 'HTML doit rester inchangé (règle skippée)' );
 	}
 }

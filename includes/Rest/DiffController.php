@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
 use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Metrics\MetricsCalculator;
 use WP_Post;
 use WP_REST_Request;
@@ -116,11 +117,13 @@ final class DiffController extends BaseController {
 			);
 		}
 
-		$html_before = (string) $post->post_content;
-		$warnings    = array();
-		$context     = array(
-			'post_id' => $post_id,
-			'source'  => 'diff',
+		$html_before  = (string) $post->post_content;
+		$warnings     = array();
+		$builder_type = $this->classifier->classify( $post_id );
+		$context      = array(
+			'post_id'      => $post_id,
+			'source'       => 'diff',
+			'builder_type' => $builder_type,
 		);
 
 		// Cascade fusionnée : on traverse les règles dans l'ordre canonique
@@ -137,9 +140,20 @@ final class DiffController extends BaseController {
 		// de `Pipeline::run()` — on n'y délègue plus parce qu'on a besoin
 		// d'intercaler le `countMatches()` entre chaque `apply()`. `Pipeline`
 		// lui-même reste utilisé par d'autres consommateurs (pages V0.1).
+		//
+		// Filtrage `BuilderScopedRule` : symétrique de `Pipeline::run()` et
+		// `DiagnosticEngine::diagnose()` — une règle dont `builder_type` est
+		// exclu n'est ni comptée ni appliquée. Sans ce filtrage, la modale
+		// Diff annoncerait des modifications (R6/R14 sur un Gutenberg) que
+		// StepRunner refuserait ensuite d'écrire → preview mensongère.
 		$current       = $html_before;
 		$applied_rules = array();
 		foreach ( $this->registry->get_rules_for_subset( $rule_ids ) as $rule ) {
+			if ( $rule instanceof BuilderScopedRule
+				&& in_array( $builder_type, $rule->excluded_builder_types(), true )
+			) {
+				continue;
+			}
 			$occurrences = $rule->countMatches( $current, $context );
 			if ( $occurrences > 0 ) {
 				$applied_rules[] = array(
@@ -170,8 +184,6 @@ final class DiffController extends BaseController {
 
 		$before = $this->metrics->compute( $html_before );
 		$after  = $this->metrics->compute( $html_after );
-
-		$builder_type = $this->classifier->classify( $post_id );
 
 		// Normalisation pour l'affichage : on fait passer les deux chaînes
 		// par le meme couple `parse_fragment` / `serialize_fragment` que les

@@ -9,7 +9,9 @@ declare( strict_types=1 );
 
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Diagnostics;
 
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use Cent_Son\Html_Normalizer\Core\Registry\PresetRegistry;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Core\Rules\RuleInterface;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticEngine;
 use Cent_Son\Html_Normalizer\Diagnostics\DiagnosticRecord;
@@ -159,6 +161,92 @@ final class DiagnosticEngineTest extends TestCase {
 		$record   = $engine->diagnose( $this->post( 1, '' ) );
 		$this->assertSame( DiagnosticRecord::STATUS_NORMAL, $record->status );
 		$this->assertSame( 0, $record->metrics['chars'] );
+	}
+
+	public function test_diagnose_skips_builder_scoped_rule_on_gutenberg(): void {
+		// Règle qui claimerait 5 matches mais est exclue de TYPE_GUTENBERG.
+		$scoped_rule = new class() implements RuleInterface, BuilderScopedRule {
+			public int $count_calls = 0;
+			public int $apply_calls = 0;
+			public function id(): string { return 'R_SCOPED'; }
+			public function label(): string { return 'R_SCOPED'; }
+			public function apply( string $html, array $context = [] ): string {
+				++$this->apply_calls;
+				return $html;
+			}
+			public function countMatches( string $html, array $context = [] ): int {
+				++$this->count_calls;
+				return 5;
+			}
+			public function excluded_builder_types(): array {
+				return array( BuilderClassifier::TYPE_GUTENBERG );
+			}
+		};
+
+		$registry   = $this->registry_with( array( $scoped_rule ) );
+		$classifier = new class() extends BuilderClassifier {
+			public function classify( int $post_id ): string {
+				return BuilderClassifier::TYPE_GUTENBERG;
+			}
+		};
+
+		$engine = new DiagnosticEngine( $registry, new MetricsCalculator(), $classifier );
+		$record = $engine->diagnose( $this->post( 99, '<p>x</p>' ) );
+
+		$this->assertSame( 0, $scoped_rule->count_calls, 'countMatches ne doit pas etre appele sur builder exclu' );
+		$this->assertSame( 0, $scoped_rule->apply_calls, 'apply ne doit pas etre appele sur builder exclu' );
+		$this->assertSame( array(), $record->matching_rules );
+		$this->assertSame( DiagnosticRecord::STATUS_NORMAL, $record->status );
+		$this->assertSame( BuilderClassifier::TYPE_GUTENBERG, $record->builder_type );
+	}
+
+	public function test_diagnose_applies_builder_scoped_rule_on_non_excluded_type(): void {
+		$scoped_rule = new class() implements RuleInterface, BuilderScopedRule {
+			public function id(): string { return 'R_SCOPED'; }
+			public function label(): string { return 'R_SCOPED'; }
+			public function apply( string $html, array $context = [] ): string { return $html; }
+			public function countMatches( string $html, array $context = [] ): int { return 5; }
+			public function excluded_builder_types(): array {
+				return array( BuilderClassifier::TYPE_GUTENBERG );
+			}
+		};
+
+		$registry   = $this->registry_with( array( $scoped_rule ) );
+		$classifier = new class() extends BuilderClassifier {
+			public function classify( int $post_id ): string {
+				return BuilderClassifier::TYPE_SITEORIGIN;
+			}
+		};
+
+		$engine = new DiagnosticEngine( $registry, new MetricsCalculator(), $classifier );
+		$record = $engine->diagnose( $this->post( 99, '<p>x</p>' ) );
+
+		$this->assertSame( DiagnosticRecord::STATUS_TO_IMPROVE, $record->status );
+		$this->assertSame( 'R_SCOPED', $record->matching_rules[0]['rule_id'] );
+		$this->assertSame( 5, $record->matching_rules[0]['occurrences'] );
+	}
+
+	public function test_diagnose_propagates_builder_type_in_context(): void {
+		$received_builder_type = null;
+		$rule                  = new class( $received_builder_type ) implements RuleInterface {
+			public function __construct( public ?string &$received_builder_type ) {}
+			public function id(): string { return 'PX'; }
+			public function label(): string { return 'PX'; }
+			public function apply( string $html, array $context = [] ): string { return $html; }
+			public function countMatches( string $html, array $context = [] ): int {
+				$this->received_builder_type = $context['builder_type'] ?? null;
+				return 0;
+			}
+		};
+		$registry   = $this->registry_with( array( $rule ) );
+		$classifier = new class() extends BuilderClassifier {
+			public function classify( int $post_id ): string {
+				return BuilderClassifier::TYPE_SITEORIGIN_FLAT;
+			}
+		};
+		$engine = new DiagnosticEngine( $registry, new MetricsCalculator(), $classifier );
+		$engine->diagnose( $this->post( 7, '<p>x</p>' ) );
+		$this->assertSame( BuilderClassifier::TYPE_SITEORIGIN_FLAT, $received_builder_type );
 	}
 
 	public function test_diagnose_passes_post_content_to_rules(): void {

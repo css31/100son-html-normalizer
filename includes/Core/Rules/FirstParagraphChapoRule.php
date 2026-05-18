@@ -64,6 +64,7 @@ namespace Cent_Son\Html_Normalizer\Core\Rules;
 defined( 'ABSPATH' ) || exit;
 
 use Cent_Son\Html_Normalizer\Core\Dom\DomHtml;
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -71,8 +72,13 @@ use DOMNode;
 /**
  * Règle R14 : marquage `class="chapo"` sur le premier paragraphe
  * phrase du fragment.
+ *
+ * Exclue de `gutenberg` (cf. `BuilderScopedRule`) : ajouter une classe
+ * `chapo` sur un `<p>` issu d'un bloc `core/paragraph` désynchronise
+ * l'attribut `className` sérialisé dans le `<!-- wp:paragraph {...} -->`
+ * en amont — Gutenberg signale "contenu invalide" à la réouverture.
  */
-final class FirstParagraphChapoRule implements RuleInterface {
+final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule {
 
 	/**
 	 * Seuil de mots minimum pour qualifier un `<p>` de chapô-phrase.
@@ -124,6 +130,13 @@ final class FirstParagraphChapoRule implements RuleInterface {
 	 */
 	public function label(): string {
 		return __( 'Marquage chapô (1er p)', '100son-html-normalizer' );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public function excluded_builder_types(): array {
+		return array( BuilderClassifier::TYPE_GUTENBERG );
 	}
 
 	/**

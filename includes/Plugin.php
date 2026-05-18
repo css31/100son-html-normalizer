@@ -310,6 +310,7 @@ final class Plugin {
 		$preset_registry = new PresetRegistry( $settings );
 		$pipeline        = new Pipeline();
 		$metrics         = new MetricsCalculator();
+		$classifier      = new BuilderClassifier();
 
 		return new StepRunner(
 			new StepsRepository(),
@@ -318,8 +319,9 @@ final class Plugin {
 			$pipeline,
 			$metrics,
 			new RegressionDetector(),
-			new DiagnosticEngine( $preset_registry, $metrics, new BuilderClassifier() ),
+			new DiagnosticEngine( $preset_registry, $metrics, $classifier ),
 			$settings,
+			$classifier,
 		);
 	}
 }

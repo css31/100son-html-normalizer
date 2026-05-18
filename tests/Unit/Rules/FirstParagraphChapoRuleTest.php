@@ -12,6 +12,8 @@ declare( strict_types=1 );
 
 namespace Cent_Son\Html_Normalizer\Tests\Unit\Rules;
 
+use Cent_Son\Html_Normalizer\Core\Posts\BuilderClassifier;
+use Cent_Son\Html_Normalizer\Core\Rules\BuilderScopedRule;
 use Cent_Son\Html_Normalizer\Core\Rules\FirstParagraphChapoRule;
 use Cent_Son\Html_Normalizer\Tests\Unit\HtmlAssertions;
 use PHPUnit\Framework\TestCase;
@@ -36,6 +38,11 @@ final class FirstParagraphChapoRuleTest extends TestCase {
 
 	public function test_label_is_not_empty(): void {
 		$this->assertNotEmpty( $this->rule->label() );
+	}
+
+	public function test_is_builder_scoped_and_excludes_gutenberg(): void {
+		$this->assertInstanceOf( BuilderScopedRule::class, $this->rule );
+		$this->assertSame( array( BuilderClassifier::TYPE_GUTENBERG ), $this->rule->excluded_builder_types() );
 	}
 
 	// =========================================================================
