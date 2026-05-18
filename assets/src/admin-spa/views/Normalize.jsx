@@ -324,43 +324,63 @@ export default function Normalize() {
 	return (
 		<div className="htmln-spa-root htmln-normalize">
 			<div className="htmln-normalize__actions">
-				<ScanBar
-					isScanning={ isScanning }
-					progress={ scanProgress }
-					error={ scanError }
-					disabled={ isRunning }
-					selectedPostCount={ selectedPostIds.size }
-					hasActiveFilters={ hasActiveFilters }
-					includeOk={ includeOk }
-					onToggleIncludeOk={ setIncludeOk }
-					lastFinalize={ scanLastFinalize }
-					onScan={ () => {
-						// Trois modes mutuellement exclusifs :
-						//   - sélection (cochés) : `filters` + include_ok ignorés serveur-side (mode chunk direct).
-						//   - filtres + include_ok : scope du scan complet via `/run`. La case
-						//     UI « Inclure les articles OK » est inversée par rapport à
-						//     l'API : décochée → `exclude_normalized = true`.
-						//   - corpus complet : aucun param de scope.
-						const hasSelection = selectedPostIds.size > 0;
-						const postIds = hasSelection
-							? Array.from( selectedPostIds )
-							: null;
-						const runFilters = hasSelection ? {} : filters;
-						const runExcludeNormalized = hasSelection
-							? false
-							: ! includeOk;
-						startScan( postIds, runFilters, runExcludeNormalized );
-					} }
-					onDismissError={ dismissScanError }
-					onDismissFinalize={ dismissScanError }
-				/>
+				<section
+					className="htmln-normalize__action-card htmln-normalize__action-card--scan"
+					aria-label={ __(
+						'Scanner le corpus',
+						'100son-html-normalizer'
+					) }
+				>
+					<ScanBar
+						isScanning={ isScanning }
+						progress={ scanProgress }
+						error={ scanError }
+						disabled={ isRunning }
+						selectedPostCount={ selectedPostIds.size }
+						hasActiveFilters={ hasActiveFilters }
+						includeOk={ includeOk }
+						onToggleIncludeOk={ setIncludeOk }
+						lastFinalize={ scanLastFinalize }
+						onScan={ () => {
+							// Trois modes mutuellement exclusifs :
+							//   - sélection (cochés) : `filters` + include_ok ignorés serveur-side (mode chunk direct).
+							//   - filtres + include_ok : scope du scan complet via `/run`. La case
+							//     UI « Inclure les articles OK » est inversée par rapport à
+							//     l'API : décochée → `exclude_normalized = true`.
+							//   - corpus complet : aucun param de scope.
+							const hasSelection = selectedPostIds.size > 0;
+							const postIds = hasSelection
+								? Array.from( selectedPostIds )
+								: null;
+							const runFilters = hasSelection ? {} : filters;
+							const runExcludeNormalized = hasSelection
+								? false
+								: ! includeOk;
+							startScan(
+								postIds,
+								runFilters,
+								runExcludeNormalized
+							);
+						} }
+						onDismissError={ dismissScanError }
+						onDismissFinalize={ dismissScanError }
+					/>
+				</section>
 
-				<ApplyStepBar
-					selectedRules={ applicableRules }
-					selectedPostCount={ selectedPostIds.size }
-					disabled={ isRunning }
-					onApplyStep={ handleApplyStep }
-				/>
+				<section
+					className="htmln-normalize__action-card htmln-normalize__action-card--apply"
+					aria-label={ __(
+						'Appliquer ce lot',
+						'100son-html-normalizer'
+					) }
+				>
+					<ApplyStepBar
+						selectedRules={ applicableRules }
+						selectedPostCount={ selectedPostIds.size }
+						disabled={ isRunning }
+						onApplyStep={ handleApplyStep }
+					/>
+				</section>
 			</div>
 
 			<FiltersBar

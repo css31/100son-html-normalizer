@@ -5,6 +5,12 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Onglet Normaliser — scission du bandeau Scan/Apply en deux cards (2026-05-18)
+
+Le panneau unique qui englobait `ScanBar` (« Scanner le corpus ») et `ApplyStepBar` (« Appliquer ce lot ») est scindé en deux cards distinctes (`htmln-normalize__action-card--scan` et `--apply`), chacune avec son propre fond / bordure / radius. Le wrapper `htmln-normalize__actions` redevient un simple layout container `flex-wrap` — côte à côte sur grand écran, empilées sur petit. Chaque card a un `aria-label` qui annonce son rôle aux technologies d'assistance.
+
+Bouton « Appliquer ce lot à N article(s) » repositionné en haut à gauche de sa card (`align-items: flex-start`), suivi en dessous du récap des règles activées. L'alignement à droite n'avait de sens que pour ancrer la barre au bord droit du panneau unique d'avant.
+
 ### Onglet Normaliser — case « Exclure » inversée en « Inclure les articles normalisés (OK) » (2026-05-18)
 
 La case à cocher de la barre de scan passe de « Exclure les articles déjà OK » (décochée par défaut, scan exhaustif) à « **Inclure les articles normalisés (OK)** » (**décochée par défaut**). Sémantique inversée mais surtout **changement de comportement par défaut** : le scan ne re-diagnostique plus systématiquement les articles déjà passés en succès. Pour les inclure à nouveau (par ex. après modification éditoriale massive), cocher la case.

@@ -345,29 +345,41 @@
  *  compteurs d'onglets en dessous.
  * ========================================================================== */
 
-/* Conteneur de la section actions (rc4) : panneau unique englobant
- * `.htmln-scan-bar` à gauche et `.htmln-normalize__apply-bar` à droite.
- * Le panneau (fond, bordure, radius) est porté par ce wrapper, pas par
- * ses enfants — il fournit le cadre commun aux deux actions. */
+/* Conteneur de la section actions (rc4 → 2026-05-18) : layout
+ * container nu qui range deux **cards distinctes** côte à côte
+ * (`.htmln-normalize__action-card--scan` et `--apply`). Le panneau
+ * (fond, bordure, radius, padding) est désormais porté par chaque
+ * card individuellement, plus par le wrapper. Sur écran étroit le
+ * `flex-wrap` empile naturellement les deux cards. */
 .htmln-normalize__actions {
 	margin: 0 0 16px;
+	display: flex;
+	align-items: stretch;
+	gap: var(--htmln-gap-lg);
+	flex-wrap: wrap;
+}
+
+/* Card individuelle de la section actions. Chacune contient une
+ * action métier autonome (scan diagnostique vs application d'un
+ * lot de règles) ; les deux étaient fusionnées dans un panneau
+ * unique avant 2026-05-18. */
+.htmln-normalize__action-card {
+	flex: 1 1 320px;
+	min-width: 240px;
 	padding: 12px 16px;
 	background: var(--htmln-bg-subtle);
 	border: 1px solid var(--htmln-border);
 	border-radius: var(--htmln-radius);
 	display: flex;
-	align-items: flex-start;
-	gap: var(--htmln-gap-lg);
-	flex-wrap: wrap;
+	flex-direction: column;
 }
 
 .htmln-scan-bar {
 
-	/* Plus de panneau propre : c'est `.htmln-normalize__actions` qui
-	 * porte fond/bordure/radius. Cette colonne se contente d'occuper
-	 * la moitié gauche du wrapper. */
-	flex: 1 1 280px;
-	min-width: 240px;
+	/* La card parent porte le cadre ; cette colonne occupe l'espace
+	 * disponible verticalement à l'intérieur. */
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .htmln-scan-bar__main {
@@ -709,20 +721,24 @@
 
 /* =============================================================================
  *  Vue Normaliser — barre « Appliquer ce lot »
- *  (rc4, dans `.htmln-normalize__actions`)
+ *  (rc4 → 2026-05-18 : isolée dans sa propre card `--apply`)
  *
- *  Colonne droite de la section actions. Pas de panneau propre — c'est
- *  le wrapper qui le porte. Layout interne : bouton primaire au-dessus,
- *  récap des règles dessous, le tout aligné à droite pour ancrer
- *  visuellement la colonne sur le bord droit du panneau.
+ *  Depuis 2026-05-18, la « Appliquer ce lot » vit dans sa propre card
+ *  (`.htmln-normalize__action-card--apply`) — le panneau (fond, bordure,
+ *  radius) est porté par la card, pas par la barre. Layout interne :
+ *  bouton primaire en haut à gauche, récap des règles dessous. Avant
+ *  la scission en deux cards, le bouton était ancré à droite pour
+ *  cohabiter avec ScanBar dans le panneau unique ; maintenant la card
+ *  lui appartient, et l'alignement à gauche s'aligne sur le rythme
+ *  visuel de ScanBar.
  * ========================================================================== */
 
 .htmln-normalize__apply-bar {
-	flex: 1 1 280px;
-	min-width: 240px;
+	flex: 1 1 auto;
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	align-items: flex-end;
+	align-items: flex-start;
 	gap: 8px;
 }
 
