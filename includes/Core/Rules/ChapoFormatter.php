@@ -1,17 +1,23 @@
 <?php
 /**
  * ChapoFormatter — utilitaire partagé par R13 et R14 pour le
- * nettoyage typographique d'un paragraphe chapô.
+ * nettoyage typographique d'un paragraphe chapô ou crédit.
  *
  * Règle éditoriale MMM : un chapô est un texte épuré, sans aucune
  * mise en forme inline résiduelle issue de l'éditeur SiteOrigin
  * (font-size, couleurs, centrages, gras/italique « visuels »). Seuls
  * les liens (`<a>`) doivent survivre — ils portent une information
  * sémantique (référence vers une source ou page), pas une décoration.
+ * Les paragraphes de crédit (« PHOTOS Cyrille Martin », « LA RÉDACTION »…)
+ * obéissent à la même règle typographique mais portent la classe `credit`
+ * plutôt que `chapo` — le paramètre optionnel `$class` de `clean()`
+ * sélectionne la classe finale.
  *
  * Le helper effectue, sur un `<p>` cible :
- *  1. **Réduction de la classe** à la seule `chapo` (drop des autres
- *     tokens éventuellement présents) ;
+ *  1. **Réduction de la classe** à la seule classe demandée (drop des
+ *     autres tokens éventuellement présents — y compris une éventuelle
+ *     classe `chapo` legacy posée par une ancienne version de R14
+ *     sur un paragraphe crédit) ;
  *  2. **Suppression de tous les autres attributs** (`style`, `id`,
  *     `data-*`, etc.) ;
  *  3. **Unwrap récursif** de tous les éléments inline descendants
@@ -48,7 +54,9 @@ use DOMNode;
 final class ChapoFormatter {
 
 	/**
-	 * Classe CSS canonique pour un chapô (alignée avec R13/R14).
+	 * Classe CSS canonique d'un chapô-lead (alignée avec R13/R14). Valeur
+	 * par défaut de l'argument `$class` de `clean()`. Pour un paragraphe
+	 * de crédit secondaire, le caller passe `'credit'`.
 	 */
 	private const CHAPO_CLASS = 'chapo';
 
@@ -67,24 +75,27 @@ final class ChapoFormatter {
 	private const PRESERVED_INLINE = 'a';
 
 	/**
-	 * Nettoie un `<p>` chapô selon les règles éditoriales MMM.
+	 * Nettoie un `<p>` chapô ou crédit selon les règles éditoriales MMM.
 	 *
-	 * @param DOMElement $p Paragraphe chapô (déjà marqué `class="chapo"`
-	 *                     ou candidat à l'être).
+	 * @param DOMElement $p     Paragraphe cible (chapô ou crédit).
+	 * @param string     $class Classe CSS finale (`chapo` par défaut,
+	 *                          `credit` pour les paragraphes secondaires
+	 *                          marqués par R14).
 	 * @return void
 	 */
-	public static function clean( DOMElement $p ): void {
-		self::reset_attributes( $p );
+	public static function clean( DOMElement $p, string $class = self::CHAPO_CLASS ): void {
+		self::reset_attributes( $p, $class );
 		self::clean_inline_descendants( $p );
 	}
 
 	/**
-	 * Réduit les attributs du `<p>` à un seul `class="chapo"`.
+	 * Réduit les attributs du `<p>` à un seul `class="$class"`.
 	 *
-	 * @param DOMElement $p Cible.
+	 * @param DOMElement $p     Cible.
+	 * @param string     $class Classe CSS finale à poser.
 	 * @return void
 	 */
-	private static function reset_attributes( DOMElement $p ): void {
+	private static function reset_attributes( DOMElement $p, string $class ): void {
 		// Collecte les noms d'attributs à supprimer (modifier la
 		// NamedNodeMap pendant itération est risqué).
 		$names_to_remove = array();
@@ -94,7 +105,7 @@ final class ChapoFormatter {
 		foreach ( $names_to_remove as $name ) {
 			$p->removeAttribute( $name );
 		}
-		$p->setAttribute( 'class', self::CHAPO_CLASS );
+		$p->setAttribute( 'class', $class );
 	}
 
 	/**

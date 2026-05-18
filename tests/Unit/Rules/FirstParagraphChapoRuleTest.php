@@ -299,20 +299,20 @@ final class FirstParagraphChapoRuleTest extends TestCase {
 	public function test_marks_la_redaction_credit_after_chapo(): void {
 		// MMM : chapô + LA RÉDACTION en signature.
 		$input    = '<p>Phrase de chapô assez longue avec ponctuation.</p><p>LA RÉDACTION</p><p>Premier paragraphe du corps.</p>';
-		$expected = '<p class="chapo">Phrase de chapô assez longue avec ponctuation.</p><p class="chapo">LA RÉDACTION</p><p>Premier paragraphe du corps.</p>';
+		$expected = '<p class="chapo">Phrase de chapô assez longue avec ponctuation.</p><p class="credit">LA RÉDACTION</p><p>Premier paragraphe du corps.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
 	public function test_marks_photos_credit_after_chapo(): void {
 		// MMM : chapô + PHOTOS Cyrille Martin.
 		$input    = '<p>Phrase de chapô assez longue avec ponctuation.</p><p>PHOTOS Cyrille Martin</p><p>Corps.</p>';
-		$expected = '<p class="chapo">Phrase de chapô assez longue avec ponctuation.</p><p class="chapo">PHOTOS Cyrille Martin</p><p>Corps.</p>';
+		$expected = '<p class="chapo">Phrase de chapô assez longue avec ponctuation.</p><p class="credit">PHOTOS Cyrille Martin</p><p>Corps.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
 	public function test_marks_photographe_credit_after_chapo(): void {
 		$input    = '<p>Phrase de chapô longue avec ponctuation.</p><p>Photographe : Cyrille Martin</p><p>Corps.</p>';
-		$expected = '<p class="chapo">Phrase de chapô longue avec ponctuation.</p><p class="chapo">Photographe : Cyrille Martin</p><p>Corps.</p>';
+		$expected = '<p class="chapo">Phrase de chapô longue avec ponctuation.</p><p class="credit">Photographe : Cyrille Martin</p><p>Corps.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
@@ -323,8 +323,8 @@ final class FirstParagraphChapoRuleTest extends TestCase {
 			. '<p>PHOTOS Cyrille Martin</p>'
 			. '<p>Premier vrai paragraphe.</p>';
 		$expected = '<p class="chapo">Phrase de chapô longue avec ponctuation.</p>'
-			. '<p class="chapo">LA RÉDACTION</p>'
-			. '<p class="chapo">PHOTOS Cyrille Martin</p>'
+			. '<p class="credit">LA RÉDACTION</p>'
+			. '<p class="credit">PHOTOS Cyrille Martin</p>'
 			. '<p>Premier vrai paragraphe.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
@@ -332,14 +332,14 @@ final class FirstParagraphChapoRuleTest extends TestCase {
 	public function test_marks_short_name_after_chapo(): void {
 		// MMM : chapô + nom isolé (« Cyrille Martin »).
 		$input    = '<p>Phrase de chapô longue avec ponctuation.</p><p>Cyrille Martin</p><p>Corps de l\'article.</p>';
-		$expected = '<p class="chapo">Phrase de chapô longue avec ponctuation.</p><p class="chapo">Cyrille Martin</p><p>Corps de l\'article.</p>';
+		$expected = '<p class="chapo">Phrase de chapô longue avec ponctuation.</p><p class="credit">Cyrille Martin</p><p>Corps de l\'article.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
 	public function test_stops_credits_at_first_body_paragraph(): void {
 		// Crédit puis paragraphe corps : on stoppe avant le corps.
 		$input    = '<p>Phrase de chapô longue assez avec ponctuation.</p><p>LA RÉDACTION</p><p>Une vraie phrase de corps avec ponctuation.</p><p>LA RÉDACTION</p>';
-		$expected = '<p class="chapo">Phrase de chapô longue assez avec ponctuation.</p><p class="chapo">LA RÉDACTION</p><p>Une vraie phrase de corps avec ponctuation.</p><p>LA RÉDACTION</p>';
+		$expected = '<p class="chapo">Phrase de chapô longue assez avec ponctuation.</p><p class="credit">LA RÉDACTION</p><p>Une vraie phrase de corps avec ponctuation.</p><p>LA RÉDACTION</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
@@ -353,7 +353,7 @@ final class FirstParagraphChapoRuleTest extends TestCase {
 	public function test_skips_empty_paragraphs_between_chapo_and_credit(): void {
 		// `<p>&nbsp;</p>` intercalaire entre chapô et crédit ne bloque pas.
 		$input    = '<p>Phrase de chapô longue assez avec ponctuation.</p><p>&nbsp;</p><p>LA RÉDACTION</p><p>Corps.</p>';
-		$expected = '<p class="chapo">Phrase de chapô longue assez avec ponctuation.</p><p>&nbsp;</p><p class="chapo">LA RÉDACTION</p><p>Corps.</p>';
+		$expected = '<p class="chapo">Phrase de chapô longue assez avec ponctuation.</p><p>&nbsp;</p><p class="credit">LA RÉDACTION</p><p>Corps.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
@@ -369,25 +369,56 @@ final class FirstParagraphChapoRuleTest extends TestCase {
 		// les 3 premiers sont marqués (MAX_CREDIT_PARAGRAPHS).
 		$input = '<p>Phrase de chapô longue assez avec ponctuation.</p>'
 			. '<p>Court 1</p><p>Court 2</p><p>Court 3</p><p>Court 4</p><p>Court 5</p>';
-		$actual    = $this->rule->apply( $input );
-		// Compte les <p class="chapo">
-		$count = preg_match_all( '/class="chapo"/i', $actual );
-		$this->assertSame( 4, $count, 'Chapô + 3 crédits = 4 marquages max' );
+		$actual = $this->rule->apply( $input );
+		// Chapô lead = 1 occurrence de class="chapo", crédits = N occurrences de class="credit".
+		$this->assertSame(
+			1,
+			preg_match_all( '/class="chapo"/i', $actual ),
+			'1 seul chapô-lead marqué'
+		);
+		$this->assertSame(
+			3,
+			preg_match_all( '/class="credit"/i', $actual ),
+			'3 crédits max (MAX_CREDIT_PARAGRAPHS), pas 4 ni 5'
+		);
 	}
 
 	public function test_credits_strip_inline_tags(): void {
 		// Inlines em/strong dans un crédit court → unwrappés, texte conservé.
 		$input    = '<p>Phrase de chapô longue assez avec ponctuation.</p><p><em>Cyrille Martin</em></p><p>Corps.</p>';
-		$expected = '<p class="chapo">Phrase de chapô longue assez avec ponctuation.</p><p class="chapo">Cyrille Martin</p><p>Corps.</p>';
+		$expected = '<p class="chapo">Phrase de chapô longue assez avec ponctuation.</p><p class="credit">Cyrille Martin</p><p>Corps.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
 	}
 
 	public function test_extends_when_first_p_already_chapo_marked_by_r13(): void {
 		// Cas typique pipeline R13 → R14 : R13 a démoté un h2-chapô en
-		// <p class="chapo">. R14 doit étendre aux crédits suivants.
+		// <p class="chapo">. R14 doit étendre aux crédits suivants en `credit`.
 		$input    = '<p class="chapo">Chapô longue déjà marqué par R13.</p><p>LA RÉDACTION</p><p>Corps.</p>';
-		$expected = '<p class="chapo">Chapô longue déjà marqué par R13.</p><p class="chapo">LA RÉDACTION</p><p>Corps.</p>';
+		$expected = '<p class="chapo">Chapô longue déjà marqué par R13.</p><p class="credit">LA RÉDACTION</p><p>Corps.</p>';
 		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
+	}
+
+	public function test_migrates_legacy_chapo_class_on_credit_paragraph(): void {
+		// Cas migration : un article déjà traité par l'ancienne R14
+		// (pré-2026-05-18) porte `class="chapo"` sur ses crédits.
+		// La nouvelle R14 doit les rebasculer en `class="credit"`.
+		$input    = '<p class="chapo">Chapô assez longue avec ponctuation.</p>'
+			. '<p class="chapo">PHOTOS Cyrille Martin</p>'
+			. '<p>Corps.</p>';
+		$expected = '<p class="chapo">Chapô assez longue avec ponctuation.</p>'
+			. '<p class="credit">PHOTOS Cyrille Martin</p>'
+			. '<p>Corps.</p>';
+		$this->assertHtmlEquals( $expected, $this->rule->apply( $input ) );
+	}
+
+	public function test_count_matches_signals_legacy_chapo_credit_migration(): void {
+		// countMatches doit déclarer une opération à venir quand un crédit
+		// porte un `class="chapo"` legacy — sinon scan=0 + apply modifie
+		// casse l'invariant d'idempotence du DiagnosticEngine.
+		$html = '<p class="chapo">Chapô longue avec ponctuation.</p>'
+			. '<p class="chapo">LA RÉDACTION</p>'
+			. '<p>Corps.</p>';
+		$this->assertSame( 1, $this->rule->countMatches( $html ) );
 	}
 
 	// =========================================================================

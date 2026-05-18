@@ -5,6 +5,32 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### R14 — paragraphes de crédit marqués `class="credit"` (2026-05-18)
+
+Les paragraphes secondaires « crédit » (signatures éditoriales et photo : « LA RÉDACTION », « PHOTOS Cyrille Martin », noms isolés…) reçoivent désormais leur propre classe `credit` plutôt que `chapo`. Permet une typographie distincte côté thème (taille, casse, italiques) sans confondre standfirst et crédit.
+
+**Avant** :
+```html
+<p class="chapo">Phrase de chapô.</p>
+<p class="chapo">PHOTOS Cyrille Martin</p>
+```
+**Après** :
+```html
+<p class="chapo">Phrase de chapô.</p>
+<p class="credit">PHOTOS Cyrille Martin</p>
+```
+
+**Migration automatique** : un article déjà traité par l'ancienne R14 porte `class="chapo"` sur ses crédits. La nouvelle R14 le détecte (l'algorithme de détection des crédits ne change pas) et appelle `ChapoFormatter::clean( $p, 'credit' )` — qui reset les attributs avant de poser la classe finale, donc le `chapo` legacy disparaît au passage. `countMatches()` signale 1 opération à venir dans ce cas (préserve l'invariant scan vs apply du DiagnosticEngine).
+
+**Implémentation** :
+- Nouvelle constante `CREDIT_CLASS = 'credit'` dans `FirstParagraphChapoRule`, helpers `already_has_credit_class()` et `has_class_token()` (factorisation de `already_has_chapo_class`).
+- `ChapoFormatter::clean()` gagne un paramètre `string $class = 'chapo'` pour sélectionner la classe finale. R14 passe `CREDIT_CLASS` pour les crédits, R13 et le chapô-lead restent inchangés (défaut).
+- Exemple SPA de la règle R14 (`Rules.jsx`) mis à jour pour refléter le nouveau rendu attendu.
+
+**Côté thème** : la classe `.credit` n'est pas stylée par le plugin — c'est au thème MMM d'ajouter une règle CSS si une typographie distincte est souhaitée (sans changement, les `<p class="credit">` héritent du style `<p>` par défaut).
+
+**Tests** : 56 PHPUnit verts sur R14 (12 chaînes attendues mises à jour, 2 tests neufs : migration legacy `chapo → credit` et `countMatches` signalant la migration). 1063 PHPUnit verts au total, PHPStan `[OK] No errors`.
+
 ### Colonne « Date » dans la liste Normaliser (2026-05-18)
 
 Ajout d'une colonne « Date » (format `dd/MM/yyyy` en `fr-FR`) juste après le Titre dans `ArticlesTable.jsx`, alimentée par `post_date` déjà exposé par `DiagnosticsController::diagnostic_to_array()`. Nouveau helper `formatLocalDate()` dans `utils/datetime.js` — `post_date` étant stocké en heure locale du site (et non UTC comme `diagnosed_at`), il s'appuie sur `parseLocalDatetime()` plutôt que `parseUtcDatetime()`. Aucun changement backend, aucun changement de schéma.

@@ -12,16 +12,26 @@
  *
  *   <p>Basée sur la région toulousaine, Laetitia Moreau de l'Atelier
  *   In Vitro décline le verre en aménagement intérieur…</p>
+ *   <p>PHOTOS Cyrille Martin</p>
  *
  *   devient :
  *
  *   <p class="chapo">Basée sur la région toulousaine, Laetitia Moreau
  *   de l'Atelier In Vitro décline le verre en aménagement intérieur…</p>
+ *   <p class="credit">PHOTOS Cyrille Martin</p>
  *
  * Complément de R13 (h2-chapô → p.chapo) : ensemble, R13 et R14
  * homogénéisent le marquage `class="chapo"` sur **toute** la
  * population de chapôs du corpus, qu'ils soient initialement en h2
- * ou en p.
+ * ou en p. Les paragraphes secondaires « crédit » (signatures
+ * éditoriales et photo : « LA RÉDACTION », « PHOTOS Cyrille
+ * Martin », noms isolés…) reçoivent depuis 2026-05-18 leur propre
+ * classe `credit` plutôt que `chapo` — permet une typographie
+ * distincte côté thème (taille, casse, italiques) sans confondre
+ * standfirst et crédit. Le passage `chapo → credit` est appliqué
+ * automatiquement aux articles déjà traités par l'ancienne R14 via
+ * `ChapoFormatter::clean( $p, 'credit' )` qui reset les attributs
+ * du `<p>` avant de poser la classe finale.
  *
  * Critères de match (cumulatifs) :
  *  - le **premier élément significatif** du fragment est un `<p>`
@@ -87,10 +97,22 @@ final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule 
 	private const MIN_WORD_COUNT = 5;
 
 	/**
-	 * Classe CSS ajoutée au `<p>`. Aligné sur R13 et la convention
-	 * française pour un chapô / lead.
+	 * Classe CSS ajoutée au `<p>` chapô-lead. Aligné sur R13 et la
+	 * convention française pour un chapô / lead.
 	 */
 	private const CHAPO_CLASS = 'chapo';
+
+	/**
+	 * Classe CSS posée sur les paragraphes secondaires « crédit » qui
+	 * suivent le chapô-lead (signatures éditoriales et photo : « LA
+	 * RÉDACTION », « PHOTOS Cyrille Martin », noms isolés, etc.). Avant
+	 * 2026-05-18 ces paragraphes recevaient `chapo` ; ils ont maintenant
+	 * leur propre classe pour permettre une typographie distincte côté
+	 * thème (la migration des articles déjà traités par l'ancienne R14
+	 * passe naturellement via `ChapoFormatter::clean( $p, 'credit' )` qui
+	 * écrase l'éventuel `chapo` legacy).
+	 */
+	private const CREDIT_CLASS = 'credit';
 
 	/**
 	 * Nombre maximum de `<p>` crédit consécutifs marqués comme chapô
@@ -340,7 +362,11 @@ final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule 
 			if ( ! self::is_credit_paragraph( $text ) ) {
 				return $count;
 			}
-			if ( ! self::already_has_chapo_class( $sibling ) ) {
+			if ( ! self::already_has_credit_class( $sibling ) ) {
+				// Inclut le cas migration : un `<p class="chapo">PHOTOS …</p>`
+				// posé par l'ancienne R14 (avant 2026-05-18) sera rebaptisé
+				// `credit` par apply(), donc compte comme une opération à
+				// venir pour countMatches.
 				++$count;
 			}
 			++$marked;
@@ -379,6 +405,30 @@ final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule 
 	 * @return bool
 	 */
 	private static function already_has_chapo_class( DOMElement $element ): bool {
+		return self::has_class_token( $element, self::CHAPO_CLASS );
+	}
+
+	/**
+	 * Indique si l'attribut `class` d'un élément contient déjà le
+	 * token `credit` (séparé par des espaces). Utilisé pour qualifier
+	 * l'idempotence du marquage crédit posé par
+	 * `extend_chapo_to_credit_paragraphs()`.
+	 *
+	 * @param DOMElement $element Élément testé.
+	 * @return bool
+	 */
+	private static function already_has_credit_class( DOMElement $element ): bool {
+		return self::has_class_token( $element, self::CREDIT_CLASS );
+	}
+
+	/**
+	 * Indique si l'attribut `class` d'un élément contient un token donné.
+	 *
+	 * @param DOMElement $element Élément testé.
+	 * @param string     $token   Nom du token CSS recherché.
+	 * @return bool
+	 */
+	private static function has_class_token( DOMElement $element, string $token ): bool {
 		$classes = $element->getAttribute( 'class' );
 		if ( '' === $classes ) {
 			return false;
@@ -387,7 +437,7 @@ final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule 
 		if ( false === $tokens ) {
 			return false;
 		}
-		return in_array( self::CHAPO_CLASS, $tokens, true );
+		return in_array( $token, $tokens, true );
 	}
 
 	/**
@@ -411,10 +461,18 @@ final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule 
 	}
 
 	/**
-	 * Étend le marquage `chapo` aux `<p>` suivants qui sont des
+	 * Marque les `<p>` suivants en `class="credit"` quand ce sont des
 	 * paragraphes de crédits (« LA RÉDACTION », « PHOTOS Cyrille
-	 * Martin », noms isolés…). On considère le chapô MMM comme un
-	 * **bloc** : phrase-lead + 1 à 3 paragraphes signature/crédit.
+	 * Martin », noms isolés…). Le chapô MMM est conçu comme un
+	 * **bloc** : phrase-lead `<p class="chapo">` + 1 à 3 paragraphes
+	 * signature/crédit `<p class="credit">`.
+	 *
+	 * Avant 2026-05-18, ces paragraphes recevaient eux aussi
+	 * `class="chapo"`. Le passage à `credit` se fait via
+	 * `ChapoFormatter::clean( $sibling, 'credit' )` qui reset les
+	 * attributs avant de poser la classe finale — un `<p class="chapo">`
+	 * legacy posé sur un crédit est donc rebaptisé naturellement, sans
+	 * code de migration dédié.
 	 *
 	 * Critères de continuité (OR) pour un `<p>` candidat crédit :
 	 *  - matche un pattern explicite (`CREDIT_PATTERN`) ;
@@ -469,11 +527,11 @@ final class FirstParagraphChapoRule implements RuleInterface, BuilderScopedRule 
 				return; // Premier `<p>` non-crédit = corps de l'article.
 			}
 
-			if ( ! self::already_has_chapo_class( $sibling ) ) {
-				self::add_chapo_class( $sibling );
-			}
-			// Nettoyage typographique (idempotent si déjà clean).
-			ChapoFormatter::clean( $sibling );
+			// Nettoyage typographique + pose `class="credit"` (idempotent
+			// si déjà clean ; rebascule un éventuel `class="chapo"` legacy
+			// posé par l'ancienne R14 vers `credit` — `ChapoFormatter::clean`
+			// reset les attributs avant de poser la classe finale).
+			ChapoFormatter::clean( $sibling, self::CREDIT_CLASS );
 			++$marked;
 			$sibling = $sibling->nextSibling;
 		}
