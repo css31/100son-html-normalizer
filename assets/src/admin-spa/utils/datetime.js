@@ -88,3 +88,28 @@ export function formatLocalDateTime( sqlStr, options = {} ) {
 	}
 	return date.toLocaleString( locale, { dateStyle, timeStyle } );
 }
+
+/**
+ * Formate une string MySQL DATETIME stockée en **heure locale du site**
+ * (typiquement `wp_posts.post_date`) en date seule, sans l'heure. Combine
+ * `parseLocalDatetime()` + `toLocaleDateString( 'fr-FR', ... )`.
+ *
+ * Le format par défaut (`dateStyle: 'short'`, locale `fr-FR`) produit
+ * « 16/05/2026 » — la convention « jour/mois/année » française attendue
+ * pour la date de publication d'un article dans la liste Normaliser.
+ *
+ * @param {?string}                                 sqlStr                      String MySQL en heure locale.
+ * @param {Object}                                  [options]                   Options surcharge.
+ * @param {Intl.DateTimeFormatOptions['dateStyle']} [options.dateStyle='short'] Style date.
+ * @param {string}                                  [options.locale='fr-FR']    Locale i18n.
+ * @param {string}                                  [options.fallback='—']      Texte si parse échoue.
+ * @return {string} Date formatée ou fallback.
+ */
+export function formatLocalDate( sqlStr, options = {} ) {
+	const { dateStyle = 'short', locale = 'fr-FR', fallback = '—' } = options;
+	const date = parseLocalDatetime( sqlStr );
+	if ( null === date ) {
+		return fallback;
+	}
+	return date.toLocaleDateString( locale, { dateStyle } );
+}

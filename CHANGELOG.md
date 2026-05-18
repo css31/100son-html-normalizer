@@ -5,6 +5,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versi
 
 ## [Unreleased]
 
+### Colonne « Date » dans la liste Normaliser (2026-05-18)
+
+Ajout d'une colonne « Date » (format `dd/MM/yyyy` en `fr-FR`) juste après le Titre dans `ArticlesTable.jsx`, alimentée par `post_date` déjà exposé par `DiagnosticsController::diagnostic_to_array()`. Nouveau helper `formatLocalDate()` dans `utils/datetime.js` — `post_date` étant stocké en heure locale du site (et non UTC comme `diagnosed_at`), il s'appuie sur `parseLocalDatetime()` plutôt que `parseUtcDatetime()`. Aucun changement backend, aucun changement de schéma.
+
 ### Scope par constructeur — R6 et R14 exclues des articles Gutenberg (2026-05-18)
 
 Les règles **R6** (`RemoveInlineStylesRule`) et **R14** (`FirstParagraphChapoRule`) ne s'appliquent plus aux articles classifiés `gutenberg` par `BuilderClassifier`. Motivation : sur du contenu Gutenberg natif, retirer les `style="..."` désynchronise les attributs JSON sérialisés dans les commentaires `<!-- wp:* {...} -->` (R6), et ajouter `class="chapo"` à un `<p>` issu d'un bloc `core/paragraph` casse l'invariant `className` (R14) — les deux produisent "contenu invalide" à la réouverture du bloc dans l'éditeur.

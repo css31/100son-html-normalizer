@@ -26,7 +26,12 @@ import { Spinner, Button } from '@wordpress/components';
 import BuilderBadge from './BuilderBadge';
 import PaginationBar from './PaginationBar';
 import { buildExternalUrl } from '../../utils/buildExternalUrl';
-import { formatLocalDateTime, parseUtcDatetime } from '../../utils/datetime';
+import {
+	formatLocalDate,
+	formatLocalDateTime,
+	parseLocalDatetime,
+	parseUtcDatetime,
+} from '../../utils/datetime';
 import {
 	getRuleLabel,
 	getRuleTooltip,
@@ -297,6 +302,16 @@ export default function ArticlesTable( {
 						<th scope="col" className="manage-column">
 							{ __( 'Titre', '100son-html-normalizer' ) }
 						</th>
+						<th
+							scope="col"
+							className="manage-column"
+							title={ __(
+								'Date de publication de l’article',
+								'100son-html-normalizer'
+							) }
+						>
+							{ __( 'Date', '100son-html-normalizer' ) }
+						</th>
 						{ showOpenOnColumn && (
 							<th scope="col" className="manage-column">
 								{ __(
@@ -424,6 +439,17 @@ export default function ArticlesTable( {
 										</a>
 									) }
 								</div>
+							</td>
+							<td>
+								<time
+									dateTime={
+										parseLocalDatetime(
+											item.post_date
+										)?.toISOString() ?? ''
+									}
+								>
+									{ formatLocalDate( item.post_date ) }
+								</time>
 							</td>
 							{ showOpenOnColumn && (
 								<td>
